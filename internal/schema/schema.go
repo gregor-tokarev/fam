@@ -203,10 +203,48 @@ func writeAtomic(path string, data []byte) error {
 }
 
 // uriPattern finds the URI of the fam dependency in a PklProject file: `uri = "package://…"`.
-var uriPattern = regexp.MustCompile(`(uri\s*=\s*")package://` + regexp.QuoteMeta(releaseBase) + `[^"/\s]+/fam@[^"\s]+(")`)
+var uriPattern = regexp.MustCompile(`(uri\s*=\s*#*")package://` + regexp.QuoteMeta(releaseBase) + `[^"/\s]+/fam@[^"\s]+("#*)`)
 
-// versionPattern is a semantic version (1.2.3, 1.2.3-rc.1).
-var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
+// versionPattern is a semantic version 2.0.0 (the regular expression of semver.org).
+var versionPattern = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+
+// commentStart finds the start of a comment (`//` or `/*`) after the start of a line or a
+// space. The `//` of a URI (`package://`) does not match.
+var commentStart = regexp.MustCompile(`(^|\s)(//|/\*)`)
+
+// replaceURI replaces the URI of the fam dependency in the code of a PklProject file, not in its
+// comments. It returns the number of URIs that it found.
+func replaceURI(b []byte, uri string) ([]byte, int) {
+	lines := strings.SplitAfter(string(b), "\n")
+	n := 0
+	block := false // in a /* */ comment
+	for i, line := range lines {
+		from := 0
+		if block {
+			end := strings.Index(line, "*/")
+			if end < 0 {
+				continue
+			}
+			block = false
+			from = end + 2
+		}
+		to := len(line)
+		if m := commentStart.FindStringSubmatchIndex(line[from:]); m != nil {
+			to = from + m[4]
+			if line[to:to+2] == "/*" && !strings.Contains(line[to:], "*/") {
+				block = true
+			}
+		}
+		code := line[from:to]
+		k := len(uriPattern.FindAllStringIndex(code, -1))
+		if k == 0 {
+			continue
+		}
+		n += k
+		lines[i] = line[:from] + uriPattern.ReplaceAllString(code, "${1}"+uri+"${2}") + line[to:]
+	}
+	return []byte(strings.Join(lines, "")), n
+}
 
 // projectFile is the PklProject that `fam new` and `fam migrate` write.
 func projectFile(v string) string {
@@ -230,16 +268,22 @@ func WriteProject(base string, p *Package) error {
 		b = []byte(projectFile(p.Version))
 	case err != nil:
 		return err
-	case len(uriPattern.FindAll(b, -1)) == 1:
-		b = uriPattern.ReplaceAll(b, []byte("${1}"+URI(p.Version)+"${2}"))
-	case uriPattern.Match(b):
-		return fmt.Errorf("%s has more than one fam dependency URI. Keep one: `[\"fam\"] { uri = %q }`", pp, URI(p.Version))
 	default:
+		nb, n := replaceURI(b, URI(p.Version))
+		if n == 1 {
+			b = nb
+			break
+		}
+		if n > 1 {
+			return fmt.Errorf("%s has more than one fam dependency URI. Keep one: `[\"fam\"] { uri = %q }`", pp, URI(p.Version))
+		}
 		return fmt.Errorf("%s has no fam dependency. Add `[\"fam\"] { uri = %q }` to its `dependencies`, then run `fam migrate` again", pp, URI(p.Version))
 	}
 	deps := map[string]any{}
 	dp := filepath.Join(base, DepsFile)
-	if old, err := os.ReadFile(dp); err == nil {
+	if old, err := os.ReadFile(dp); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	} else if err == nil {
 		if err := json.Unmarshal(old, &deps); err != nil {
 			return fmt.Errorf("read %s: %w", dp, err)
 		}
