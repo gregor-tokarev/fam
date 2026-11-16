@@ -62,7 +62,16 @@ FAM downloads `pkl` 0.33.0 from the GitHub release on first use into `<user cach
 
 A standard bundle installs only its tool, and `fam.GitHubSkill` tasks get the skills from the tool's GitHub repository. FAM vendors no skills, and a standard bundle does not install a browser, a runtime, or system packages. A standard bundle always installs a tool: a skill alone is not a standard bundle. Without a `ref`, the skills come from the latest GitHub release. That is usually the version that the package manager installs, but a registry can be ahead of or behind GitHub.
 
-Acceptance scenario 16 applies all standard bundles. A new standard bundle goes into a group folder (`bundles/<group>/`) and its group class in `std.pkl`, the fixture `config-std-all.pkl`, and the skill list of the scenario.
+Acceptance scenario 16 applies all standard bundles. A new standard bundle goes into `bundles/<group>/<name>.pkl` and `std/<group>.pkl`. The group module keeps typed bundle properties and doc comments for editor completion. `std.pkl` imports the groups. Scenario 16 discovers bundles from these modules and reads the expected skills from its first plan. A bundle can set `supported` from machine facts when its tool needs a specific platform.
+
+Generate the [standard bundle catalogue](std.md) after a bundle change:
+
+```sh
+go run ./cmd/fam internal std-docs
+go run ./cmd/fam internal std-docs --check
+```
+
+The command evaluates the embedded package with fixed Ubuntu 26.04 amd64 facts. It does not download skills or install tools. CI runs the check.
 
 ## Acceptance harness
 
@@ -72,3 +81,34 @@ Acceptance scenario 16 applies all standard bundles. A new standard bundle goes 
 go run ./acceptance prepare ubuntu-26.04   # download is separate: put the cloud image in ~/.cache/fam-acceptance/images
 go run ./acceptance run ubuntu-26.04
 ```
+
+## Package tasks
+
+`PackageRef` selects `uv`, `cargo`, or `go` for user tools. Cargo and Go install into `~/.local/bin`. The manager must exist first. `system` selects brew on macOS, or apt, dnf, pacman, or apk from the Linux facts. Unknown distributions need an explicit manager.
+
+```pkl
+new fam.Package {
+  package = new fam.PackageRef {
+    package = "fd"
+    manager = "system"
+    names { ["apt"] = "fd-find" }
+  }
+  binary = if (facts.distro == "ubuntu") "fdfind" else "fd"
+}
+```
+
+`GitHubRelease` installs one binary without sudo. Assets can be bare binaries, tar.gz archives, or zip archives. An archive needs the file path of its binary. Asset names and archive paths can use `{tag}` or `{version}`. The latter removes the leading `v`.
+
+```pkl
+new fam.GitHubRelease {
+  repo = "junegunn/fzf"
+  binary = "fzf"
+  assets {
+    ["linux-amd64"] { name = "fzf-{version}-linux_amd64.tar.gz"; format = "tar.gz"; file = "fzf" }
+    ["linux-arm64"] { name = "fzf-{version}-linux_arm64.tar.gz"; format = "tar.gz"; file = "fzf" }
+    ["darwin-arm64"] { name = "fzf-{version}-darwin_arm64.tar.gz"; format = "tar.gz"; file = "fzf" }
+  }
+}
+```
+
+Set `tag` to pin a release. FAM finds the latest tag otherwise. FAM downloads on the cockpit and uses the GitHub cache with ETags, size limits, and retries. It checks SHA-256 checksum assets when present. Set `checksum` on an asset for a nonstandard checksum name. Plan compares `<binary> --version` with the release tag. Set `versionCommand` when the tool needs another command. Its output must contain the tag as a word, with or without the leading `v`. An absent task or bundle removes the binary.

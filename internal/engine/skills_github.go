@@ -139,7 +139,7 @@ func latestRelease(ctx context.Context, repo string) (string, error) {
 	// The tag is everything after /releases/tag/. A tag can contain slashes (skills/v1).
 	_, tag, ok := strings.Cut(loc, "/releases/tag/")
 	if resp.StatusCode < 300 || resp.StatusCode >= 400 || !ok || tag == "" {
-		return "", fmt.Errorf("%s has no release (HTTP %d from %s). Set `ref` of the skill to a tag, branch, or commit", repo, resp.StatusCode, u)
+		return "", fmt.Errorf("%s has no release (HTTP %d from %s). Set `ref` for a skill, or `tag` for a release binary", repo, resp.StatusCode, u)
 	}
 	if t, err := url.PathUnescape(tag); err == nil {
 		tag = t
@@ -209,8 +209,7 @@ func badArchive(u string, err error) error {
 // full disk).
 var errNoCache = errors.New("the cache folder cannot keep the archive")
 
-// A cached archive file starts with a line that holds the ETag of the download. The gzip data
-// follows.
+// A cached download starts with a line that holds its ETag. The downloaded bytes follow.
 
 // archiveCache holds the archive of each repository and ref that this run checked. The lock of
 // an entry makes all skills of one repository and ref wait for one download.
@@ -224,7 +223,7 @@ var archiveCache = struct {
 type runArchive struct {
 	mu      sync.Mutex
 	file    *os.File
-	data    int64 // offset of the gzip data
+	data    int64 // offset of the downloaded bytes
 	size    int64
 	bad     *os.File // the file that a reader found damaged
 	noCache bool     // the cache folder cannot keep this archive in this run
@@ -240,6 +239,11 @@ func (a *runArchive) reader() io.Reader {
 // downloaded again (once for each damaged file). With errNoCache, direct is a started download
 // that the caller reads (nil when there is none).
 func cachedArchiveFor(ctx context.Context, repo, ref, u string, repair bool) (a *runArchive, direct *stallReader, err error) {
+	return cachedDownloadFor(ctx, repo, ref, u, repair, maxArchive)
+}
+
+// cachedDownloadFor also serves release assets, with a separate key and size limit.
+func cachedDownloadFor(ctx context.Context, repo, ref, u string, repair bool, limit int64) (a *runArchive, direct *stallReader, err error) {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		return nil, nil, errNoCache
@@ -278,7 +282,7 @@ func cachedArchiveFor(ctx context.Context, repo, ref, u string, repair bool) (a 
 			etag, _ = readETag(f)
 		}
 	}
-	f, direct, err := refreshArchive(ctx, dir, path, u, old, etag)
+	f, direct, err := refreshArchive(ctx, dir, path, u, old, etag, limit)
 	if errors.Is(err, errNoCache) {
 		// Every later skill of this archive also reads its own download.
 		a.noCache = true
@@ -313,7 +317,7 @@ func cachedArchiveFor(ctx context.Context, repo, ref, u string, repair bool) (a 
 // atomic rename. refreshArchive closes old when it does not return it. When the cache folder
 // cannot take the archive before FAM read any data, it returns errNoCache with the download as
 // direct.
-func refreshArchive(ctx context.Context, dir, path, u string, old *os.File, etag string) (*os.File, *stallReader, error) {
+func refreshArchive(ctx context.Context, dir, path, u string, old *os.File, etag string, limit int64) (*os.File, *stallReader, error) {
 	if old != nil && etag == "" {
 		old.Close()
 		old = nil
@@ -328,7 +332,7 @@ func refreshArchive(ctx context.Context, dir, path, u string, old *os.File, etag
 	if body == nil {
 		return old, nil, nil // 304
 	}
-	f, err := saveArchive(dir, path, u, body)
+	f, err := saveArchive(dir, path, u, body, limit)
 	if errors.Is(err, errNoCache) && !body.started.Load() {
 		return nil, body, err
 	}
@@ -338,7 +342,7 @@ func refreshArchive(ctx context.Context, dir, path, u string, old *os.File, etag
 
 // saveArchive writes a download into a temporary file in the cache folder, renames it to path,
 // and returns it open. An error of the cache folder gives errNoCache.
-func saveArchive(dir, path, u string, body *stallReader) (*os.File, error) {
+func saveArchive(dir, path, u string, body *stallReader, limit int64) (*os.File, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, errNoCache
 	}
@@ -357,7 +361,7 @@ func saveArchive(dir, path, u string, body *stallReader) (*os.File, error) {
 	if _, err := fmt.Fprintf(w, "%s\n", body.etag); err != nil {
 		return nil, errNoCache
 	}
-	if _, err := io.Copy(w, &capReader{r: body, left: maxArchive}); err != nil {
+	if _, err := io.Copy(w, &capReader{r: body, left: limit}); err != nil {
 		if w.err != nil {
 			return nil, errNoCache
 		}

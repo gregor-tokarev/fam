@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 )
 
+var stdGroups = os.Getenv("FAM_STD_GROUPS")
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: acceptance prepare|up|run|clean ...")
@@ -58,6 +60,7 @@ func main() {
 	case "run":
 		fs := flag.NewFlagSet("run", flag.ExitOnError)
 		scen := fs.String("scenarios", "", "comma separated scenario numbers (default: all)")
+		fs.StringVar(&stdGroups, "std-groups", stdGroups, "comma separated standard groups for scenario 16 (default: all)")
 		fam := fs.String("fam", "", "fam binary (default: build it)")
 		fs.Parse(os.Args[2:])
 		if err := runMatrix(ctx, w, fs.Args(), *scen, *fam); err != nil {

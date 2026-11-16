@@ -21,6 +21,7 @@ type Facts struct {
 	Distro        string `json:"distro" toon:"distro"`
 	DistroVersion string `json:"distroVersion" toon:"distroVersion"`
 	Arch          string `json:"arch" toon:"arch"`
+	Libc          string `json:"libc" toon:"libc"`
 	CPUs          int    `json:"cpus" toon:"cpus"`
 	Home          string `json:"home" toon:"home"`
 	User          string `json:"user" toon:"user"`
@@ -42,6 +43,7 @@ func (f Facts) Properties() map[string]string {
 		"fam.distro":        f.Distro,
 		"fam.distroVersion": f.DistroVersion,
 		"fam.arch":          f.Arch,
+		"fam.libc":          f.Libc,
 		"fam.cpus":          strconv.Itoa(f.CPUs),
 		"fam.home":          f.Home,
 		"fam.user":          f.User,
@@ -67,6 +69,15 @@ if [ "$k" = Darwin ]; then
   echo "shell=$(dscl . -read "/Users/$(id -un)" UserShell 2>/dev/null | awk '{print $2}')"
 elif [ -r /etc/os-release ]; then
   ( . /etc/os-release; echo "distro=${ID:-linux}"; echo "distroVersion=${VERSION_ID:-}" )
+fi
+if [ "$k" = Linux ]; then
+  if getconf GNU_LIBC_VERSION >/dev/null 2>&1; then echo libc=glibc
+  elif ldd --version 2>&1 | grep -qi musl; then echo libc=musl
+  else
+    for loader in /lib/ld-musl-*.so.1; do
+      if [ -f "$loader" ]; then echo libc=musl; break; fi
+    done
+  fi
 fi
 if [ "$k" != Darwin ]; then
   echo "cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null)"
@@ -120,6 +131,7 @@ func Collect(ctx context.Context, t transport.Transport, machine, role string) (
 		Init:          kv["init"],
 		Shell:         kv["shell"],
 		BashSSHRC:     kv["bashsshrc"] == "yes",
+		Libc:          kv["libc"],
 	}
 	switch kernel {
 	case "Linux":

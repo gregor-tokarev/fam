@@ -14,6 +14,7 @@ import "../../facts.pkl"
 name = "agent-desktop"
 description = "Computer use CLI for AI agents"
 version = "@FAM_VERSION@"
+supported = facts.distro != "alpine"
 tasks {
   new fam.Package {
     package = "agent-desktop"

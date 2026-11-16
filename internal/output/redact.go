@@ -69,6 +69,9 @@ func Redact(run *Run, values []string) {
 		if f := m.Facts; f != nil {
 			f.Machine, f.Hostname, f.User, f.Home = s(f.Machine), s(f.Hostname), s(f.User), s(f.Home)
 		}
+		for j := range m.Warnings {
+			m.Warnings[j] = s(m.Warnings[j])
+		}
 		for j := range m.Tasks {
 			t := &m.Tasks[j]
 			t.Group, t.Name, t.Detail, t.Error = s(t.Group), s(t.Name), s(t.Detail), s(t.Error)

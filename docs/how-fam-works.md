@@ -74,11 +74,14 @@ User scripts (`Script`, `Package`) run in Bash when the machine has Bash, else i
 | `~/.claude/CLAUDE.md` | A link to `~/.agents/CLAUDE.md`. |
 | `~/.agents/skills/<name>/` | A copy of each skill, with a `.fam-managed` marker file. |
 | `~/.claude/skills/<name>` | A link to `~/.agents/skills/<name>`. |
+| `~/.local/bin/<binary>` | A binary from a `GitHubRelease` task. |
+| `~/.local/state/fam/releases/<binary>.json` | The repository and SHA-256 of a binary that FAM installed. |
 
-FAM stores no state. It finds what it manages from the content:
+FAM uses markers and release records to find what it manages:
 
 - Instruction files start with a marker line that holds the SHA-256 of the rest of the file. A file without the marker, or with a different digest, was not written by FAM (or was changed by hand). FAM saves a copy (`<file>.fam-backup-<time>`) before it replaces such a file.
 - A skill folder with `.fam-managed` belongs to FAM. A skill folder or a Claude skill link that FAM did not make is a conflict: the plan stops, and `fam apply` changes nothing on that machine. FAM removes managed skills that the config no longer lists.
+- A release binary without a FAM record is a conflict. Plan stops, and apply changes nothing on that machine. Remove the file, then apply to let FAM manage it. FAM replaces a managed binary after a hand change. An absent bundle removes only its managed binary and record.
 
 ## Instruction templates
 
@@ -87,7 +90,7 @@ FAM stores no state. It finds what it manages from the content:
 | Variable | Content |
 |---|---|
 | `.Machine.Name`, `.Machine.Role`, `.Machine.Address`, `.Machine.User` | The machine entry. |
-| `.Facts.OS`, `.Facts.Distro`, `.Facts.DistroVersion`, `.Facts.Arch`, `.Facts.CPUs`, `.Facts.Home`, `.Facts.User`, `.Facts.Hostname`, `.Facts.Init`, `.Facts.Shell`, `.Facts.Machine`, `.Facts.Role` | The facts. |
+| `.Facts.OS`, `.Facts.Distro`, `.Facts.DistroVersion`, `.Facts.Arch`, `.Facts.Libc`, `.Facts.CPUs`, `.Facts.Home`, `.Facts.User`, `.Facts.Hostname`, `.Facts.Init`, `.Facts.Shell`, `.Facts.Machine`, `.Facts.Role` | The facts. |
 
 There is no `.Agent` variable. Bundles add no instructions: a bundle's skill tells the agents about its tool.
 
@@ -108,6 +111,11 @@ The secrets file on the cockpit has `NAME=value` lines. Empty lines and lines th
 
 FAM writes the values as `export NAME='value'` with `'\''` for a single quote. The plan shows the names. The run log, the text output, JSON, and TOON replace each secret value with `[secret]`. The secrets file goes to the machine through stdin, so it is never in a command line or a log. FAM also hides the old values that it finds in the secrets file of a machine (after a rotation, scripts still load them), and the forms in which a value appears in output: without its outer spaces, and with `'\''` for a single quote.
 
+A bundle can list `requiredSecrets`, for example `requiredSecrets { "SENTRY_AUTH_TOKEN" }`.
+Plan and apply warn when the secrets file of the config does not supply a required name.
+Text, JSON, and TOON show the warning. It does not change the exit code.
+Absent bundles do not need secrets.
+
 Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only when its first line is the FAM header. On the cockpit, the source file must not be `~/.config/fam/secrets.env` itself.
 
 ## Bundles
@@ -115,26 +123,13 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 - A bundle entry is a bundle module or `new { bundle = …; state = … }`.
 - The `name` identifies a bundle. Two files with the same name are an error.
 - A machine entry wins over the global entry with the same name.
-- An absent bundle undoes its typed tasks in reverse order (`File`, `Symlink`, `Merge` keys, `Service`, `Linger`, `Package` with an `uninstall` command), then runs its `uninstall` tasks. FAM cannot undo a `Script`, so it skips scripts. FAM also removes the skill, the Claude link, and the variables of the bundle.
+- An absent bundle undoes its typed tasks in reverse order (`File`, `Symlink`, `Merge` keys, `Service`, `Linger`, `Package` with an `uninstall` command, `GitHubRelease`), then runs its `uninstall` tasks. FAM cannot undo a `Script`, so it skips scripts. FAM also removes the skill, the Claude link, and the variables of the bundle.
 
 ## Standard bundles
 
-`@fam/std.pkl` has ready bundles for agent tools, in groups: `bundles { std.networking.portless; std.media.hyperframes }`. Each one installs the CLI (with npm, unless `packageManagers` selects another manager) and copies its skills from the latest GitHub release. None installs a browser, a runtime, or system packages. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
+`@fam/std.pkl` has ready bundles for agent tools, in groups: `bundles { std.networking.portless; std.media.hyperframes }`. Each one installs its tool with a package manager, an install script, or a GitHub release and copies its skills from the latest GitHub release. None installs a browser, a runtime, or system packages. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
 
-| Bundle | Installs | Skills |
-|---|---|---|
-| `std.computer.agentBrowser` | `agent-browser` | agent-browser |
-| `std.computer.agentDesktop` | `agent-desktop` (glibc only) | agent-desktop, and agent-desktop-linux or agent-desktop-macos |
-| `std.context.issueGraph` | `issue-graph` | issue-graph |
-| `std.context.latMd` | `lat` (npm `lat.md`, glibc only) | lat-md |
-| `std.context.opensrc` | `opensrc` (Node.js 24) | opensrc |
-| `std.media.aiCli` | `ai` (npm `ai-cli`) | ai-cli |
-| `std.media.hyperframes` | `hyperframes` | hyperframes, hyperframes-cli, hyperframes-registry, media-use, reverse-any-video, style-sampling |
-| `std.media.webreel` | `webreel` | webreel |
-| `std.networking.portless` | `portless` (Node.js 24) | portless |
-| `std.testing.emulate` | `emulate` | emulate |
-| `std.agents.skills` | `skills` | find-skills |
-| `std.languages.zero` | `~/.zero/bin/zero` (install script) | zero |
+See the [standard bundle catalogue](std.md) for descriptions, install methods, skills, and required secrets.
 
 ## Services
 
@@ -158,6 +153,10 @@ new fam.Package { package = new { package = "tree"; manager = "apt" } }
 | `npm` | `npm ls -g` (no global folder yet: not installed) | `npm install -g` | `npm install -g <p>@latest` | `npm uninstall -g` | user |
 | `bun` | `bun pm ls -g` | `bun add -g` | `bun add -g <p>@latest` | `bun remove -g` | user |
 | `vite` | `vp list -g` | `vp install -g` | `vp update -g` | `vp uninstall -g` | user |
+| `uv` | `uv tool list` | `uv tool install` | `uv tool upgrade` | `uv tool uninstall` | user |
+| `cargo` | Cargo install records | `cargo install --locked` | `cargo install --locked` | `cargo uninstall` | user |
+| `go` | `go version -m` | `go install <module>@latest` | the install command | remove the matching binary | user |
+| `system` | the selected manager | brew on macOS, or apt, dnf, pacman, apk on Linux | the selected manager | the selected manager | as selected |
 | `brew` | `brew list` | `brew install` | `brew upgrade` | `brew uninstall` | user |
 | `apt` | `dpkg-query` | `apt-get install` | `apt-get install --only-upgrade` | `apt-get remove` | sudo |
 | `dnf` | `rpm -q` | `dnf install` | `dnf upgrade` | `dnf remove` | sudo |
@@ -166,6 +165,12 @@ new fam.Package { package = new { package = "tree"; manager = "apt" } }
 | `apk` | `apk info -e` | `apk add` | `apk add --upgrade` | `apk del` | sudo |
 
 FAM asks the package manager, not `PATH`, whether the package is installed. When the manager itself is missing, the plan shows a change (an earlier bundle can install it), and apply stops with a clear error if it is still missing. `binary` defaults to the package name without its npm scope. Own `install`, `update`, and `uninstall` commands win over the commands of the manager.
+
+Cargo uses `--root ~/.local`. Go uses `GOBIN=~/.local/bin`. A `PackageRef` can give `names` for each manager, for example `names { ["apt"] = "fd-find" }`. FAM uses the generic `package` name when no name matches the selected manager.
+
+A `GitHubRelease` task installs a release binary into `~/.local/bin`, without sudo. It supports bare binaries, tar.gz, and zip. Plan compares the installed version with the latest tag, or a pinned `tag`. FAM checks SHA-256 checksum files when present. See [Package tasks](development.md#package-tasks) for the schema and an example.
+
+On Linux, FAM detects glibc or musl from the machine. On musl, `assets` uses `linux-amd64-musl` or `linux-arm64-musl` when present. Otherwise, FAM uses the plain Linux key. Prefer static or musl builds for the plain Linux keys when available, because they run everywhere.
 
 ## Agents
 

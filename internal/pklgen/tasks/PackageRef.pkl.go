@@ -14,4 +14,8 @@ type PackageRef struct {
 
 	// The package manager.
 	Manager manager.Manager `pkl:"manager"`
+
+	// Package names for specific managers, for example `names { ["apt"] = "fd-find" }`.
+	// FAM uses [package] when the selected manager has no name here.
+	Names map[manager.Manager]string `pkl:"names"`
 }

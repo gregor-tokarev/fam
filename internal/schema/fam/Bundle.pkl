@@ -16,7 +16,7 @@
 /// }
 /// ```
 ///
-/// Bundles declare no secrets. Secrets come from the secrets file of the config.
+/// Bundles list secret names. Values come from the secrets file of the config.
 module fam.Bundle
 
 import "pkl:reflect"
@@ -30,6 +30,10 @@ name: String(matches(Regex("[a-z0-9][a-z0-9._-]*")))
 /// A short description for output.
 description: String?
 
+/// Whether the tool supports the current machine facts.
+/// The acceptance harness omits unsupported bundles.
+supported: Boolean = true
+
 /// The version of the bundle. Standard bundles have the FAM version.
 version: String?
 
@@ -38,6 +42,10 @@ fixed source: String = reflect.Module(module).uri
 
 /// Environment variables that FAM exports in every shell of the machine.
 env: Mapping<String(matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))), String>
+
+/// Names of environment variables that the tool needs at run time.
+/// FAM warns when the secrets file of the config does not give a name.
+requiredSecrets: Listing<String(matches(Regex("[A-Za-z_][A-Za-z0-9_]*")))>
 
 /// Directories that FAM adds to the start of `PATH` in every shell and in FAM scripts,
 /// for example `"~/.cargo/bin"`. `~/` is the home directory.

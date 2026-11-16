@@ -1,0 +1,2 @@
+/// Cloud platforms and their tools.
+module fam.std.cloud

@@ -6,11 +6,13 @@ import "github.com/apple/pkl-go/pkl"
 func init() {
 	pkl.RegisterMappingFor[Tasks]("fam.tasks")
 	pkl.RegisterMappingFor[FileImpl]("fam.tasks#File")
+	pkl.RegisterMappingFor[GitHubReleaseImpl]("fam.tasks#GitHubRelease")
 	pkl.RegisterMappingFor[GitHubSkillImpl]("fam.tasks#GitHubSkill")
 	pkl.RegisterMappingFor[LingerImpl]("fam.tasks#Linger")
 	pkl.RegisterMappingFor[MergeImpl]("fam.tasks#Merge")
 	pkl.RegisterMappingFor[PackageImpl]("fam.tasks#Package")
 	pkl.RegisterMappingFor[PackageRef]("fam.tasks#PackageRef")
+	pkl.RegisterMappingFor[ReleaseAsset]("fam.tasks#ReleaseAsset")
 	pkl.RegisterMappingFor[ScriptImpl]("fam.tasks#Script")
 	pkl.RegisterMappingFor[ServiceImpl]("fam.tasks#Service")
 	pkl.RegisterMappingFor[SkillImpl]("fam.tasks#Skill")
