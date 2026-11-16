@@ -56,7 +56,7 @@ FAM downloads `pkl` 0.33.0 from the GitHub release on first use into `<user cach
 
 ## Standard bundles
 
-A standard bundle installs only its tool and gets its skill from the tool's GitHub repository (`Bundle.GitHubSkill`). FAM vendors no skills. Without a `ref`, the skill comes from the latest GitHub release. That is usually the version that the package manager installs, but a registry can be ahead of or behind GitHub.
+A standard bundle installs only its tool, and a `fam.GitHubSkill` task gets the skill from the tool's GitHub repository. FAM vendors no skills. Without a `ref`, the skill comes from the latest GitHub release. That is usually the version that the package manager installs, but a registry can be ahead of or behind GitHub.
 
 ## Acceptance harness
 

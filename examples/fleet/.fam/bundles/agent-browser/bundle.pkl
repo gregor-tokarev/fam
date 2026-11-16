@@ -1,4 +1,4 @@
-//! Written by FAM 0.4.0. Do not edit. Run `fam upgrade` to update.
+//! Written by FAM 0.5.0. Do not edit. Run `fam upgrade` to update.
 
 /// agent-browser: a browser automation CLI for AI agents (https://github.com/vercel-labs/agent-browser).
 ///
@@ -14,21 +14,20 @@
 /// agent-browser uses yourself, for example with `agent-browser install`, or in a bundle of your own.
 amends "../../Bundle.pkl"
 
-import "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "agent-browser"
 description = "Browser automation CLI for AI agents"
-version = "0.4.0"
-skill = new Bundle.GitHubSkill {
-  repo = "vercel-labs/agent-browser"
-  path = "skills/agent-browser"
-}
-
+version = "0.5.0"
 tasks {
   // npm by default. Another manager: package = new { package = "agent-browser"; manager = "brew" }
   new fam.Package {
     package = "agent-browser"
+  }
+  // The skill of the latest release, from GitHub.
+  new fam.GitHubSkill {
+    repo = "vercel-labs/agent-browser"
+    path = "skills/agent-browser"
   }
 }
 

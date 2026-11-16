@@ -17,7 +17,7 @@
 1. Environment: `~/.config/fam/secrets.env`, `~/.config/fam/env.sh`, and the loader blocks.
 2. Agents: the CLI package, then the settings merge, for each agent. They come after the environment, so that the installers see its variables (for example a proxy).
 3. Bundles: first the `bundles` of `config.pkl` (every machine), then the bundles of the machine's role (`roles` in `config.pkl`), then the `bundles` of the machine entry, each in list order. An entry with the name of an earlier bundle replaces it at its position, so a role or a machine can change or remove (`state = "absent"`) a bundle of every machine.
-4. Skills.
+4. The skills of `skills/`, then the removal of old managed skills. (Bundle skills are tasks of their bundle.)
 5. Instructions.
 
 ## Check exit codes
@@ -76,9 +76,11 @@ There is no `.Agent` variable. Bundles add no instructions: a bundle's skill tel
 
 ## Skills
 
-FAM copies each folder of `skills/` (resolved relative to `--base`, or set with `--skills`) and the skill of each present bundle. The skill name is the folder name. A bundle skill folder with the name `skill` gets the bundle name. Two skills with the same name are an error.
+FAM copies each folder of `skills/` (resolved relative to `--base`, or set with `--skills`) after the bundles. The skill name is the folder name.
 
-A bundle skill can also be a folder in a public GitHub repository (`new Bundle.GitHubSkill { repo; path; ref }`). The cockpit downloads the repository archive from `codeload.github.com` once for each run, also for `fam plan`, and copies the folder like a local one. Without a `ref`, FAM uses the tag of the latest release (the redirect of `github.com/<repo>/releases/latest`, no API token). A link in the folder becomes a copy of the file that it points to, which must be in the same folder. FAM reads at most 1 GiB of the archive and keeps only the folder (at most 16 MiB for each file, 64 MiB and 5000 files in total).
+Bundles install skills with tasks, as many as they need, in task order: `new fam.Skill { path }` for a folder of the bundle, and `new fam.GitHubSkill { repo; path; ref }` for a folder in a public GitHub repository. A skill task copies the skill and links `~/.claude/skills/<name>`. The name is the folder name (a bundle folder named `skill` gets the bundle name), or `name`. With `state = "absent"`, or in an absent bundle, the task removes the skill, but only one that FAM made. Two skills with the same name are an error. FAM removes managed skills that no bundle and no folder of `skills/` lists any more.
+
+For a GitHub skill, the cockpit downloads the repository archive from `codeload.github.com` once for each run, also for `fam plan`, and copies the folder like a local one. Without a `ref`, FAM uses the tag of the latest release (the redirect of `github.com/<repo>/releases/latest`, no API token). FAM tries a request up to three times when the network fails. A link in the folder becomes a copy of the file that it points to, which must be in the same folder. FAM reads at most 1 GiB of the archive and keeps only the folder (at most 16 MiB for each file, 64 MiB and 5000 files in total).
 
 ## Secrets
 

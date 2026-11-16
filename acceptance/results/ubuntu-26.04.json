@@ -4,7 +4,7 @@
     "n": 1,
     "name": "plan shows the changes and changes nothing",
     "result": "pass",
-    "detail": "24 changes, 3 satisfied",
+    "detail": "26 changes, 3 satisfied",
     "duration": "13s"
   },
   {
@@ -12,8 +12,8 @@
     "n": 2,
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
-    "detail": "first apply 24 changed, second plan 27 satisfied, second apply 0 changed",
-    "duration": "17s"
+    "detail": "first apply 26 changed, second plan 29 satisfied, second apply 0 changed",
+    "duration": "18s"
   },
   {
     "target": "ubuntu-26.04",
@@ -29,7 +29,7 @@
     "name": "drift is found and repaired",
     "result": "pass",
     "detail": "drift in 5 tasks found and repaired, copy of the hand-edited AGENTS.md saved",
-    "duration": "18s"
+    "duration": "19s"
   },
   {
     "target": "ubuntu-26.04",
@@ -37,7 +37,7 @@
     "name": "absent bundle removes skill, links, files, merged keys, variables",
     "result": "pass",
     "detail": "file, link, merged keys, skill, Claude link, variables removed",
-    "duration": "17s"
+    "duration": "18s"
   },
   {
     "target": "ubuntu-26.04",
@@ -92,16 +92,16 @@
     "n": 12,
     "name": "Claude Code and Codex: install, update, settings, paths",
     "result": "pass",
-    "detail": "pinned 28 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
-    "duration": "1m6s"
+    "detail": "pinned 30 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
+    "duration": "3m10s"
   },
   {
     "target": "ubuntu-26.04",
     "n": 14,
     "name": "standard bundle agentBrowser",
     "result": "pass",
-    "detail": "28 changed; agent-browser 0.43.0",
-    "duration": "24s"
+    "detail": "30 changed; agent-browser 0.43.0",
+    "duration": "23s"
   },
   {
     "target": "ubuntu-26.04",

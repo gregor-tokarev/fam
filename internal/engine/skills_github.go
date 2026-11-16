@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -14,8 +15,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/gregor-tokarev/fam/internal/pklgen/bundle"
 )
 
 // GitHubBase and CodeloadBase are the GitHub hosts for skill downloads.
@@ -38,13 +37,14 @@ type githubSkillResult struct {
 	err   error
 }
 
-// loadGitHubSkill downloads a skill folder from a GitHub repository.
-func loadGitHubSkill(ctx context.Context, gs bundle.GitHubSkill, origin string) (*SkillSource, error) {
+// loadGitHubSkill downloads a skill folder from a GitHub repository. name is the skill name
+// ("" for the last part of the folder path).
+func loadGitHubSkill(ctx context.Context, repo, folder string, refp *string, name, origin string) (*SkillSource, error) {
 	ref := ""
-	if gs.Ref != nil {
-		ref = *gs.Ref
+	if refp != nil {
+		ref = *refp
 	}
-	key := gs.Repo + "\x00" + gs.Path + "\x00" + ref
+	key := repo + "\x00" + folder + "\x00" + ref
 	githubSkills.Lock()
 	r, ok := githubSkills.done[key]
 	if !ok {
@@ -55,12 +55,12 @@ func loadGitHubSkill(ctx context.Context, gs bundle.GitHubSkill, origin string) 
 	r.once.Do(func() {
 		r.ref = ref
 		if r.ref == "" {
-			r.ref, r.err = latestRelease(ctx, gs.Repo)
+			r.ref, r.err = latestRelease(ctx, repo)
 			if r.err != nil {
 				return
 			}
 		}
-		r.files, r.err = downloadSkill(ctx, gs.Repo, gs.Path, r.ref)
+		r.files, r.err = downloadSkill(ctx, repo, folder, r.ref)
 	})
 	if r.err != nil && ctx.Err() != nil {
 		// Do not keep a canceled download: a later call tries again.
@@ -70,8 +70,10 @@ func loadGitHubSkill(ctx context.Context, gs bundle.GitHubSkill, origin string) 
 		}
 		githubSkills.Unlock()
 	}
-	name := path.Base(gs.Path)
-	src := fmt.Sprintf("github.com/%s/%s@%s", gs.Repo, gs.Path, r.ref)
+	if name == "" {
+		name = path.Base(folder)
+	}
+	src := fmt.Sprintf("github.com/%s/%s@%s", repo, folder, r.ref)
 	if r.err != nil {
 		return nil, fmt.Errorf("skill %s (%s): %w", name, origin, r.err)
 	}
@@ -90,7 +92,7 @@ func latestRelease(ctx context.Context, repo string) (string, error) {
 		Timeout:       30 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	resp, err := c.Do(req)
+	resp, err := doRetry(ctx, c, req)
 	if err != nil {
 		return "", fmt.Errorf("find the latest release of %s: %w", repo, err)
 	}
@@ -127,7 +129,7 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 	if err != nil {
 		return nil, err
 	}
-	resp, err := (&http.Client{Timeout: 5 * time.Minute}).Do(req)
+	resp, err := doRetry(ctx, &http.Client{Timeout: 5 * time.Minute}, req)
 	if err != nil {
 		return nil, fmt.Errorf("download %s: %w", u, err)
 	}
@@ -251,4 +253,36 @@ func (c *capReader) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
 	c.left -= int64(n)
 	return n, err
+}
+
+// doRetry sends a GET request up to three times when the network fails (for example a DNS
+// timeout). An HTTP response, also an error status, is not retried.
+func doRetry(ctx context.Context, c *http.Client, req *http.Request) (*http.Response, error) {
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt) * 2 * time.Second):
+			}
+		}
+		var resp *http.Response
+		resp, err = c.Do(req.Clone(ctx))
+		if err == nil {
+			return resp, nil
+		}
+		// Only a network failure (DNS, connect, reset, timeout) is worth another try. Client.Do
+		// wraps every error in *url.Error, which is itself a net.Error, so look at the cause.
+		cause := err
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			cause = ue.Err
+		}
+		var ne net.Error
+		if ctx.Err() != nil || !errors.As(cause, &ne) {
+			return nil, err
+		}
+	}
+	return nil, err
 }
