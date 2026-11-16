@@ -165,15 +165,16 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 	}
 	u := CodeloadBase + "/" + repo + "/tar.gz/" + strings.Join(segs, "/")
 	for attempt := 0; ; attempt++ {
-		a, err := cachedArchiveFor(ctx, repo, ref, u, attempt > 0)
+		a, direct, err := cachedArchiveFor(ctx, repo, ref, u, attempt > 0)
 		if errors.Is(err, errNoCache) {
 			// The cache folder cannot keep the archive: read the download directly.
-			body, err := fetchArchive(ctx, u, "")
-			if err != nil {
-				return nil, err
+			if direct == nil {
+				if direct, err = fetchArchive(ctx, u, ""); err != nil {
+					return nil, err
+				}
 			}
-			defer body.Close()
-			return readSkill(body, folder, u)
+			defer direct.Close()
+			return readSkill(direct, folder, u)
 		}
 		if err != nil {
 			return nil, err
@@ -221,11 +222,12 @@ var archiveCache = struct {
 // runArchive is an open cache file that GitHub confirmed in this run. All skills of the run read
 // this same file, also when another process replaces or removes its path.
 type runArchive struct {
-	mu   sync.Mutex
-	file *os.File
-	data int64 // offset of the gzip data
-	size int64
-	bad  *os.File // the file that a reader found damaged
+	mu      sync.Mutex
+	file    *os.File
+	data    int64 // offset of the gzip data
+	size    int64
+	bad     *os.File // the file that a reader found damaged
+	noCache bool     // the cache folder cannot keep this archive in this run
 }
 
 func (a *runArchive) reader() io.Reader {
@@ -235,11 +237,12 @@ func (a *runArchive) reader() io.Reader {
 }
 
 // cachedArchiveFor returns the checked archive of this run. With repair, a damaged archive is
-// downloaded again (once for each damaged file).
-func cachedArchiveFor(ctx context.Context, repo, ref, u string, repair bool) (*runArchive, error) {
+// downloaded again (once for each damaged file). With errNoCache, direct is a started download
+// that the caller reads (nil when there is none).
+func cachedArchiveFor(ctx context.Context, repo, ref, u string, repair bool) (a *runArchive, direct *stallReader, err error) {
 	dir, err := os.UserCacheDir()
 	if err != nil {
-		return nil, errNoCache
+		return nil, nil, errNoCache
 	}
 	dir = filepath.Join(dir, "fam", "github")
 	// The file name is a hash, so that no repository or ref can give a path outside the folder.
@@ -254,12 +257,15 @@ func cachedArchiveFor(ctx context.Context, repo, ref, u string, repair bool) (*r
 	archiveCache.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.noCache {
+		return nil, nil, errNoCache
+	}
 	if a.file != nil && repair && a.bad == nil {
 		a.bad = a.file
 		a.file = nil
 	}
 	if a.file != nil {
-		return a, nil
+		return a, nil, nil
 	}
 	pruneOnce.Do(func() { pruneArchives(dir) })
 	// Read the ETag from the file that a 304 confirms, also when another process replaces the
@@ -272,54 +278,62 @@ func cachedArchiveFor(ctx context.Context, repo, ref, u string, repair bool) (*r
 			etag, _ = readETag(f)
 		}
 	}
-	f, err := refreshArchive(ctx, dir, path, u, old, etag)
+	f, direct, err := refreshArchive(ctx, dir, path, u, old, etag)
+	if errors.Is(err, errNoCache) {
+		// Every later skill of this archive also reads its own download.
+		a.noCache = true
+		return nil, direct, err
+	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		f.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	if _, err := readETag(f); err != nil {
 		f.Close()
-		return nil, badArchive(u, err)
+		return nil, nil, badArchive(u, err)
 	}
 	pos, _ := f.Seek(0, io.SeekCurrent)
 	st, err := f.Stat()
 	if err != nil {
 		f.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	now := time.Now()
 	_ = os.Chtimes(path, now, now)
 	a.file, a.data, a.size = f, pos, st.Size()
-	return a, nil
+	return a, nil, nil
 }
 
 // refreshArchive asks GitHub for the archive with the ETag of the cached file old, and returns
 // an open cache file. GitHub answers 304 when the archive did not change (also for a branch, or
 // a tag that did not move): then old is the result. Otherwise FAM saves the new archive with an
-// atomic rename. refreshArchive closes old when it does not return it.
-func refreshArchive(ctx context.Context, dir, path, u string, old *os.File, etag string) (*os.File, error) {
+// atomic rename. refreshArchive closes old when it does not return it. When the cache folder
+// cannot take the archive before FAM read any data, it returns errNoCache with the download as
+// direct.
+func refreshArchive(ctx context.Context, dir, path, u string, old *os.File, etag string) (*os.File, *stallReader, error) {
 	if old != nil && etag == "" {
 		old.Close()
 		old = nil
 	}
 	body, err := fetchArchive(ctx, u, etag)
-	if err != nil {
-		if old != nil {
-			old.Close()
-		}
-		return nil, err
-	}
-	if body == nil {
-		return old, nil // 304
-	}
-	if old != nil {
+	if old != nil && (err != nil || body != nil) {
 		old.Close()
 	}
-	defer body.Close()
-	return saveArchive(dir, path, u, body)
+	if err != nil {
+		return nil, nil, err
+	}
+	if body == nil {
+		return old, nil, nil // 304
+	}
+	f, err := saveArchive(dir, path, u, body)
+	if errors.Is(err, errNoCache) && !body.started.Load() {
+		return nil, body, err
+	}
+	body.Close()
+	return f, nil, err
 }
 
 // saveArchive writes a download into a temporary file in the cache folder, renames it to path,
@@ -349,11 +363,13 @@ func saveArchive(dir, path, u string, body *stallReader) (*os.File, error) {
 		}
 		return nil, fmt.Errorf("download %s: %w", u, err)
 	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		return nil, errNoCache
-	}
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
 		return nil, err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		// The download is complete: this run reads the open file, and the next run downloads
+		// it again.
+		os.Remove(tmp.Name())
 	}
 	keep = true
 	return tmp, nil
@@ -486,6 +502,7 @@ type stallReader struct {
 	last    atomic.Int64 // time of the last data, in Unix nanoseconds
 	stalled atomic.Bool
 	closed  atomic.Bool
+	started atomic.Bool // a Read returned data
 }
 
 // check runs from the timer. It cancels the download only when the last data is older than
@@ -507,6 +524,7 @@ func (s *stallReader) Read(p []byte) (int, error) {
 	n, err := s.body.Read(p)
 	if n > 0 {
 		s.last.Store(time.Now().UnixNano())
+		s.started.Store(true)
 	}
 	if err != nil && err != io.EOF && s.stalled.Load() {
 		err = fmt.Errorf("no data for %s", archiveStall)
