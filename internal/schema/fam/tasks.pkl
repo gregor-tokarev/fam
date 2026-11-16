@@ -133,10 +133,12 @@ class Linger extends StateTask {
 /// A package manager for [Package.package].
 ///
 /// - `"npm"`, `"bun"`, `"vite"` (Vite+ `vp install -g`): global JavaScript packages, as the user.
+/// - `"uv"`, `"cargo"`, `"go"`: user tools, without sudo.
+/// - `"system"`: brew on macOS, or the package manager of the Linux distribution.
 /// - `"brew"`: Homebrew, as the user.
 /// - `"apt"`, `"dnf"`, `"pacman"`, `"apk"`: the OS package manager. FAM runs it with `sudo`.
 /// - `"yay"`: AUR packages on Arch Linux, as the user (yay runs `sudo` itself).
-typealias Manager = "npm"|"bun"|"vite"|"brew"|"apt"|"dnf"|"pacman"|"yay"|"apk"
+typealias Manager = "uv"|"cargo"|"go"|"system"|"npm"|"bun"|"vite"|"brew"|"apt"|"dnf"|"pacman"|"yay"|"apk"
 
 /// A package with its package manager.
 ///
@@ -149,6 +151,10 @@ class PackageRef {
 
   /// The package manager.
   manager: Manager = "npm"
+
+  /// Package names for specific managers, for example `names { ["apt"] = "fd-find" }`.
+  /// FAM uses [package] when the selected manager has no name here.
+  names: Mapping<Manager, String(!isEmpty)>
 }
 
 /// A command line program.
@@ -251,4 +257,40 @@ class GitHubSkill extends StateTask {
 
   /// The skill name. The default is the last part of [path].
   name: String(matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))?
+}
+
+/// A binary from a public GitHub release, installed into `~/.local/bin` without sudo.
+/// FAM compares the installed version with the release tag.
+class GitHubRelease extends StateTask {
+  /// The repository, `owner/name`.
+  repo: String(matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")))
+
+  /// The name of the installed binary.
+  binary: String(matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
+
+  /// A command that prints the installed version. The default is `<binary> --version`.
+  /// Its output must contain the release tag as a word, with or without the leading `v`.
+  versionCommand: String?
+
+  /// Assets by platform, for example `assets { ["linux-amd64"] { name = "tool.tar.gz"; file = "tool" } }`.
+  assets: Mapping<"linux-amd64"|"linux-arm64"|"darwin-arm64", ReleaseAsset>
+
+  /// A pinned release tag. The default is the latest release.
+  tag: String(!isEmpty)?
+}
+
+/// One release asset. FAM checks a SHA-256 checksum file when the release supplies one.
+class ReleaseAsset {
+  /// The asset name. `{tag}` and `{version}` expand to the tag and the tag without `v`.
+  name: String(!isEmpty && !contains("/") && !contains(".."))
+
+  /// The asset format.
+  format: "binary"|"tar.gz"|"zip" = "binary"
+
+  /// The binary path inside an archive. Required for `tar.gz` and `zip`.
+  /// It also accepts `{tag}` and `{version}`.
+  file: String(!isEmpty && !startsWith("/") && !split("/").contains(".."))?
+
+  /// The checksum asset name. The default finds common SHA-256 checksum file names.
+  checksum: String(!isEmpty && !contains("/"))?
 }

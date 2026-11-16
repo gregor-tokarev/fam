@@ -8,6 +8,7 @@ import (
 	"regexp"
 
 	"github.com/gregor-tokarev/fam/internal/config"
+	"github.com/gregor-tokarev/fam/internal/facts"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
 )
 
@@ -21,7 +22,7 @@ type Section struct {
 }
 
 // convert turns a schema task into an engine task.
-func convert(t tasks.Task, group string, absent bool, pm map[string]string) (Task, error) {
+func convert(t tasks.Task, group string, absent bool, pm map[string]string, f facts.Facts) (Task, error) {
 	b := base{group: group, sudo: t.GetSudo()}
 	units := make([]Unit, 0, len(t.GetRestarts()))
 	for _, u := range t.GetRestarts() {
@@ -67,12 +68,13 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string) (Tas
 			pt.Binary = *v
 		}
 		if p := x.GetPackage(); p != nil && *p != nil {
-			name, mgr, err := packageSpec(*p)
+			original, _, err := packageSpec(*p)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", group, err)
 			}
-			if m, ok := pm[name]; ok {
-				mgr = m
+			name, mgr, err := PackageSpec(*p, pm[original], f)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", group, err)
 			}
 			if err := managedPackage(pt, name, mgr); err != nil {
 				return nil, fmt.Errorf("%s: %w", group, err)
@@ -99,6 +101,11 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string) (Tas
 			pt.VersionCmd = *v
 		}
 		return pt, nil
+	case tasks.GitHubRelease:
+		if t.GetSudo() {
+			return nil, fmt.Errorf("%s: GitHubRelease runs as the SSH user. Remove sudo", group)
+		}
+		return &GitHubReleaseTask{base: b, Repo: x.GetRepo(), Binary: x.GetBinary(), Assets: x.GetAssets(), Tag: x.GetTag(), VersionCommand: x.GetVersionCommand(), Absent: isAbsent(string(x.GetState())), units: units}, nil
 	case tasks.Script:
 		if absent {
 			return nil, nil // FAM cannot undo a script.
@@ -178,7 +185,7 @@ var skillName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 // in reverse order, then runs its uninstall tasks. A present bundle restarts the units of its
 // changed tasks once, at its end. A restart of a unit that a Service task of the same bundle
 // manages uses the scope of that task.
-func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string) (Section, error) {
+func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string, f facts.Facts) (Section, error) {
 	group := "bundle " + u.Bundle.Name
 	sec := Section{Name: group}
 	if u.State == "absent" {
@@ -190,7 +197,7 @@ func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 				sec.Tasks = append(sec.Tasks, st...)
 				continue
 			}
-			t, err := convert(u.Bundle.Tasks[i], group, true, pm)
+			t, err := convert(u.Bundle.Tasks[i], group, true, pm, f)
 			if err != nil {
 				return sec, err
 			}
@@ -206,7 +213,7 @@ func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 				sec.Tasks = append(sec.Tasks, st...)
 				continue
 			}
-			t, err := convert(ut, group, false, pm)
+			t, err := convert(ut, group, false, pm, f)
 			if err != nil {
 				return sec, err
 			}
@@ -236,7 +243,7 @@ func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 			return sec, err
 		}
 		if !ok {
-			t, err := convert(bt, group, false, pm)
+			t, err := convert(bt, group, false, pm, f)
 			if err != nil {
 				return sec, err
 			}

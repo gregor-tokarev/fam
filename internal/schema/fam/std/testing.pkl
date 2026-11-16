@@ -1,0 +1,7 @@
+/// Tools for tests.
+module fam.std.testing
+
+import "../Bundle.pkl"
+
+/// emulate: local API emulation for CI and sandboxes, with its skill.
+emulate: Bundle = import("../bundles/testing/emulate.pkl")

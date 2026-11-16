@@ -52,8 +52,8 @@
     "n": 7,
     "name": "secrets in shells, never in output or logs",
     "result": "pass",
-    "detail": "6 shells export both secrets; values absent from 12 outputs and 6 run logs",
-    "duration": "21s"
+    "detail": "6 shells export both secrets; values absent from 14 outputs and 7 run logs",
+    "duration": "23s"
   },
   {
     "target": "ubuntu-26.04",
@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "23s"
+    "duration": "27s"
   },
   {
     "target": "ubuntu-26.04",
@@ -116,8 +116,8 @@
     "n": 16,
     "name": "all standard bundles: install, verify, satisfied, archive cache",
     "result": "pass",
-    "detail": "75 changed, 18 skills; apply 2m7s, plan 23s",
-    "duration": "2m46s"
+    "detail": "75 changed, 20 skills; apply 2m6s, plan 23s",
+    "duration": "3m3s"
   },
   {
     "target": "ubuntu-26.04",
@@ -125,6 +125,6 @@
     "name": "package from the OS package manager, chosen in config.pkl, then removed",
     "result": "pass",
     "detail": "tree (apt): changed, then removed",
-    "duration": "33s"
+    "duration": "39s"
   }
 ]

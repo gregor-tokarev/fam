@@ -1,0 +1,7 @@
+/// Programming languages for agents.
+module fam.std.languages
+
+import "../Bundle.pkl"
+
+/// Zero: the programming language for agents, with its skill.
+zero: Bundle = import("../bundles/languages/zero.pkl")

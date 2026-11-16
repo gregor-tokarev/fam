@@ -22,7 +22,7 @@ Run the harness from the root of the repository.
 
 ```sh
 go run ./acceptance prepare <target>...     # provision a base image once (cloud-init, then power off)
-go run ./acceptance run [-scenarios 1,2] <target>...
+go run ./acceptance run [-scenarios 1,2] [-std-groups cloud,data] <target>...
 go run ./acceptance run -scenarios 13 <target> <target>   # two VMs in parallel, then --serial
 go run ./acceptance up <target>             # boot a clean VM for manual work
 go run ./acceptance windows                 # Windows: FAM must stop with "Windows is not supported"
@@ -37,6 +37,8 @@ go run ./acceptance clean                   # delete base images and runtime fil
 - The network is QEMU user networking with an SSH port on `127.0.0.1` (2261 to 2266). The harness writes `~/.cache/fam-acceptance/ssh_config` with one host alias for each target and gives it to FAM with `FAM_SSH_CONFIG`. FAM targets `fam@fam-<target>`.
 - Scenario 9 stops the network card of the VM with the QEMU monitor (`set_link nic0 off`) while FAM runs a slow script.
 - The test project, its secrets file, and the run logs of each scenario are in `~/.cache/fam-acceptance/run/`. Results go to `acceptance/results/<target>.json`.
+
+Scenario 16 discovers all standard bundles from the package. `-std-groups cloud,data` or `FAM_STD_GROUPS=cloud,data` limits it to those groups. Bundles with `supported = false` for the target facts are omitted. The scenario reads expected skills from the first plan, requires every verify to pass, and requires a satisfied second plan.
 
 ## Windows
 
@@ -80,4 +82,5 @@ FAM as the cockpit inside the Mac: the Mac is an Intel (x86-64) VM, and pkl 0.33
 | 13 | Two VMs in parallel, then `--serial`. Text output is grouped by machine. |
 | 14 | The standard bundle `agentBrowser`, with Node.js from a test bundle: the CLI, and its skill from the latest GitHub release. FAM installs no browser and sets no `AGENT_BROWSER_*` variables. |
 | 15 | Machines without systemd (Alpine): systemd tasks fail with a clear error. |
-| 17 | A bundle names only a package (`tree`); `packageManagers` in the config selects the OS package manager (apt, dnf, pacman, apk). FAM installs it, the plan is satisfied, and `state = "absent"` removes it. |
+| 16 | All standard bundles, with expected skills from the plan, every verify passed, and a satisfied second plan. |
+| 17 | A bundle names only a package (`tree`); `system` selects the OS package manager. A second package uses a manager-specific name (`fd-find` on apt). A GitHub release installs fzf with its checksum. The next plan is satisfied. An absent bundle removes the packages and binary. |

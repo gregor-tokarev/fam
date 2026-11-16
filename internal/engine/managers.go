@@ -2,10 +2,13 @@ package engine
 
 import (
 	"fmt"
+	"path"
+	"strconv"
 	"strings"
 
 	"github.com/apple/pkl-go/pkl"
 
+	"github.com/gregor-tokarev/fam/internal/facts"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
 	"github.com/gregor-tokarev/fam/internal/transport"
 )
@@ -26,6 +29,27 @@ type manager struct {
 // The installed queries exit 0 when the package is installed, 1 when it is not, and any other
 // code when the query fails. %[1]s is the quoted package name, %[2]s the raw name for awk.
 var managers = map[string]manager{
+	"uv": {tool: "uv", installed: `out=$(uv tool list 2>&1) || exit 5
+printf '%%s\n' "$out" | awk -v p=%[1]s '$1 == p { found = 1 } END { exit !found }'`,
+		install: "uv tool install %s", update: "uv tool upgrade %s", uninstall: "uv tool uninstall %s"},
+	// Cargo's list command creates metadata even when no tools exist. Read its records directly.
+	"cargo": {tool: "cargo", installed: `[ -e "$HOME/.local/.crates.toml" ] || exit 1
+out=$(cat "$HOME/.local/.crates.toml") || exit 5
+printf '%%s\n' "$out" | awk -F '"' -v p=%[1]s 'index($2, p " ") == 1 { found = 1 } END { exit !found }'`,
+		install: `cargo install --locked --root "$HOME/.local" %s`, update: `cargo install --locked --root "$HOME/.local" %s`, uninstall: `cargo uninstall --root "$HOME/.local" %s`},
+	// Go inspection must not create telemetry files during plan.
+	"go": {tool: "go", installed: `for b in "$HOME/.local/bin/"*; do
+[ -f "$b" ] || continue
+out=$(TEST_TELEMETRY_DIR=/dev/null go version -m "$b" 2>/dev/null) || continue
+printf '%%s\n' "$out" | awk -v p=%[1]s '$1 == "path" && $2 == p { found = 1 } END { exit !found }' && exit 0
+done
+exit 1`,
+		install: `GOBIN="$HOME/.local/bin" go install %s@latest`, update: `GOBIN="$HOME/.local/bin" go install %s@latest`,
+		uninstall: `for b in "$HOME/.local/bin/"*; do
+[ -f "$b" ] || continue
+out=$(TEST_TELEMETRY_DIR=/dev/null go version -m "$b" 2>/dev/null) || continue
+if printf '%%s\n' "$out" | awk -v p=%s '$1 == "path" && $2 == p { found = 1 } END { exit !found }'; then rm -f "$b" || exit; fi
+done`},
 	// npm: `npm ls -g` knows versions (foo@1.2.3), but exits 254 with ENOENT when the global
 	// folder does not exist yet (a fresh prefix). That is "not installed", not an error. Only
 	// ENOENT on the global folder or a folder above it counts. Any other failure is an error.
@@ -67,8 +91,92 @@ case "$st" in *"install ok installed"*) exit 0 ;; *) exit 1 ;; esac`,
 		install: "apk add --no-cache %s", update: "apk add --no-cache --upgrade %s", uninstall: "apk del %s", root: true},
 }
 
-// packageSpec reads the `package` field: a string (npm), a PackageRef, or a Dynamic object
-// with `package` and `manager`.
+// PackageSpec resolves a package, its override, and the name for the selected manager.
+func PackageSpec(v any, override string, f facts.Facts) (name, mgr string, err error) {
+	name, mgr, err = packageSpec(v)
+	if err != nil {
+		return
+	}
+	if override != "" {
+		mgr = override
+	}
+	if mgr == "system" {
+		mgr, err = systemManager(f)
+		if err != nil {
+			return
+		}
+	}
+	names := map[string]string{}
+	switch x := v.(type) {
+	case tasks.PackageRef:
+		for k, n := range x.Names {
+			names[string(k)] = n
+		}
+	case *tasks.PackageRef:
+		for k, n := range x.Names {
+			names[string(k)] = n
+		}
+	case pkl.Object:
+		names, err = objectNames(x.Properties["names"])
+	case *pkl.Object:
+		names, err = objectNames(x.Properties["names"])
+	}
+	if n, ok := names[mgr]; ok {
+		name = n
+	}
+	return
+}
+
+func systemManager(f facts.Facts) (string, error) {
+	if f.OS == "darwin" {
+		return "brew", nil
+	}
+	if f.OS == "linux" {
+		switch f.Distro {
+		case "ubuntu", "debian", "linuxmint", "pop", "raspbian", "kali":
+			return "apt", nil
+		case "fedora", "rhel", "centos", "rocky", "almalinux", "amzn":
+			return "dnf", nil
+		case "arch", "manjaro", "endeavouros":
+			return "pacman", nil
+		case "alpine":
+			return "apk", nil
+		}
+	}
+	return "", fmt.Errorf("no system package manager for %s/%s. Select a manager explicitly", f.OS, f.Distro)
+}
+
+func objectNames(v any) (map[string]string, error) {
+	out := map[string]string{}
+	if v == nil {
+		return out, nil
+	}
+	switch x := v.(type) {
+	case pkl.Object:
+		for k, v := range x.Entries {
+			n, ok := v.(string)
+			key, keyOK := k.(string)
+			if !ok || !keyOK || n == "" {
+				return nil, fmt.Errorf("package names must map managers to nonempty strings")
+			}
+			out[key] = n
+		}
+	case map[any]any:
+		for k, v := range x {
+			n, ok := v.(string)
+			key, keyOK := k.(string)
+			if !ok || !keyOK || n == "" {
+				return nil, fmt.Errorf("package names must map managers to nonempty strings")
+			}
+			out[key] = n
+		}
+	default:
+		return nil, fmt.Errorf("package names must be a mapping")
+	}
+	return out, nil
+}
+
+// packageSpec reads a package string, PackageRef, or Dynamic object.
 func packageSpec(v any) (name, mgr string, err error) {
 	switch x := v.(type) {
 	case string:
@@ -87,8 +195,8 @@ func packageSpec(v any) (name, mgr string, err error) {
 
 func packageFromObject(o *pkl.Object) (string, string, error) {
 	for k := range o.Properties {
-		if k != "package" && k != "manager" {
-			return "", "", fmt.Errorf("package has the unknown property %q. Use package and manager", k)
+		if k != "package" && k != "manager" && k != "names" {
+			return "", "", fmt.Errorf("package has the unknown property %q. Use package, manager, and names", k)
 		}
 	}
 	name, ok := o.Properties["package"].(string)
@@ -103,8 +211,8 @@ func packageFromObject(o *pkl.Object) (string, string, error) {
 		}
 		mgr = s
 	}
-	if _, ok := managers[mgr]; !ok {
-		return "", "", fmt.Errorf("package %s: unknown manager %q. Use one of npm, bun, vite, brew, apt, dnf, pacman, yay, apk", name, mgr)
+	if _, ok := managers[mgr]; !ok && mgr != "system" {
+		return "", "", fmt.Errorf("package %s: unknown manager %q. Use one of npm, bun, vite, uv, cargo, go, system, brew, apt, dnf, pacman, yay, apk", name, mgr)
 	}
 	return name, mgr, nil
 }
@@ -134,7 +242,17 @@ func managedPackage(pt *PackageTask, name, mgr string) error {
 	pt.Uninstall = fmt.Sprintf(m.uninstall, q)
 	pt.ApplySudo = m.root
 	if pt.Binary == "" {
-		pt.Binary = defaultBinary(name)
+		binaryName := name
+		if mgr == "go" {
+			// Go omits a major version suffix from the executable name.
+			suffix := path.Base(name)
+			if strings.HasPrefix(suffix, "v") {
+				if major, err := strconv.Atoi(suffix[1:]); err == nil && major >= 2 {
+					binaryName = path.Dir(name)
+				}
+			}
+		}
+		pt.Binary = defaultBinary(binaryName)
 	}
 	return nil
 }

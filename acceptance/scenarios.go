@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/output"
+	"github.com/gregor-tokarev/fam/internal/stdlib"
 )
 
 // Ctx is the context of one scenario on one VM.
@@ -410,14 +411,37 @@ func s6MachineAbsent(c *Ctx) error {
 }
 
 func s7Secrets(c *Ctx) error {
+	bundlePath := filepath.Join(c.dir, "bundles", "tool", "bundle.pkl")
+	data, err := os.ReadFile(bundlePath)
+	if err != nil {
+		return err
+	}
+	data = append(data, []byte("\nrequiredSecrets { \"FAM_TEST_TOKEN\"; \"FAM_MISSING_TOKEN\" }\n")...)
+	if err := os.WriteFile(bundlePath, data, 0o644); err != nil {
+		return err
+	}
 	before := listRuns(c.logDir)
 	plan := c.famCmd("plan")
 	planJ := c.famCmd("plan", "--json")
 	planT := c.famCmd("plan", "--toon")
-	if _, err := c.applyOK(); err != nil {
+	applied, err := c.applyOK()
+	if err != nil {
 		return err
 	}
-	c.famCmd("apply", "--toon")
+	machine, err := machineOf(applied)
+	if err != nil {
+		return err
+	}
+	if len(machine.Warnings) != 1 || !strings.Contains(machine.Warnings[0], "FAM_MISSING_TOKEN") {
+		return fmt.Errorf("apply warnings: %v", machine.Warnings)
+	}
+	applyT := c.famCmd("apply", "--toon")
+	applyText := c.famCmd("apply")
+	for _, output := range []famRun{plan, planJ, planT, applyT, applyText} {
+		if output.Code != 0 || !strings.Contains(output.Stdout, "FAM_MISSING_TOKEN") {
+			return fmt.Errorf("missing secret warning or changed exit code: %d %s", output.Code, output.Stdout)
+		}
+	}
 	c.famCmd("verify")
 	if plan.Code != 0 || planJ.Code != 0 || planT.Code != 0 {
 		return fmt.Errorf("plan failed: %d %d %d", plan.Code, planJ.Code, planT.Code)
@@ -700,16 +724,32 @@ func s14Std(c *Ctx) error {
 	return nil
 }
 
-// stdSkills are the skills of all standard bundles, apart from the skills of agent-desktop and
-// lat.md, which depend on the target.
-var stdSkills = []string{
-	"agent-browser",
-	"ai-cli", "emulate",
-	"hyperframes", "hyperframes-cli", "hyperframes-registry", "media-use", "reverse-any-video", "style-sampling",
-	"issue-graph", "opensrc", "portless", "find-skills", "webreel", "zero",
-}
-
 func s16StdAll(c *Ctx) error {
+	groups, err := stdlib.Read(c.ctx, stdlib.LinuxFacts())
+	if err != nil {
+		return err
+	}
+	if _, err := stdlib.Select(groups, stdGroups); err != nil {
+		return err
+	}
+	first, err := c.famJSON("plan", "--config", "config-std-all.pkl")
+	if err != nil {
+		return err
+	}
+	if first.Code != 0 || !first.Res.OK {
+		return fmt.Errorf("first standard plan: %s", describe(first.Res))
+	}
+	initial, err := machineOf(first.Res)
+	if err != nil {
+		return err
+	}
+	var want []string
+	for _, t := range initial.Tasks {
+		if t.Kind == "skill" && strings.HasPrefix(t.Group, "bundle ") {
+			name, _, _ := strings.Cut(t.Name, " (")
+			want = append(want, name)
+		}
+	}
 	start := time.Now()
 	r, err := c.applyOK("--config", "config-std-all.pkl")
 	if err != nil {
@@ -720,16 +760,17 @@ func s16StdAll(c *Ctx) error {
 	if err != nil {
 		return err
 	}
-	want := stdSkills
-	switch {
-	case c.t.BootScript != "":
-		want = append(want, "agent-desktop", "agent-desktop-macos", "lat-md")
-	case !strings.Contains(c.t.Name, "alpine"):
-		want = append(want, "agent-desktop", "agent-desktop-linux", "lat-md")
+	if len(m.Verify) == 0 {
+		return errors.New("the standard apply has no verify results")
+	}
+	for _, v := range m.Verify {
+		if v.Status != "passed" {
+			return fmt.Errorf("verify %s/%s did not pass: %s", v.Bundle, v.Name, v.Status)
+		}
 	}
 	var missing []string
 	for _, s := range want {
-		if out, _ := c.ssh("test -f ~/.agents/skills/" + s + "/SKILL.md && test -L ~/.claude/skills/" + s + " && echo ok"); !strings.Contains(out, "ok") {
+		if out, err := c.ssh("test -f ~/.agents/skills/" + s + "/SKILL.md && test -L ~/.claude/skills/" + s + " && echo ok"); err != nil || strings.TrimSpace(out) != "ok" {
 			missing = append(missing, s)
 		}
 	}
@@ -746,6 +787,11 @@ func s16StdAll(c *Ctx) error {
 	pm, err := machineOf(p.Res)
 	if err != nil || p.Code != 0 || !p.Res.OK || pm.Counts.Change != 0 || pm.Counts.Error != 0 || pm.Counts.Conflict != 0 {
 		return fmt.Errorf("plan after the apply:\n%s", describe(p.Res))
+	}
+	for _, t := range pm.Tasks {
+		if t.Status != "satisfied" {
+			return fmt.Errorf("second plan: %s %s is %s", t.Kind, t.Name, t.Status)
+		}
 	}
 	c.notes = append(c.notes, fmt.Sprintf("%d changed, %d skills; apply %s, plan %s", m.Counts.Changed, len(want), applied.Round(time.Second), planned.Round(time.Second)))
 	return nil
@@ -774,6 +820,9 @@ func s17Packages(c *Ctx) error {
 	}
 	if _, err := c.applyOK("--config", "config-pkg-absent.pkl"); err != nil {
 		return err
+	}
+	if out, err := c.ssh("test ! -e ~/.local/bin/fzf && echo removed"); err != nil || !strings.Contains(out, "removed") {
+		return fmt.Errorf("release binary was not removed: %v %s", err, out)
 	}
 	// Ask the package manager through FAM: another program can also be called tree
 	// (BusyBox on Alpine has a tree applet).

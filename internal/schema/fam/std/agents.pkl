@@ -1,0 +1,7 @@
+/// Tools for the agents themselves.
+module fam.std.agents
+
+import "../Bundle.pkl"
+
+/// skills: the agent skills tool, with the find-skills skill.
+skills: Bundle = import("../bundles/agents/skills.pkl")

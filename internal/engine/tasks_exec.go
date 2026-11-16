@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gregor-tokarev/fam/internal/transport"
 )
@@ -291,7 +292,7 @@ func (t *PackageTask) Update(ctx context.Context, env *Env) (bool, string, error
 // versionIs reports whether the version output contains the version as a whole word:
 // "2.1.325 (Claude Code)" is 2.1.325, not 2.1.32.
 func versionIs(out, version string) bool {
-	for _, f := range strings.FieldsFunc(out, func(r rune) bool { return r == ' ' || r == '(' || r == ')' || r == ',' }) {
+	for _, f := range strings.FieldsFunc(out, func(r rune) bool { return unicode.IsSpace(r) || r == '(' || r == ')' || r == ',' }) {
 		if strings.TrimPrefix(f, "v") == strings.TrimPrefix(version, "v") {
 			return true
 		}

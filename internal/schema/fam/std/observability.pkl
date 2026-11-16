@@ -1,0 +1,2 @@
+/// Logs, metrics, and error reports.
+module fam.std.observability

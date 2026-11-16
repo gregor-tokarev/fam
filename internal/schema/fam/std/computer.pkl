@@ -1,0 +1,10 @@
+/// Tools that let agents use a computer: browsers and desktop apps.
+module fam.std.computer
+
+import "../Bundle.pkl"
+
+/// agent-browser: a browser automation CLI for agents, with its skill.
+agentBrowser: Bundle = import("../bundles/computer/agent-browser.pkl")
+
+/// agent-desktop: computer use for agents through the accessibility tree, with its skills.
+agentDesktop: Bundle = import("../bundles/computer/agent-desktop.pkl")

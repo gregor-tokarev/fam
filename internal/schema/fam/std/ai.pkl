@@ -1,0 +1,2 @@
+/// AI services and tools.
+module fam.std.ai

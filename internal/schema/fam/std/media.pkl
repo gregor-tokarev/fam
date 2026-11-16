@@ -1,0 +1,13 @@
+/// Tools that make media: video, images, and text.
+module fam.std.media
+
+import "../Bundle.pkl"
+
+/// ai-cli: generate text, images, and more from the terminal, with its skill.
+aiCli: Bundle = import("../bundles/media/ai-cli.pkl")
+
+/// HyperFrames: HTML to video, with the core skills.
+hyperframes: Bundle = import("../bundles/media/hyperframes.pkl")
+
+/// webreel: scripted browser demos as video, with its skill.
+webreel: Bundle = import("../bundles/media/webreel.pkl")

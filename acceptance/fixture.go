@@ -116,30 +116,23 @@ bundles {
   std.computer.agentBrowser
 }
 `,
-		// Scenario 16: all standard bundles.
-		// agent-desktop and lat.md have no builds for musl (Alpine).
-		"config-std-all.pkl": `amends "config.pkl"
+		// Scenario 16 discovers group modules and their bundles from the package.
+		"config-std-all.pkl": fmt.Sprintf(`amends "config.pkl"
 import "@fam/std.pkl"
-import "@fam/facts.pkl"
+
+local selectedGroups = %q.split(",").map((name) -> name.trim())
 
 bundles {
   import("bundles/node.pkl")
-  std.computer.agentBrowser
-  when (facts.distro != "alpine") {
-    std.computer.agentDesktop
-    std.context.latMd
+  for (group, tools in std.toDynamic().toMap()) {
+    when (selectedGroups == List("") || selectedGroups.contains(group)) {
+      for (_, bundle in tools.toDynamic().toMap()) {
+        when (bundle.supported) { bundle }
+      }
+    }
   }
-  std.media.aiCli
-  std.testing.emulate
-  std.media.hyperframes
-  std.context.issueGraph
-  std.context.opensrc
-  std.networking.portless
-  std.agents.skills
-  std.media.webreel
-  std.languages.zero
 }
-`,
+`, stdGroups),
 		"bundles/tool/bundle.pkl": `amends "@fam/Bundle.pkl"
 import "@fam/tasks.pkl" as fam
 
@@ -216,17 +209,29 @@ tasks {
   }
 }
 `,
-		// Scenario 17: a package from the OS package manager. The bundle names only the package
-		// (npm by default); the config selects the manager of the distribution.
+		// Scenario 17: system packages, manager-specific names, and a GitHub release.
 		"bundles/pkgtest.pkl": `amends "@fam/Bundle.pkl"
 import "@fam/tasks.pkl" as fam
+import "@fam/facts.pkl"
 
 name = "pkgtest"
 tasks {
-  new fam.Package { package = "tree" }
+  new fam.Package { package = new fam.PackageRef { package = "tree"; manager = "system" } }
+  new fam.Package { package = new { package = "fd"; manager = "system"; names { ["apt"] = "fd-find" } }; binary = if (facts.distro == "ubuntu" || facts.distro == "debian") "fdfind" else "fd" }
+  new fam.GitHubRelease {
+    repo = "junegunn/fzf"
+    binary = "fzf"
+    assets {
+      ["linux-amd64"] { name = "fzf-{version}-linux_amd64.tar.gz"; format = "tar.gz"; file = "fzf" }
+      ["linux-arm64"] { name = "fzf-{version}-linux_arm64.tar.gz"; format = "tar.gz"; file = "fzf" }
+      ["darwin-arm64"] { name = "fzf-{version}-darwin_arm64.tar.gz"; format = "tar.gz"; file = "fzf" }
+    }
+  }
 }
 verify {
   new { event = "fresh_shell"; script = "tree --version" }
+  new { event = "fresh_shell"; script = "fzf --version" }
+  new { event = "fresh_shell"; script = if (facts.distro == "ubuntu" || facts.distro == "debian") "fdfind --version" else "fd --version" }
 }
 `,
 		"config-pkg.pkl": `amends "config.pkl"

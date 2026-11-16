@@ -40,7 +40,7 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section,
 	}
 	var verify []VerifySpec
 	for _, u := range spec.Bundles {
-		s, err := BundleSection(ctx, u, spec.PackageManagers)
+		s, err := BundleSection(ctx, u, spec.PackageManagers, env.Facts)
 		if err != nil {
 			return nil, nil, err
 		}

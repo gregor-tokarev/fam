@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/gregor-tokarev/fam/internal/pklbin"
 	"github.com/gregor-tokarev/fam/internal/project"
 	"github.com/gregor-tokarev/fam/internal/schema"
+	"github.com/gregor-tokarev/fam/internal/stdlib"
 	"github.com/gregor-tokarev/fam/internal/version"
 )
 
@@ -152,6 +154,30 @@ func versionCmd() *cobra.Command {
 
 func internalCmd() *cobra.Command {
 	c := &cobra.Command{Use: "internal", Hidden: true}
+	var check bool
+	docs := &cobra.Command{Use: "std-docs [file]", Short: "Write the standard bundle catalogue", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		dest := "docs/std.md"
+		if len(args) > 0 {
+			dest = args[0]
+		}
+		data, err := stdlib.Docs(cmd.Context())
+		if err != nil {
+			return err
+		}
+		if check {
+			old, err := os.ReadFile(dest)
+			if err != nil {
+				return err
+			}
+			if !bytes.Equal(old, data) {
+				return fmt.Errorf("%s is not current. Run go run ./cmd/fam internal std-docs", dest)
+			}
+			return nil
+		}
+		return os.WriteFile(dest, data, 0o644)
+	}}
+	docs.Flags().BoolVar(&check, "check", false, "fail when the catalogue is not current")
+	c.AddCommand(docs)
 	c.AddCommand(&cobra.Command{
 		Use:   "package <dir>",
 		Short: "Write the files of the fam Pkl package that a release publishes",

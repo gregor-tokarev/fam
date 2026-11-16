@@ -33,6 +33,7 @@ type MachineResult struct {
 	// ErrorKind is "connection", "unsupported", "config", "sudo", or "task" when Status is "error" or "failed".
 	ErrorKind string          `json:"errorKind,omitempty" toon:"errorKind,omitempty"`
 	Error     string          `json:"error,omitempty" toon:"error,omitempty"`
+	Warnings  []string        `json:"warnings,omitempty" toon:"warnings,omitempty"`
 	Facts     *facts.Facts    `json:"facts,omitempty" toon:"facts,omitempty"`
 	Tasks     []TaskResult    `json:"tasks" toon:"tasks"`
 	Restarts  []RestartResult `json:"restarts,omitempty" toon:"restarts,omitempty"`

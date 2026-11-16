@@ -1,0 +1,7 @@
+/// Tools for local networking.
+module fam.std.networking
+
+import "../Bundle.pkl"
+
+/// portless: named local URLs instead of port numbers, with its skill.
+portless: Bundle = import("../bundles/networking/portless.pkl")

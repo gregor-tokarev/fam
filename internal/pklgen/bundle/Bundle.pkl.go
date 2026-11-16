@@ -28,7 +28,7 @@ import (
 //
 // ```
 //
-// Bundles declare no secrets. Secrets come from the secrets file of the config.
+// Bundles list secret names. Values come from the secrets file of the config.
 type Bundle struct {
 	// The identity of the bundle.
 	//
@@ -38,6 +38,10 @@ type Bundle struct {
 	// A short description for output.
 	Description *string `pkl:"description"`
 
+	// Whether the tool supports the current machine facts.
+	// The acceptance harness omits unsupported bundles.
+	Supported bool `pkl:"supported"`
+
 	// The version of the bundle. Standard bundles have the FAM version.
 	Version *string `pkl:"version"`
 
@@ -46,6 +50,10 @@ type Bundle struct {
 
 	// Environment variables that FAM exports in every shell of the machine.
 	Env map[string]string `pkl:"env"`
+
+	// Names of environment variables that the tool needs at run time.
+	// FAM warns when the secrets file of the config does not give a name.
+	RequiredSecrets []string `pkl:"requiredSecrets"`
 
 	// Directories that FAM adds to the start of `PATH` in every shell and in FAM scripts,
 	// for example `"~/.cargo/bin"`. `~/` is the home directory.

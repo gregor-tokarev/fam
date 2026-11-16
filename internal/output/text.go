@@ -30,6 +30,9 @@ func WriteText(w io.Writer, r *Run) {
 			f := m.Facts
 			fmt.Fprintf(w, "   %s %s %s, %s, %d CPUs, user %s\n", f.OS, f.Distro, f.DistroVersion, f.Arch, f.CPUs, f.User)
 		}
+		for _, warning := range m.Warnings {
+			fmt.Fprintf(w, "   warning: %s\n", warning)
+		}
 		group := ""
 		for _, t := range m.Tasks {
 			if t.Group != group {

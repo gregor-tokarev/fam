@@ -1,0 +1,13 @@
+/// Tools that give agents context: source code of packages, a knowledge graph of a codebase, related issues.
+module fam.std.context
+
+import "../Bundle.pkl"
+
+/// issue-graph: related issues and changes before work starts, with its skill.
+issueGraph: Bundle = import("../bundles/context/issue-graph.pkl")
+
+/// lat.md: a Markdown knowledge graph of a codebase, with its skill.
+latMd: Bundle = import("../bundles/context/lat-md.pkl")
+
+/// opensrc: the source code of npm packages for agents, with its skill.
+opensrc: Bundle = import("../bundles/context/opensrc.pkl")

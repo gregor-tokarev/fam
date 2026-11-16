@@ -305,6 +305,24 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 		setError(mr.res, err)
 		return
 	}
+	if opts.Mode == ModePlan || opts.Mode == ModeApply {
+		supplied := map[string]bool{}
+		for _, secret := range secretList {
+			supplied[secret.Name] = true
+		}
+		for _, u := range spec.Bundles {
+			if u.State != "present" {
+				continue
+			}
+			seen := map[string]bool{}
+			for _, name := range u.Bundle.RequiredSecrets {
+				if !supplied[name] && !seen[name] {
+					mr.res.Warnings = append(mr.res.Warnings, fmt.Sprintf("bundle %s needs secret %s, but the config secrets do not supply it", u.Bundle.Name, name))
+					seen[name] = true
+				}
+			}
+		}
+	}
 	mr.spec = spec
 	sects, verify, err := buildSections(ctx, mr.env, spec)
 	if err != nil {
