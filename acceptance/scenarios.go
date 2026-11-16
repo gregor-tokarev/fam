@@ -165,7 +165,7 @@ var scenarios = []scenario{
 	{2, "apply, then plan is satisfied and apply changes nothing", s2Apply, nil},
 	{3, "verify: fresh_shell and reconnect", s3Verify, nil},
 	{4, "drift is found and repaired", s4Drift, nil},
-	{5, "absent bundle removes skill, links, files, instruction lines", s5Absent, nil},
+	{5, "absent bundle removes skill, links, files, merged keys, variables", s5Absent, nil},
 	{6, "global bundle removed on one machine", s6MachineAbsent, nil},
 	{7, "secrets in shells, never in output or logs", s7Secrets, nil},
 	{8, "check exit 1 never applies, failed task stops the rest", s8Failures, nil},
@@ -364,19 +364,15 @@ func s5Absent(c *Ctx) error {
 		return err
 	}
 	out, _ := c.ssh(`for p in ~/.local/bin/fam-tool ~/.local/bin/fam-tool-link ~/.agents/skills/tool-skill ~/.claude/skills/tool-skill; do if [ -e "$p" ] || [ -L "$p" ]; then echo "present $p"; fi; done
-grep -c 'fam-tool' ~/.agents/AGENTS.md ~/.agents/CLAUDE.md
-grep -c FAM_TOOL_MODE ~/.config/fam/env.sh
+echo "vars=$(grep -c FAM_TOOL_MODE ~/.config/fam/env.sh)"
 cat ~/.config/fam-tool/config.json`)
 	if strings.Contains(out, "present ") {
 		return fmt.Errorf("absent bundle left items: %s", out)
 	}
-	if !strings.Contains(out, "AGENTS.md:0") || !strings.Contains(out, "CLAUDE.md:0") {
-		return fmt.Errorf("instruction lines of the absent bundle stayed: %s", out)
-	}
 	if strings.Contains(out, `"mode"`) || strings.Contains(out, `"nested"`) {
 		return fmt.Errorf("merged keys of the absent bundle stayed: %s", out)
 	}
-	if !strings.Contains(out, "\n0\n") {
+	if !strings.Contains(out, "vars=0") {
 		return fmt.Errorf("bundle variables stayed in env.sh: %s", out)
 	}
 	if out2, _ := c.ssh(`test -d ~/.agents/skills/fleet-skill && echo kept`); !strings.Contains(out2, "kept") {
@@ -390,7 +386,7 @@ cat ~/.config/fam-tool/config.json`)
 	if pm.Counts.Change != 0 {
 		return fmt.Errorf("plan after removal:\n%s", describe(p.Res))
 	}
-	c.notes = append(c.notes, "file, link, merged keys, skill, Claude link, instruction lines, variables removed")
+	c.notes = append(c.notes, "file, link, merged keys, skill, Claude link, variables removed")
 	return nil
 }
 
@@ -404,8 +400,8 @@ func s6MachineAbsent(c *Ctx) error {
 	if _, err := c.applyOK("--config", "config-machine-absent.pkl"); err != nil {
 		return err
 	}
-	out, _ := c.ssh(`test -e ~/.local/share/fam-global/marker && echo still; grep -c 'Global bundle line' ~/.agents/AGENTS.md; test -x ~/.local/bin/fam-tool && echo tool`)
-	if strings.Contains(out, "still") || !strings.Contains(out, "0") || !strings.Contains(out, "tool") {
+	out, _ := c.ssh(`test -e ~/.local/share/fam-global/marker && echo still; test -x ~/.local/bin/fam-tool && echo tool`)
+	if strings.Contains(out, "still") || !strings.Contains(out, "tool") {
 		return fmt.Errorf("machine entry did not remove only the global bundle: %s", out)
 	}
 	c.notes = append(c.notes, "global bundle removed by the machine entry, other bundles kept")
@@ -685,7 +681,7 @@ func s14Std(c *Ctx) error {
 		return err
 	}
 	m, _ := machineOf(r)
-	out, err := c.mustSSH(`bash -lc 'agent-browser --version'; grep -q '^name: agent-browser' ~/.agents/skills/agent-browser/SKILL.md && echo skill; test -L ~/.claude/skills/agent-browser && echo link; grep -c agent-browser ~/.agents/AGENTS.md`)
+	out, err := c.mustSSH(`bash -lc 'agent-browser --version'; grep -q '^name: agent-browser' ~/.agents/skills/agent-browser/SKILL.md && echo skill; test -L ~/.claude/skills/agent-browser && echo link`)
 	if err != nil || !strings.Contains(out, "skill") || !strings.Contains(out, "link") {
 		return fmt.Errorf("agentBrowser: %v %s", err, out)
 	}

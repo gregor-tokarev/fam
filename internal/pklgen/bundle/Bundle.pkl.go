@@ -9,7 +9,7 @@ import (
 )
 
 // A bundle: a reusable part of the config. Usually one tool or one piece of machine setup, with
-// its tasks, environment, skill, instructions, and checks.
+// its tasks, environment, skill, and checks.
 //
 // `config.pkl` selects the machines: `bundles` (every machine), `roles` (every machine with a
 // role), or the `bundles` of one machine. A bundle itself does not know the machines.
@@ -62,9 +62,6 @@ type Bundle struct {
 	// FAM copies it to `~/.agents/skills/<folder name>` (a local folder named `skill` uses the
 	// bundle name).
 	Skill *any `pkl:"skill"`
-
-	// Lines that FAM adds to the agent instructions of the machine.
-	Instructions []string `pkl:"instructions"`
 
 	// The install tasks, in order.
 	Tasks []tasks.Task `pkl:"tasks"`

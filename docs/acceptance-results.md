@@ -8,7 +8,7 @@ Final run of the VM harness (`go run ./acceptance run …`) with the code of the
 | 2 | apply, then plan is satisfied and apply changes nothing | pass | pass | pass | pass | pass | pass | pass |
 | 3 | verify: fresh_shell and reconnect | pass | pass | pass | pass | pass | pass | pass |
 | 4 | drift is found and repaired | pass | pass | pass | pass | pass | pass | pass |
-| 5 | absent bundle removes skill, links, files, instruction lines | pass | pass | pass | pass | pass | pass | pass |
+| 5 | absent bundle removes skill, links, files, merged keys, variables | pass | pass | pass | pass | pass | pass | pass |
 | 6 | global bundle removed on one machine | pass | pass | pass | pass | pass | pass | pass |
 | 7 | secrets in shells, never in output or logs | pass | pass | pass | pass | pass | pass | pass |
 | 8 | check exit 1 never applies, failed task stops the rest | pass | pass | pass | pass | pass | pass | pass |

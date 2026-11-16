@@ -125,9 +125,6 @@ env {
   ["FAM_TOOL_MODE"] = "acceptance"
 }
 skill = "tool-skill"
-instructions {
-  "Use ` + "`fam-tool`" + ` in acceptance tests."
-}
 tasks {
   new fam.File {
     path = "~/.local/bin/fam-tool"
@@ -156,9 +153,6 @@ verify {
 import "../.fam/tasks.pkl" as fam
 
 name = "global"
-instructions {
-  "Global bundle line."
-}
 tasks {
   new fam.File { path = "~/.local/share/fam-global/marker"; content = "global\n" }
 }

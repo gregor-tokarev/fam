@@ -426,23 +426,6 @@ func render(file string, data map[string]any) (string, error) {
 	return b.String(), nil
 }
 
-func bundleInstructions(spec *config.Spec) string {
-	var b strings.Builder
-	for _, u := range spec.Bundles {
-		if u.State != "present" || len(u.Bundle.Instructions) == 0 {
-			continue
-		}
-		if b.Len() == 0 {
-			b.WriteString("\n## Tools on this machine\n")
-		}
-		fmt.Fprintf(&b, "\n### %s\n\n", u.Bundle.Name)
-		for _, l := range u.Bundle.Instructions {
-			b.WriteString(l + "\n")
-		}
-	}
-	return b.String()
-}
-
 func instructionsSection(env *Env, spec *config.Spec) (Section, error) {
 	g := base{group: "instructions"}
 	data := templateData(env)
@@ -450,7 +433,6 @@ func instructionsSection(env *Env, spec *config.Spec) (Section, error) {
 	if err != nil {
 		return Section{}, err
 	}
-	tools := bundleInstructions(spec)
 	joinMD := func(parts ...string) string {
 		var out []string
 		for _, p := range parts {
@@ -463,7 +445,7 @@ func instructionsSection(env *Env, spec *config.Spec) (Section, error) {
 		}
 		return strings.Join(out, "\n\n") + "\n"
 	}
-	agentsBody := joinMD(agents, tools)
+	agentsBody := joinMD(agents)
 	claude := ""
 	cp := path.Join(env.Project.InstructionsDir, "CLAUDE.md")
 	if _, err := os.Stat(cp); err == nil {
@@ -472,7 +454,7 @@ func instructionsSection(env *Env, spec *config.Spec) (Section, error) {
 			return Section{}, err
 		}
 	}
-	claudeBody := joinMD(agents, tools, claude)
+	claudeBody := joinMD(agents, claude)
 	return Section{Name: "instructions", Tasks: []Task{
 		&ManagedFileTask{base: g, Path: "~/.agents/AGENTS.md", Content: managedContent([]byte(agentsBody))},
 		&ManagedFileTask{base: g, Path: "~/.agents/CLAUDE.md", Content: managedContent([]byte(claudeBody))},
