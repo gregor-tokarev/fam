@@ -1,6 +1,6 @@
 /// kind: Run local Kubernetes clusters in containers (https://github.com/kubernetes-sigs/kind).
 ///
-/// FAM installs the CLI with Go. Installation needs Go 1.17 or later.
+/// FAM installs the standalone CLI from GitHub and checks the vendor SHA-256 file.
 /// Cluster operations need a separately installed Docker, Podman, or nerdctl engine.
 amends "../../Bundle.pkl"
 
@@ -10,10 +10,15 @@ name = "kind"
 description = "Run local Kubernetes clusters in containers"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef { package = "sigs.k8s.io/kind"; manager = "go" }
+  new fam.GitHubRelease {
+    repo = "kubernetes-sigs/kind"
     binary = "kind"
     versionCommand = "kind version"
+    assets {
+      ["linux-amd64"] { name = "kind-linux-amd64"; checksum = "kind-linux-amd64.sha256sum" }
+      ["linux-arm64"] { name = "kind-linux-arm64"; checksum = "kind-linux-arm64.sha256sum" }
+      ["darwin-arm64"] { name = "kind-darwin-arm64"; checksum = "kind-darwin-arm64.sha256sum" }
+    }
   }
 }
 

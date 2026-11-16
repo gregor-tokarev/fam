@@ -1,6 +1,6 @@
 /// goose: Apply and track database schema migrations (https://github.com/pressly/goose).
 ///
-/// FAM installs the CLI with Go. Installation needs Go 1.26 or later.
+/// FAM installs the standalone CLI from GitHub and checks the vendor SHA-256 file.
 /// Database operations need GOOSE_DRIVER and a connection string in GOOSE_DBSTRING.
 amends "../../Bundle.pkl"
 
@@ -11,10 +11,15 @@ description = "Apply and track database schema migrations"
 version = "@FAM_VERSION@"
 requiredSecrets { "GOOSE_DBSTRING" }
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef { package = "github.com/pressly/goose/v3/cmd/goose"; manager = "go" }
+  new fam.GitHubRelease {
+    repo = "pressly/goose"
     binary = "goose"
     versionCommand = "goose --version"
+    assets {
+      ["linux-amd64"] { name = "goose_linux_x86_64"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "goose_linux_arm64"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "goose_darwin_arm64"; checksum = "checksums.txt" }
+    }
   }
 }
 

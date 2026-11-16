@@ -3,7 +3,7 @@ module fam.std.cloud
 
 import "../Bundle.pkl"
 
-/// aws-cli: manage AWS services with AWS CLI v1.
+/// aws-cli: manage AWS services with AWS CLI v2.
 awsCli: Bundle = import("../bundles/cloud/aws-cli.pkl")
 
 /// azure-cli: manage Azure resources and deployments.

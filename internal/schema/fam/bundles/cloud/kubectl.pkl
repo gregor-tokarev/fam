@@ -1,22 +1,51 @@
 /// kubectl: Manage Kubernetes resources and clusters (https://github.com/kubernetes/kubernetes).
 ///
-/// FAM installs the CLI with Homebrew.
-/// It needs Homebrew on macOS or glibc Linux. Homebrew does not support Alpine.
+/// FAM downloads the latest official binary and checks the vendor SHA-256 file.
+/// It installs only the CLI atomically into ~/.local/bin, without sudo.
+/// Installation needs curl, standard shell tools, and sha256sum on Linux or shasum on macOS.
 /// Cluster operations need a kubeconfig, cluster credentials, and a reachable cluster.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
-import "../../facts.pkl"
+
+local installKubectl = #"""
+  set -eu
+  mkdir -p "$HOME/.local/bin"
+  work=$(mktemp -d "$HOME/.local/bin/.kubectl.XXXXXX")
+  trap 'rm -rf "$work"' EXIT HUP INT TERM
+  case "$(uname -s)" in
+    Linux) os=linux ;;
+    Darwin) os=darwin ;;
+    *) echo 'Unsupported operating system' >&2; exit 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *) echo 'Unsupported architecture' >&2; exit 1 ;;
+  esac
+  version=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+  printf '%s\n' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+  url="https://dl.k8s.io/release/$version/bin/$os/$arch/kubectl"
+  curl -fsSL "$url" -o "$work/kubectl"
+  expected=$(curl -fsSL "$url.sha256" | awk '{print $1}')
+  case "$os" in
+    darwin) actual=$(shasum -a 256 "$work/kubectl" | awk '{print $1}') ;;
+    linux) actual=$(sha256sum "$work/kubectl" | awk '{print $1}') ;;
+  esac
+  [ "${#expected}" -eq 64 ] && [ "$actual" = "$expected" ] || { echo 'SHA-256 mismatch' >&2; exit 1; }
+  chmod 755 "$work/kubectl"
+  mv -f "$work/kubectl" "$HOME/.local/bin/kubectl"
+  """#
 
 name = "kubectl"
 description = "Manage Kubernetes resources and clusters"
 version = "@FAM_VERSION@"
-supported = facts.libc != "musl"
-path { if (facts.os == "darwin") "/opt/homebrew/bin" else "/home/linuxbrew/.linuxbrew/bin" }
 tasks {
   new fam.Package {
-    package = new fam.PackageRef { package = "kubernetes-cli"; manager = "brew" }
-    binary = "kubectl"
+    binary = "~/.local/bin/kubectl"
+    install = installKubectl
+    update = installKubectl
+    uninstall = "rm -f ~/.local/bin/kubectl"
     versionCommand = "kubectl version --client --output=yaml"
   }
 }

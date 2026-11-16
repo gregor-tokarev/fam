@@ -1,21 +1,56 @@
 /// tailscale: Connect worker machines through the Tailscale private network (https://github.com/tailscale/tailscale).
 ///
-/// FAM installs the CLI with Go.
-/// Installation needs Go 1.27.4 or later. Network operations need a separately configured tailscaled daemon and login.
+/// Linux uses the latest official static CLI archive with its SHA-256 checksum. Installation needs curl and tar.
+/// macOS uses the Homebrew tailscale formula. The GitHub releases contain no binary assets.
+/// Network operations need a separately configured tailscaled daemon and login.
 /// FAM installs only the CLI and does not change the network or start a daemon.
-/// Go source builds can show incomplete version metadata.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+local installTailscale = #"""
+  set -eu
+  mkdir -p "$HOME/.local/bin"
+  work=$(mktemp -d "$HOME/.local/bin/.tailscale.XXXXXX")
+  trap 'rm -rf "$work"' EXIT HUP INT TERM
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *) echo 'Unsupported architecture' >&2; exit 1 ;;
+  esac
+  curl -fsSL https://pkgs.tailscale.com/stable/ -o "$work/index"
+  archive=$(sed -n "s/.*href=\"\(tailscale_[0-9.]*_${arch}\.tgz\)\".*/\1/p" "$work/index" | sort -u | tail -1)
+  printf '%s\n' "$archive" | grep -Eq '^tailscale_[0-9]+\.[0-9]+\.[0-9]+_(amd64|arm64)\.tgz$'
+  base="https://pkgs.tailscale.com/stable/$archive"
+  curl -fsSL "$base" -o "$work/tailscale.tgz"
+  expected=$(curl -fsSL "$base.sha256" | awk '{print $1}')
+  actual=$(sha256sum "$work/tailscale.tgz" | awk '{print $1}')
+  [ "${#expected}" -eq 64 ] && [ "$actual" = "$expected" ] || { echo 'SHA-256 mismatch' >&2; exit 1; }
+  tar -xzf "$work/tailscale.tgz" -C "$work" "${archive%.tgz}/tailscale"
+  chmod 755 "$work/${archive%.tgz}/tailscale"
+  mv -f "$work/${archive%.tgz}/tailscale" "$HOME/.local/bin/tailscale"
+  """#
 
 name = "tailscale"
 description = "Connect worker machines through the Tailscale private network"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef { package = "tailscale.com/cmd/tailscale"; manager = "go" }
-    binary = "tailscale"
-    versionCommand = "tailscale version"
+  when (facts.os == "linux") {
+    new fam.Package {
+      binary = "~/.local/bin/tailscale"
+      install = installTailscale
+      update = installTailscale
+      uninstall = "rm -f ~/.local/bin/tailscale"
+      versionCommand = "tailscale version"
+    }
+  }
+  when (facts.os == "darwin") {
+    new fam.Package {
+      package = new fam.PackageRef { package = "tailscale"; manager = "brew" }
+      binary = "tailscale"
+      versionCommand = "tailscale version"
+    }
   }
 }
 

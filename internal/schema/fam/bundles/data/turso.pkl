@@ -1,20 +1,28 @@
 /// turso: Manage Turso databases, branches, and access tokens (https://github.com/tursodatabase/turso-cli).
 ///
-/// FAM installs the CLI with Go.
-/// Installation needs Go 1.25 or later. Cloud operations need TURSO_API_TOKEN or a login.
+/// FAM installs the standalone CLI from GitHub and checks the vendor SHA-256 file.
+/// The Linux release needs glibc. The vendor supplies no musl release.
+/// Cloud operations need TURSO_API_TOKEN or a login.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
 
 name = "turso"
 description = "Manage Turso databases, branches, and access tokens"
 version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
 requiredSecrets { "TURSO_API_TOKEN" }
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef { package = "github.com/tursodatabase/turso-cli/cmd/turso"; manager = "go" }
+  new fam.GitHubRelease {
+    repo = "tursodatabase/turso-cli"
     binary = "turso"
     versionCommand = "turso --version"
+    assets {
+      ["linux-amd64"] { name = "turso-cli_Linux_x86_64.tar.gz"; format = "tar.gz"; file = "turso"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "turso-cli_Linux_arm64.tar.gz"; format = "tar.gz"; file = "turso"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "turso-cli_Darwin_arm64.tar.gz"; format = "tar.gz"; file = "turso"; checksum = "checksums.txt" }
+    }
   }
 }
 

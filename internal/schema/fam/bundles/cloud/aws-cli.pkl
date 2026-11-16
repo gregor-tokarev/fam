@@ -1,20 +1,100 @@
 /// aws-cli: Manage AWS services from the command line (https://github.com/aws/aws-cli).
 ///
-/// FAM installs the CLI with uv.
-/// This bundle installs AWS CLI v1, not v2. It needs uv and Python 3.10 or later.
+/// FAM installs AWS CLI v2 with the official installer, without sudo.
+/// Linux installation needs glibc, curl, unzip, and GnuPG. AWS supplies no musl build.
+/// FAM verifies the Linux archive's PGP signature with the embedded AWS CLI Team public key.
+/// Its fingerprint is FB5DB77FD5C118B80511ADA8A6310ACC4672475C, from the AWS installation guide.
+/// macOS uses the official pkg for the current user, with Apple's signature and Gatekeeper checks.
 /// Use AWS credentials or a configured profile. AWS_SESSION_TOKEN applies only to temporary credentials.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+local installAws = #"""
+  set -eu
+  mkdir -p "$HOME/.local/bin"
+  work=$(mktemp -d)
+  trap 'rm -rf "$work"' EXIT HUP INT TERM
+  case "$(uname -s)" in
+    Linux)
+      case "$(uname -m)" in
+        x86_64) arch=x86_64 ;;
+        aarch64|arm64) arch=aarch64 ;;
+        *) echo 'Unsupported architecture' >&2; exit 1 ;;
+      esac
+      url="https://awscli.amazonaws.com/awscli-exe-linux-$arch.zip"
+      curl -fsSL "$url" -o "$work/awscliv2.zip"
+      curl -fsSL "$url.sig" -o "$work/awscliv2.sig"
+      mkdir -m 700 "$work/gnupg"
+      cat > "$work/aws-key.asc" <<'AWS_KEY'
+  -----BEGIN PGP PUBLIC KEY BLOCK-----
+
+  mQINBF2Cr7UBEADJZHcgusOJl7ENSyumXh85z0TRV0xJorM2B/JL0kHOyigQluUG
+  ZMLhENaG0bYatdrKP+3H91lvK050pXwnO/R7fB/FSTouki4ciIx5OuLlnJZIxSzx
+  PqGl0mkxImLNbGWoi6Lto0LYxqHN2iQtzlwTVmq9733zd3XfcXrZ3+LblHAgEt5G
+  TfNxEKJ8soPLyWmwDH6HWCnjZ/aIQRBTIQ05uVeEoYxSh6wOai7ss/KveoSNBbYz
+  gbdzoqI2Y8cgH2nbfgp3DSasaLZEdCSsIsK1u05CinE7k2qZ7KgKAUIcT/cR/grk
+  C6VwsnDU0OUCideXcQ8WeHutqvgZH1JgKDbznoIzeQHJD238GEu+eKhRHcz8/jeG
+  94zkcgJOz3KbZGYMiTh277Fvj9zzvZsbMBCedV1BTg3TqgvdX4bdkhf5cH+7NtWO
+  lrFj6UwAsGukBTAOxC0l/dnSmZhJ7Z1KmEWilro/gOrjtOxqRQutlIqG22TaqoPG
+  fYVN+en3Zwbt97kcgZDwqbuykNt64oZWc4XKCa3mprEGC3IbJTBFqglXmZ7l9ywG
+  EEUJYOlb2XrSuPWml39beWdKM8kzr1OjnlOm6+lpTRCBfo0wa9F8YZRhHPAkwKkX
+  XDeOGpWRj4ohOx0d2GWkyV5xyN14p2tQOCdOODmz80yUTgRpPVQUtOEhXQARAQAB
+  tCFBV1MgQ0xJIFRlYW0gPGF3cy1jbGlAYW1hem9uLmNvbT6JAlQEEwEIAD4CGwMF
+  CwkIBwIGFQoJCAsCBBYCAwECHgECF4AWIQT7Xbd/1cEYuAURraimMQrMRnJHXAUC
+  akV0ygUJDqP4lQAKCRCmMQrMRnJHXFHjD/9eyZLYcKuQOlLvtqSDtUBiEZf6ZZjM
+  i3ygYH8rJNtuToUH+HvSpe819urJCquXhDrlK6N+aqW0hCLtNABJG/vsafIgvIYJ
+  hSGgpgtNnQyMV1jViRWqPjbouw8OkYKBThUfT1i2Y+wn58ifs6ODBCmTexWtXspA
+  Si+Gt49xDOW0APmbOPnI+a4HJW6tVEo6MWS0WjzpiBayR3d1A4pt4YrPfSdDgpLo
+  h2SLQqlRqvvVZJaWBjhkErNFpfsBA06sDcPEOb0G8LBUbR4WOcdvhe5LubJbZuxC
+  AG9kNPCVeQP1ixwjgjXKysaxeQ6rv0VzIQgRp6tLVLWhy6AKDNvLjFSsmXZ1Wl08
+  Y/RlOHXlzLuQMRE6sR1wOdRxc9TsrNWTGiBK65cvSWOy03JeBkQQ8pesqltiyxI9
+  U21kkgiXtTSKNGfKK8pO27D81YANhRqPK7iTp6kuFiY2WtOg90KTMNlIT+Ff85Y2
+  b1rHj6Z0SrCkJujhWk3IBPic/wJgz01LEc/OAdUPlby90RJZcIBhSlWhT7mXnXIO
+  c0HWlNQrns2s3CTyYwZSiSlYe9ApeLwhjDo8NhbFuCAy61l6O5UsR4AfZxx/rGKv
+  2wFb1/RN/P4gNe6vmxZAPjR0AQcwD3tc2McimOLr/22kmPz8IH3I0X7WoSFr0Biz
+  E91G7bb0hOb/cA==
+  =knv7
+  -----END PGP PUBLIC KEY BLOCK-----
+  AWS_KEY
+      gpg --homedir "$work/gnupg" --batch --import "$work/aws-key.asc"
+      gpg --homedir "$work/gnupg" --batch --verify "$work/awscliv2.sig" "$work/awscliv2.zip"
+      unzip -q "$work/awscliv2.zip" -d "$work"
+      "$work/aws/install" -i "$HOME/.local/aws-cli" -b "$HOME/.local/bin" --update
+      ;;
+    Darwin)
+      curl -fsSL https://awscli.amazonaws.com/AWSCLIV2.pkg -o "$work/AWSCLIV2.pkg"
+      pkgutil --check-signature "$work/AWSCLIV2.pkg"
+      spctl --assess --type install "$work/AWSCLIV2.pkg"
+      cat > "$work/choices.xml" <<AWS_CHOICES
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  <plist version="1.0"><array><dict>
+  <key>choiceAttribute</key><string>customLocation</string>
+  <key>attributeSetting</key><string>$HOME/.local</string>
+  <key>choiceIdentifier</key><string>default</string>
+  </dict></array></plist>
+  AWS_CHOICES
+      installer -pkg "$work/AWSCLIV2.pkg" -target CurrentUserHomeDirectory -applyChoiceChangesXML "$work/choices.xml"
+      ln -sf "$HOME/.local/aws-cli/aws" "$HOME/.local/bin/aws"
+      ln -sf "$HOME/.local/aws-cli/aws_completer" "$HOME/.local/bin/aws_completer"
+      ;;
+    *) echo 'Unsupported operating system' >&2; exit 1 ;;
+  esac
+  """#
 
 name = "aws-cli"
-description = "Manage AWS services with AWS CLI v1"
+description = "Manage AWS services with AWS CLI v2"
 version = "@FAM_VERSION@"
 requiredSecrets { "AWS_ACCESS_KEY_ID"; "AWS_SECRET_ACCESS_KEY"; "AWS_SESSION_TOKEN" }
+supported = facts.libc != "musl"
 tasks {
   new fam.Package {
-    package = new fam.PackageRef { package = "awscli"; manager = "uv" }
-    binary = "aws"
+    binary = "~/.local/bin/aws"
+    install = installAws
+    update = installAws
+    uninstall = #"rm -f "$HOME/.local/bin/aws" "$HOME/.local/bin/aws_completer" && rm -rf "$HOME/.local/aws-cli""#
     versionCommand = "aws --version"
   }
 }
