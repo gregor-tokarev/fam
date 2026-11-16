@@ -34,7 +34,9 @@ type SymlinkImpl struct {
 	// Units that FAM restarts once, at the end of the bundle, when this task made a change.
 	//
 	// FAM does not restart units after a failed task.
-	// A unit managed by a [Service] task in the same bundle uses the scope of that task.
+	// FAM does not restart units for a bundle with the state `"absent"`.
+	// A unit managed by a [Service] task in the same bundle uses the scope of that task (when the
+	// bundle has a user and a system Service task with this name, the rule below applies).
 	// Other units use the system scope when [sudo] is `true`, and the user scope when it is `false`.
 	Restarts []string `pkl:"restarts"`
 }
@@ -66,7 +68,9 @@ func (rcv SymlinkImpl) GetSudo() bool {
 // Units that FAM restarts once, at the end of the bundle, when this task made a change.
 //
 // FAM does not restart units after a failed task.
-// A unit managed by a [Service] task in the same bundle uses the scope of that task.
+// FAM does not restart units for a bundle with the state `"absent"`.
+// A unit managed by a [Service] task in the same bundle uses the scope of that task (when the
+// bundle has a user and a system Service task with this name, the rule below applies).
 // Other units use the system scope when [sudo] is `true`, and the user scope when it is `false`.
 func (rcv SymlinkImpl) GetRestarts() []string {
 	return rcv.Restarts

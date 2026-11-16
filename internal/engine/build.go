@@ -52,7 +52,7 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string) (Tas
 	case tasks.Service:
 		return &ServiceTask{base: b, Unit: x.GetName(), Scope: x.GetScope(), Content: x.GetContent(), Enabled: x.GetEnabled(), Running: x.GetRunning(), Absent: isAbsent(string(x.GetState())), units: units}, nil
 	case tasks.Linger:
-		lt := &LingerTask{base: b, Absent: isAbsent(string(x.GetState()))}
+		lt := &LingerTask{base: b, Absent: isAbsent(string(x.GetState())), units: units}
 		if u := x.GetUser(); u != nil {
 			lt.User = *u
 		}
@@ -139,11 +139,20 @@ func BundleSection(u config.BundleUse, pm map[string]string) (Section, error) {
 		return sec, nil
 	}
 	sec.RestartUnits = true
+	// The scope of each unit that a Service task of this bundle manages. A name with a user and
+	// a system Service task is ambiguous: its restarts keep the scope from the `sudo` of the task.
 	scopes := map[string]string{}
+	ambiguous := map[string]bool{}
 	for _, t := range u.Bundle.Tasks {
 		if s, ok := t.(tasks.Service); ok {
+			if prev, ok := scopes[s.GetName()]; ok && prev != s.GetScope() {
+				ambiguous[s.GetName()] = true
+			}
 			scopes[s.GetName()] = s.GetScope()
 		}
+	}
+	for n := range ambiguous {
+		delete(scopes, n)
 	}
 	for _, bt := range u.Bundle.Tasks {
 		t, err := convert(bt, group, false, pm)

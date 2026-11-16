@@ -9,7 +9,7 @@
 3. **Evaluate.** FAM evaluates the full config for each machine, with the facts of that machine as the Pkl properties `fam.<name>`, and checks the rules that Pkl cannot check: bundle names and scripts with a check.
 4. **Plan.** FAM runs the check of every task. A check changes nothing.
 5. **Apply** (`fam apply` only). FAM stops on a machine with a conflict before it changes anything. Then for each task: check, apply when the check finds a difference, and check again. A task that fails stops the tasks after it on that machine. FAM never runs apply after a check error.
-6. **Restart.** At the end of each bundle, FAM restarts each unit that a changed task names in `restarts` once. FAM does not restart units after a failure.
+6. **Restart.** At the end of each present bundle, FAM restarts each unit that a changed task names in `restarts` once. FAM does not restart units after a failure, and not for a bundle with `state = "absent"`.
 7. **Verify.** FAM runs the verify scripts of the bundles and the agent checks in new shells.
 
 ## Task order on a machine
