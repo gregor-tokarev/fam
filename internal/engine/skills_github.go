@@ -203,6 +203,14 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 	// The target must be a file in the same folder.
 	// The copies count against the same limits as regular files.
 	for rel, target := range links {
+		// Follow a chain of links (alias.md -> other.md -> file), at most 16 steps.
+		for hops := 0; hops < 16; hops++ {
+			next, isLink := links[target]
+			if !isLink {
+				break
+			}
+			target = next
+		}
 		i, ok := byRel[target]
 		if !ok || path.IsAbs(target) {
 			return fail("the link %s does not point to a file in the skill folder", rel)
