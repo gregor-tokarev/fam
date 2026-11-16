@@ -1,0 +1,27 @@
+//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+
+/// ai-cli: generate text, images, and more from the terminal (https://github.com/vercel-labs/ai-cli).
+///
+/// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
+/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+
+name = "ai-cli"
+description = "Generate anything from the terminal"
+version = "0.7.0"
+tasks {
+  new fam.Package {
+    package = "ai-cli"
+    binary = "ai"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel-labs/ai-cli"
+    path = "skills/ai-cli"
+  }
+}
+
+verify {
+  new { name = "ai --version"; script = "ai --version" }
+}

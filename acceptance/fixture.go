@@ -116,6 +116,32 @@ bundles {
   std.agentBrowser
 }
 `,
+		// Scenario 16: all standard bundles.
+		// agent-desktop and lat.md have no builds for musl (Alpine).
+		"config-std-all.pkl": `amends "config.pkl"
+import ".fam/std.pkl"
+import ".fam/facts.pkl"
+
+bundles {
+  import("bundles/node.pkl")
+  std.agentBrowser
+  when (facts.distro != "alpine") {
+    std.agentDesktop
+    std.latMd
+  }
+  std.agentSkills
+  std.aiCli
+  std.d3k
+  std.emulate
+  std.hyperframes
+  std.issueGraph
+  std.opensrc
+  std.portless
+  std.skills
+  std.webreel
+  std.zero
+}
+`,
 		"bundles/tool/bundle.pkl": `amends "../../.fam/Bundle.pkl"
 import "../../.fam/tasks.pkl" as fam
 
@@ -184,7 +210,7 @@ tasks {
         set -e
         arch=$(uname -m); case "$arch" in x86_64) a=x64 ;; aarch64|arm64) a=arm64 ;; esac
         os=$(uname -s | tr A-Z a-z)
-        v=$(curl -fsSL https://nodejs.org/dist/index.json | grep -o '"version":"v22[^"]*"' | head -1 | cut -d'"' -f4)
+        v=$(curl -fsSL https://nodejs.org/dist/index.json | grep -o '"version":"v24[^"]*"' | head -1 | cut -d'"' -f4)
         mkdir -p "$HOME/.local"
         curl -fsSL "https://nodejs.org/dist/$v/node-$v-$os-$a.tar.gz" | tar -xz -C "$HOME/.local" --strip-components=1
         """#

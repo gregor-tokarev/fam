@@ -80,7 +80,7 @@ FAM copies each folder of `skills/` (resolved relative to `--base`, or set with 
 
 Bundles install skills with tasks, as many as they need, in task order: `new fam.Skill { path }` for a folder of the bundle, and `new fam.GitHubSkill { repo; path; ref }` for a folder in a public GitHub repository. A skill task copies the skill and links `~/.claude/skills/<name>`. The name is the folder name (a bundle folder named `skill` gets the bundle name), or `name`. With `state = "absent"`, or in an absent bundle, the task removes the skill, but only one that FAM made. Two skills with the same name are an error. FAM removes managed skills that no bundle and no folder of `skills/` lists any more.
 
-For a GitHub skill, the cockpit downloads the repository archive from `codeload.github.com` once for each run, also for `fam plan`, and copies the folder like a local one. Without a `ref`, FAM uses the tag of the latest release (the redirect of `github.com/<repo>/releases/latest`, no API token). FAM tries a request up to three times when the network fails. A link in the folder becomes a copy of the file that it points to, which must be in the same folder. FAM reads at most 1 GiB of the archive and keeps only the folder (at most 16 MiB for each file, 64 MiB and 5000 files in total).
+For a GitHub skill, the cockpit downloads the repository archive from `codeload.github.com` and copies the folder like a local one. All skills of one repository and ref share one download. FAM keeps the archive in `<user cache dir>/fam/github/` with its ETag. Once in each run, also for `fam plan`, FAM asks GitHub with this ETag, and GitHub sends the archive again only when it changed (a new commit on a branch, or a moved tag). FAM removes an archive that no run used for 30 days. Without a `ref`, FAM uses the tag of the latest release (the redirect of `github.com/<repo>/releases/latest`, no API token). FAM tries a request up to three times when the network fails. A link in the folder becomes a copy of the file that it points to, which must be in the same folder. FAM reads at most 1 GiB of the archive and keeps only the folder (at most 16 MiB for each file, 64 MiB and 5000 files in total).
 
 ## Secrets
 
@@ -99,6 +99,27 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 - The `name` identifies a bundle. Two files with the same name are an error.
 - A machine entry wins over the global entry with the same name.
 - An absent bundle undoes its typed tasks in reverse order (`File`, `Symlink`, `Merge` keys, `Service`, `Linger`, `Package` with an `uninstall` command), then runs its `uninstall` tasks. FAM cannot undo a `Script`, so it skips scripts. FAM also removes the skill, the Claude link, and the variables of the bundle.
+
+## Standard bundles
+
+`.fam/std.pkl` has ready bundles for agent tools: `bundles { std.portless; std.hyperframes }`. Each one installs the CLI (with npm, unless `packageManagers` selects another manager) and copies its skills from the latest GitHub release. None installs a browser, a runtime, or system packages.
+
+| Bundle | Installs | Skills |
+|---|---|---|
+| `std.agentBrowser` | `agent-browser` | agent-browser |
+| `std.agentDesktop` | `agent-desktop` (glibc only) | agent-desktop, and agent-desktop-linux or agent-desktop-macos |
+| `std.agentSkills` | (skills only) | the 9 skills of `vercel-labs/agent-skills` |
+| `std.aiCli` | `ai` (npm `ai-cli`) | ai-cli |
+| `std.d3k` | (skill only: it brings its own runtime) | d3k |
+| `std.emulate` | `emulate` | emulate |
+| `std.hyperframes` | `hyperframes` | hyperframes, hyperframes-cli, hyperframes-registry, media-use, reverse-any-video, style-sampling |
+| `std.issueGraph` | `issue-graph` | issue-graph |
+| `std.latMd` | `lat` (npm `lat.md`, glibc only) | lat-md |
+| `std.opensrc` | `opensrc` (Node.js 24) | opensrc |
+| `std.portless` | `portless` (Node.js 24) | portless |
+| `std.skills` | `skills` | find-skills |
+| `std.webreel` | `webreel` | webreel |
+| `std.zero` | `~/.zero/bin/zero` (install script) | zero |
 
 ## Services
 

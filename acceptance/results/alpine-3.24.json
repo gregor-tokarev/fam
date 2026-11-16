@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "29s"
+    "duration": "1m18s"
   },
   {
     "target": "alpine-3.24",
@@ -110,6 +110,14 @@
     "result": "pass",
     "detail": "error: the Service task fam-demo.service needs systemd or launchd, but vm (alpine 3.24.4) has no supported service manager (init: none)",
     "duration": "29s"
+  },
+  {
+    "target": "alpine-3.24",
+    "n": 16,
+    "name": "all standard bundles: install, verify, satisfied, archive cache",
+    "result": "pass",
+    "detail": "87 changed, 25 skills; apply 3m14s, plan 26s",
+    "duration": "4m11s"
   },
   {
     "target": "alpine-3.24",

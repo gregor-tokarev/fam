@@ -174,6 +174,7 @@ var scenarios = []scenario{
 	{11, "unknown template variable stops FAM", s11Template, nil},
 	{12, "Claude Code and Codex: install, update, settings, paths", s12Agents, nil},
 	{14, "standard bundle agentBrowser", s14Std, nil},
+	{16, "all standard bundles: install, verify, satisfied, archive cache", s16StdAll, nil},
 	{17, "package from the OS package manager, chosen in config.pkl, then removed", s17Packages, func(t Target) string {
 		if t.BootScript != "" {
 			return "macOS has no OS package manager in the base image"
@@ -696,6 +697,59 @@ func s14Std(c *Ctx) error {
 		return fmt.Errorf("agentBrowser changed more than the CLI: %s", extra)
 	}
 	c.notes = append(c.notes, fmt.Sprintf("%d changed; %s", m.Counts.Changed, firstLineS(out)))
+	return nil
+}
+
+// stdSkills are the skills of all standard bundles, apart from the skills of agent-desktop and
+// lat.md, which depend on the target.
+var stdSkills = []string{
+	"agent-browser",
+	"vercel-composition-patterns", "deploy-to-vercel", "vercel-react-best-practices", "vercel-react-native-skills",
+	"vercel-react-view-transitions", "vercel-cli-with-tokens", "vercel-optimize", "web-design-guidelines", "writing-guidelines",
+	"ai-cli", "d3k", "emulate",
+	"hyperframes", "hyperframes-cli", "hyperframes-registry", "media-use", "reverse-any-video", "style-sampling",
+	"issue-graph", "opensrc", "portless", "find-skills", "webreel", "zero",
+}
+
+func s16StdAll(c *Ctx) error {
+	start := time.Now()
+	r, err := c.applyOK("--config", "config-std-all.pkl")
+	if err != nil {
+		return err
+	}
+	applied := time.Since(start)
+	m, err := machineOf(r)
+	if err != nil {
+		return err
+	}
+	want := stdSkills
+	switch {
+	case c.t.BootScript != "":
+		want = append(want, "agent-desktop", "agent-desktop-macos", "lat-md")
+	case !strings.Contains(c.t.Name, "alpine"):
+		want = append(want, "agent-desktop", "agent-desktop-linux", "lat-md")
+	}
+	var missing []string
+	for _, s := range want {
+		if out, _ := c.ssh("test -f ~/.agents/skills/" + s + "/SKILL.md && test -L ~/.claude/skills/" + s + " && echo ok"); !strings.Contains(out, "ok") {
+			missing = append(missing, s)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("skills missing: %s", strings.Join(missing, ", "))
+	}
+	// The second plan reads the archives from the cache of the cockpit.
+	start = time.Now()
+	p, err := c.famJSON("plan", "--config", "config-std-all.pkl")
+	if err != nil {
+		return err
+	}
+	planned := time.Since(start)
+	pm, err := machineOf(p.Res)
+	if err != nil || p.Code != 0 || !p.Res.OK || pm.Counts.Change != 0 || pm.Counts.Error != 0 || pm.Counts.Conflict != 0 {
+		return fmt.Errorf("plan after the apply:\n%s", describe(p.Res))
+	}
+	c.notes = append(c.notes, fmt.Sprintf("%d changed, %d skills; apply %s, plan %s", m.Counts.Changed, len(want), applied.Round(time.Second), planned.Round(time.Second)))
 	return nil
 }
 

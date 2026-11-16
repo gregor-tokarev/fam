@@ -1,0 +1,28 @@
+//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+
+/// skills: the open agent skills tool (`npx skills`), with its find-skills skill
+/// (https://github.com/vercel-labs/skills).
+///
+/// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
+/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+/// Skills that FAM installs belong to FAM. `skills update` does not change them.
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+
+name = "skills"
+description = "The agent skills tool and its find-skills skill"
+version = "0.7.0"
+tasks {
+  new fam.Package {
+    package = "skills"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel-labs/skills"
+    path = "skills/find-skills"
+  }
+}
+
+verify {
+  new { name = "skills --version"; script = "skills --version" }
+}

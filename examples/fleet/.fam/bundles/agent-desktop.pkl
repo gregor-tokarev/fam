@@ -1,0 +1,43 @@
+//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+
+/// agent-desktop: computer use for AI agents through the accessibility tree of the system
+/// (https://github.com/vercel-labs/agent-desktop).
+///
+/// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
+/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+///
+/// On Linux, agent-desktop needs glibc (not Alpine) and a desktop session (X11 or Wayland) with
+/// AT-SPI. FAM does not change the system for this.
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+import "../facts.pkl"
+
+name = "agent-desktop"
+description = "Computer use CLI for AI agents"
+version = "0.7.0"
+tasks {
+  new fam.Package {
+    package = "agent-desktop"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel-labs/agent-desktop"
+    path = "skills/agent-desktop"
+  }
+  when (facts.os == "linux") {
+    new fam.GitHubSkill {
+      repo = "vercel-labs/agent-desktop"
+      path = "skills/agent-desktop-linux"
+    }
+  }
+  when (facts.os == "darwin") {
+    new fam.GitHubSkill {
+      repo = "vercel-labs/agent-desktop"
+      path = "skills/agent-desktop-macos"
+    }
+  }
+}
+
+verify {
+  new { name = "agent-desktop --version"; script = "agent-desktop --version" }
+}

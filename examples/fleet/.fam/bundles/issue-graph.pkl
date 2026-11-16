@@ -1,0 +1,29 @@
+//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+
+/// issue-graph: finds related issues, competing changes, and open follow-ups before work starts
+/// (https://github.com/vercel-labs/issue-graph).
+///
+/// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
+/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+/// issue-graph uses the login of the GitHub CLI (`gh auth login`).
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+
+name = "issue-graph"
+description = "Related issues and changes before you start work"
+version = "0.7.0"
+tasks {
+  new fam.Package {
+    package = "issue-graph"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel-labs/issue-graph"
+    path = "skills/issue-graph"
+  }
+}
+
+verify {
+  // issue-graph has no --version.
+  new { name = "issue-graph --help"; script = "issue-graph --help >/dev/null" }
+}

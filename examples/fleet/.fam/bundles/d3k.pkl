@@ -1,0 +1,20 @@
+//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+
+/// d3k (dev3000): a managed browser and a timeline of server output, browser console, and network
+/// requests for agents (https://github.com/vercel-labs/dev3000).
+///
+/// d3k is only a skill: it brings its own runtime. FAM copies the skill of the latest release from
+/// GitHub. d3k needs Node.js 24 or later, pnpm, and Chrome. FAM does not install them.
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+
+name = "d3k"
+description = "Browser and server timeline for agents (dev3000)"
+version = "0.7.0"
+tasks {
+  new fam.GitHubSkill {
+    repo = "vercel-labs/dev3000"
+    path = "skills/d3k"
+  }
+}

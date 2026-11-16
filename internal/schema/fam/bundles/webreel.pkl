@@ -1,0 +1,26 @@
+//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
+
+/// webreel: records scripted browser demos as video (https://github.com/vercel-labs/webreel).
+///
+/// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
+/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+
+name = "webreel"
+description = "Scripted browser demos as video"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "webreel"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel-labs/webreel"
+    path = "skills/webreel"
+  }
+}
+
+verify {
+  new { name = "webreel --version"; script = "webreel --version" }
+}

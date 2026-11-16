@@ -4,16 +4,21 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -23,8 +28,8 @@ var (
 	CodeloadBase = "https://codeload.github.com"
 )
 
-// githubSkills holds the skills that this run downloaded, so that all machines share one
-// download for each repository, folder, and ref.
+// githubSkills holds the skills that this run read, so that all machines share one read for
+// each repository, folder, and ref.
 var githubSkills = struct {
 	sync.Mutex
 	done map[string]*githubSkillResult
@@ -55,7 +60,7 @@ func loadGitHubSkill(ctx context.Context, repo, folder string, refp *string, nam
 	r.once.Do(func() {
 		r.ref = ref
 		if r.ref == "" {
-			r.ref, r.err = latestRelease(ctx, repo)
+			r.ref, r.err = latestReleaseOnce(ctx, repo)
 			if r.err != nil {
 				return
 			}
@@ -78,6 +83,39 @@ func loadGitHubSkill(ctx context.Context, repo, folder string, refp *string, nam
 		return nil, fmt.Errorf("skill %s (%s): %w", name, origin, r.err)
 	}
 	return &SkillSource{Name: name, Dir: src, Origin: origin, files: r.files}, nil
+}
+
+// latestTags holds the latest release tag of each repository for this run.
+var latestTags = struct {
+	sync.Mutex
+	done map[string]*latestTag
+}{done: map[string]*latestTag{}}
+
+type latestTag struct {
+	once sync.Once
+	tag  string
+	err  error
+}
+
+// latestReleaseOnce asks GitHub for the latest release of a repository once in a run, so that
+// all skills of one repository come from the same release.
+func latestReleaseOnce(ctx context.Context, repo string) (string, error) {
+	latestTags.Lock()
+	t, ok := latestTags.done[repo]
+	if !ok {
+		t = &latestTag{}
+		latestTags.done[repo] = t
+	}
+	latestTags.Unlock()
+	t.once.Do(func() { t.tag, t.err = latestRelease(ctx, repo) })
+	if t.err != nil && ctx.Err() != nil {
+		latestTags.Lock()
+		if latestTags.done[repo] == t {
+			delete(latestTags.done, repo)
+		}
+		latestTags.Unlock()
+	}
+	return t.tag, t.err
 }
 
 // latestRelease returns the tag of the latest release of a repository. It reads the redirect of
@@ -118,31 +156,399 @@ const (
 	maxSkillFiles = 5000
 )
 
-// downloadSkill reads the files of one folder from the archive of a repository at a ref.
+// downloadSkill reads the files of one folder from the archive of a repository at a ref. FAM
+// keeps the archive in its cache folder, and asks GitHub once in a run whether it changed.
 func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, error) {
 	segs := strings.Split(ref, "/")
 	for i, sg := range segs {
 		segs[i] = url.PathEscape(sg)
 	}
 	u := CodeloadBase + "/" + repo + "/tar.gz/" + strings.Join(segs, "/")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	for attempt := 0; ; attempt++ {
+		a, direct, err := cachedArchiveFor(ctx, repo, ref, u, attempt > 0)
+		if errors.Is(err, errNoCache) {
+			// The cache folder cannot keep the archive: read the download directly.
+			if direct == nil {
+				if direct, err = fetchArchive(ctx, u, ""); err != nil {
+					return nil, err
+				}
+			}
+			defer direct.Close()
+			return readSkill(direct, folder, u)
+		}
+		if err != nil {
+			return nil, err
+		}
+		files, err := readSkill(a.reader(), folder, u)
+		var ae *archiveError
+		if err != nil && errors.As(err, &ae) && attempt == 0 {
+			// A damaged file in the cache: download it again, without the ETag.
+			continue
+		}
+		return files, err
+	}
+}
+
+// archiveError is an error of the archive data (gzip or tar), not of the skill folder in it.
+type archiveError struct{ err error }
+
+func (e *archiveError) Error() string { return e.err.Error() }
+func (e *archiveError) Unwrap() error { return e.err }
+
+// badArchive marks an error of the archive data. A too large archive is not damaged: a second
+// download does not help.
+func badArchive(u string, err error) error {
+	err = fmt.Errorf("read the archive %s: %w", u, err)
+	if errors.Is(err, errArchiveTooLarge) {
+		return err
+	}
+	return &archiveError{err}
+}
+
+// errNoCache: the cache folder cannot keep an archive (no cache folder, no write access, or a
+// full disk).
+var errNoCache = errors.New("the cache folder cannot keep the archive")
+
+// A cached archive file starts with a line that holds the ETag of the download. The gzip data
+// follows.
+
+// archiveCache holds the archive of each repository and ref that this run checked. The lock of
+// an entry makes all skills of one repository and ref wait for one download.
+var archiveCache = struct {
+	sync.Mutex
+	entries map[string]*runArchive
+}{entries: map[string]*runArchive{}}
+
+// runArchive is an open cache file that GitHub confirmed in this run. All skills of the run read
+// this same file, also when another process replaces or removes its path.
+type runArchive struct {
+	mu      sync.Mutex
+	file    *os.File
+	data    int64 // offset of the gzip data
+	size    int64
+	bad     *os.File // the file that a reader found damaged
+	noCache bool     // the cache folder cannot keep this archive in this run
+}
+
+func (a *runArchive) reader() io.Reader {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return io.NewSectionReader(a.file, a.data, a.size-a.data)
+}
+
+// cachedArchiveFor returns the checked archive of this run. With repair, a damaged archive is
+// downloaded again (once for each damaged file). With errNoCache, direct is a started download
+// that the caller reads (nil when there is none).
+func cachedArchiveFor(ctx context.Context, repo, ref, u string, repair bool) (a *runArchive, direct *stallReader, err error) {
+	dir, err := os.UserCacheDir()
 	if err != nil {
+		return nil, nil, errNoCache
+	}
+	dir = filepath.Join(dir, "fam", "github")
+	// The file name is a hash, so that no repository or ref can give a path outside the folder.
+	sum := sha256.Sum256([]byte(repo + "\x00" + ref))
+	path := filepath.Join(dir, hex.EncodeToString(sum[:16])+".tar.gz")
+	archiveCache.Lock()
+	a, ok := archiveCache.entries[path]
+	if !ok {
+		a = &runArchive{}
+		archiveCache.entries[path] = a
+	}
+	archiveCache.Unlock()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.noCache {
+		return nil, nil, errNoCache
+	}
+	if a.file != nil && repair && a.bad == nil {
+		a.bad = a.file
+		a.file = nil
+	}
+	if a.file != nil {
+		return a, nil, nil
+	}
+	pruneOnce.Do(func() { pruneArchives(dir) })
+	// Read the ETag from the file that a 304 confirms, also when another process replaces the
+	// path meanwhile.
+	var old *os.File
+	etag := ""
+	if !repair {
+		if f, err := os.Open(path); err == nil {
+			old = f
+			etag, _ = readETag(f)
+		}
+	}
+	f, direct, err := refreshArchive(ctx, dir, path, u, old, etag)
+	if errors.Is(err, errNoCache) {
+		// Every later skill of this archive also reads its own download.
+		a.noCache = true
+		return nil, direct, err
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	if _, err := readETag(f); err != nil {
+		f.Close()
+		return nil, nil, badArchive(u, err)
+	}
+	pos, _ := f.Seek(0, io.SeekCurrent)
+	st, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	now := time.Now()
+	_ = os.Chtimes(path, now, now)
+	a.file, a.data, a.size = f, pos, st.Size()
+	return a, nil, nil
+}
+
+// refreshArchive asks GitHub for the archive with the ETag of the cached file old, and returns
+// an open cache file. GitHub answers 304 when the archive did not change (also for a branch, or
+// a tag that did not move): then old is the result. Otherwise FAM saves the new archive with an
+// atomic rename. refreshArchive closes old when it does not return it. When the cache folder
+// cannot take the archive before FAM read any data, it returns errNoCache with the download as
+// direct.
+func refreshArchive(ctx context.Context, dir, path, u string, old *os.File, etag string) (*os.File, *stallReader, error) {
+	if old != nil && etag == "" {
+		old.Close()
+		old = nil
+	}
+	body, err := fetchArchive(ctx, u, etag)
+	if old != nil && (err != nil || body != nil) {
+		old.Close()
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if body == nil {
+		return old, nil, nil // 304
+	}
+	f, err := saveArchive(dir, path, u, body)
+	if errors.Is(err, errNoCache) && !body.started.Load() {
+		return nil, body, err
+	}
+	body.Close()
+	return f, nil, err
+}
+
+// saveArchive writes a download into a temporary file in the cache folder, renames it to path,
+// and returns it open. An error of the cache folder gives errNoCache.
+func saveArchive(dir, path, u string, body *stallReader) (*os.File, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, errNoCache
+	}
+	tmp, err := os.CreateTemp(dir, ".download-*")
+	if err != nil {
+		return nil, errNoCache
+	}
+	keep := false
+	defer func() {
+		if !keep {
+			tmp.Close()
+			os.Remove(tmp.Name())
+		}
+	}()
+	w := &trackWriter{w: tmp}
+	if _, err := fmt.Fprintf(w, "%s\n", body.etag); err != nil {
+		return nil, errNoCache
+	}
+	if _, err := io.Copy(w, &capReader{r: body, left: maxArchive}); err != nil {
+		if w.err != nil {
+			return nil, errNoCache
+		}
+		return nil, fmt.Errorf("download %s: %w", u, err)
+	}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	resp, err := doRetry(ctx, &http.Client{Timeout: 5 * time.Minute}, req)
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		// The download is complete: this run reads the open file, and the next run downloads
+		// it again.
+		os.Remove(tmp.Name())
+	}
+	keep = true
+	return tmp, nil
+}
+
+// trackWriter remembers a write error, so that FAM can tell a full disk from a network error.
+type trackWriter struct {
+	w   io.Writer
+	err error
+}
+
+func (t *trackWriter) Write(p []byte) (int, error) {
+	n, err := t.w.Write(p)
 	if err != nil {
+		t.err = err
+	}
+	return n, err
+}
+
+// validETag: an ETag that FAM can send back (visible ASCII, at most 512 bytes).
+func validETag(s string) bool {
+	if s == "" || len(s) > 512 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x21 || s[i] > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
+// readETag reads the first line of a cached archive file. An invalid ETag gives "" with no
+// error: FAM then downloads without a condition.
+func readETag(f *os.File) (string, error) {
+	var b [1]byte
+	var line []byte
+	for len(line) <= 512 {
+		if _, err := io.ReadFull(f, b[:]); err != nil {
+			return "", fmt.Errorf("the cached archive %s has no ETag line: %w", f.Name(), err)
+		}
+		if b[0] == '\n' {
+			if !validETag(string(line)) {
+				return "", nil
+			}
+			return string(line), nil
+		}
+		line = append(line, b[0])
+	}
+	return "", fmt.Errorf("the cached archive %s has no ETag line", f.Name())
+}
+
+// archiveMaxAge: FAM removes a cached archive that no run used for this time.
+const archiveMaxAge = 30 * 24 * time.Hour
+
+var pruneOnce sync.Once
+
+// pruneArchives removes old archives and temporary files that a stopped run left. A run that
+// still reads a removed file keeps its open file.
+func pruneArchives(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		age := time.Since(info.ModTime())
+		if age > archiveMaxAge || (strings.HasPrefix(e.Name(), ".download-") && age > 24*time.Hour) {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
+}
+
+// archiveStall: a download fails when no data arrives for this time. A large archive on a slow
+// line can take many minutes, so there is no limit for the whole download.
+const archiveStall = time.Minute
+
+// fetchArchive starts the download of an archive. With an ETag, it returns a nil body when
+// GitHub answers 304 (not modified).
+func fetchArchive(ctx context.Context, u, etag string) (*stallReader, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	if validETag(etag) {
+		req.Header.Set("If-None-Match", etag)
+	} else {
+		etag = ""
+	}
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.ResponseHeaderTimeout = archiveStall
+	// No Accept-Encoding: the ETag of the archive is the same in each run.
+	tr.DisableCompression = true
+	resp, err := doRetry(ctx, &http.Client{Transport: tr}, req)
+	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("download %s: %w", u, err)
 	}
-	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotModified && etag != "" {
+		resp.Body.Close()
+		cancel()
+		return nil, nil
+	}
 	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		cancel()
 		return nil, fmt.Errorf("download %s: HTTP %d", u, resp.StatusCode)
 	}
-	gz, err := gzip.NewReader(resp.Body)
+	newTag := resp.Header.Get("ETag")
+	if !validETag(newTag) {
+		newTag = ""
+	}
+	sr := &stallReader{body: resp.Body, cancel: cancel, etag: newTag}
+	sr.last.Store(time.Now().UnixNano())
+	sr.timer = time.AfterFunc(archiveStall, sr.check)
+	return sr, nil
+}
+
+// stallReader cancels its download when no data arrives for archiveStall.
+type stallReader struct {
+	body    io.ReadCloser
+	timer   *time.Timer
+	cancel  context.CancelFunc
+	etag    string
+	last    atomic.Int64 // time of the last data, in Unix nanoseconds
+	stalled atomic.Bool
+	closed  atomic.Bool
+	started atomic.Bool // a Read returned data
+}
+
+// check runs from the timer. It cancels the download only when the last data is older than
+// archiveStall; otherwise it waits for the rest of the time.
+func (s *stallReader) check() {
+	if s.closed.Load() {
+		return
+	}
+	idle := time.Since(time.Unix(0, s.last.Load()))
+	if idle < archiveStall {
+		s.timer.Reset(archiveStall - idle)
+		return
+	}
+	s.stalled.Store(true)
+	s.cancel()
+}
+
+func (s *stallReader) Read(p []byte) (int, error) {
+	n, err := s.body.Read(p)
+	if n > 0 {
+		s.last.Store(time.Now().UnixNano())
+		s.started.Store(true)
+	}
+	if err != nil && err != io.EOF && s.stalled.Load() {
+		err = fmt.Errorf("no data for %s", archiveStall)
+	}
+	return n, err
+}
+
+func (s *stallReader) Close() error {
+	s.closed.Store(true)
+	s.timer.Stop()
+	err := s.body.Close()
+	s.cancel()
+	return err
+}
+
+// readSkill reads the files of one folder from a .tar.gz archive of a repository.
+func readSkill(archive io.Reader, folder, u string) ([]skillFile, error) {
+	capped := &capReader{r: archive, left: maxArchive}
+	gz, err := gzip.NewReader(capped)
 	if err != nil {
-		return nil, fmt.Errorf("download %s: %w", u, err)
+		return nil, badArchive(u, err)
 	}
 	fail := func(format string, a ...any) ([]skillFile, error) {
-		return nil, fmt.Errorf("skill %s of %s@%s: %s", folder, repo, ref, fmt.Sprintf(format, a...))
+		return nil, fmt.Errorf("skill %s in %s: %s", folder, u, fmt.Sprintf(format, a...))
 	}
 	prefix := strings.Trim(folder, "/") + "/"
 	var files []skillFile
@@ -150,14 +556,19 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 	links := map[string]string{} // rel path in the folder -> link target in the repository
 	total := 0
 	root := ""
-	tr := tar.NewReader(&capReader{r: gz, left: maxArchive})
+	data := &capReader{r: gz, left: maxArchive}
+	tr := tar.NewReader(data)
 	for {
 		h, err := tr.Next()
 		if errors.Is(err, io.EOF) {
+			// Read the rest of the gzip stream, so that its checksum finds a damaged archive.
+			if _, err := io.Copy(io.Discard, data); err != nil {
+				return nil, badArchive(u, err)
+			}
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("download %s: %w", u, err)
+			return nil, badArchive(u, err)
 		}
 		if h.Typeflag == tar.TypeXGlobalHeader {
 			continue
@@ -189,7 +600,7 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 			}
 			data, err := io.ReadAll(tr)
 			if err != nil {
-				return nil, fmt.Errorf("download %s: %w", u, err)
+				return nil, badArchive(u, err)
 			}
 			byRel[rel] = len(files)
 			files = append(files, skillFile{rel: rel, data: data, exec: h.Mode&0o100 != 0})
@@ -237,7 +648,10 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 	return files, nil
 }
 
-// capReader stops with an error after `left` bytes.
+// errArchiveTooLarge: the archive has more than maxArchive bytes.
+var errArchiveTooLarge = fmt.Errorf("the archive is larger than %d bytes", int64(maxArchive))
+
+// capReader stops with errArchiveTooLarge after `left` bytes.
 type capReader struct {
 	r    io.Reader
 	left int64
@@ -245,7 +659,7 @@ type capReader struct {
 
 func (c *capReader) Read(p []byte) (int, error) {
 	if c.left <= 0 {
-		return 0, fmt.Errorf("the archive is larger than %d bytes", int64(maxArchive))
+		return 0, errArchiveTooLarge
 	}
 	if int64(len(p)) > c.left {
 		p = p[:c.left]

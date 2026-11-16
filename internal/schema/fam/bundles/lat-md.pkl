@@ -1,0 +1,29 @@
+//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
+
+/// lat.md: a knowledge graph of a codebase, written in Markdown (https://github.com/vercel-labs/lat.md).
+///
+/// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
+/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+/// On Linux, lat.md needs glibc: its database module has no build for musl (Alpine).
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+
+name = "lat-md"
+description = "Markdown knowledge graph of a codebase"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "lat.md"
+    binary = "lat"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel-labs/lat.md"
+    path = "templates/skill"
+    name = "lat-md"
+  }
+}
+
+verify {
+  new { name = "lat --version"; script = "lat --version" }
+}
