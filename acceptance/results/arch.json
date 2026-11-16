@@ -34,7 +34,7 @@
   {
     "target": "arch",
     "n": 5,
-    "name": "absent bundle removes skill, links, files, instruction lines",
+    "name": "absent bundle removes skill, links, files, merged keys, variables",
     "result": "pass",
     "detail": "file, link, merged keys, skill, Claude link, instruction lines, variables removed",
     "duration": "19s"
@@ -84,7 +84,7 @@
     "n": 11,
     "name": "unknown template variable stops FAM",
     "result": "pass",
-    "detail": "error: instruction template /home/gregor/.cache/fam-acceptance/run/projects/arch-s11/instructions-bad/AGENTS.md: template: AGENTS.md:1:10: executing \"AGENTS.md\" at \u003c.Agent\u003e: map has no entry for key \"Agent\"",
+    "detail": "error: instruction template /home/gregor/.cache/fam-acceptance/run/projects/arch-s11/instructions-bad/AGENTS.md: template: AGENTS.md:1:10: executing \"AGENTS.md\" at <.Agent>: map has no entry for key \"Agent\"",
     "duration": "20s"
   },
   {
@@ -92,7 +92,7 @@
     "n": 12,
     "name": "Claude Code and Codex: install, update, settings, paths",
     "result": "pass",
-    "detail": "pinned 31 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
+    "detail": "pinned 31 changed; update: claude updated 2.1.311 (Claude Code) -> 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -> codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
     "duration": "1m3s"
   },
   {
