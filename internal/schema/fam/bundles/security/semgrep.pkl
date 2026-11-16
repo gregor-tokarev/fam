@@ -1,0 +1,29 @@
+/// semgrep: Scan source code for security issues through Semgrep rules (https://github.com/semgrep/semgrep).
+///
+/// FAM installs the official semgrep package with uv.
+/// uv must exist.
+/// Python 3.10 or later must exist. FAM does not install Python.
+/// Linux wheels need glibc 2.34 or later, or musl 1.2 or later.
+/// Local rules need no login. SEMGREP_APP_TOKEN is optional for Semgrep platform features.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "semgrep"
+description = "Scan source code for security issues through Semgrep rules"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "semgrep"
+      manager = "uv"
+    }
+    install = "uv tool install --no-python-downloads semgrep"
+    update = "uv tool upgrade --no-python-downloads semgrep"
+    versionCommand = "semgrep --disable-version-check --metrics=off --version"
+  }
+}
+
+verify {
+  new { name = "version"; script = "semgrep --disable-version-check --metrics=off --version" }
+}

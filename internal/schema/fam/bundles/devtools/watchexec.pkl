@@ -1,0 +1,25 @@
+/// watchexec: Run commands after files change, with debounce and process control (https://github.com/watchexec/watchexec).
+///
+/// FAM builds the official watchexec-cli crate with Cargo into ~/.local/bin.
+/// Cargo, Rust, and a C compiler must exist.
+/// Watched commands need their own shell or interpreter.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "watchexec"
+description = "Run commands after files change, with debounce and process control"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "watchexec-cli"
+      manager = "cargo"
+    }
+    binary = "watchexec"
+  }
+}
+
+verify {
+  new { name = "version"; script = "watchexec --version" }
+}

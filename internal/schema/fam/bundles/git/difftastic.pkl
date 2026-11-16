@@ -1,0 +1,25 @@
+/// difftastic: Compare source files through syntax-aware diffs (https://github.com/Wilfred/difftastic).
+///
+/// FAM builds the official difftastic crate with Cargo into ~/.local/bin.
+/// Cargo, Rust 1.85 or later, and C/C++ compilers must exist.
+/// Git integration stays separate. Use explicit file paths for commands without a terminal.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "difftastic"
+description = "Compare source files through syntax-aware diffs"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "difftastic"
+      manager = "cargo"
+    }
+    binary = "difft"
+  }
+}
+
+verify {
+  new { name = "version"; script = "difft --version" }
+}

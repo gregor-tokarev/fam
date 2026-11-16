@@ -1,0 +1,26 @@
+/// shfmt: Format shell scripts and validate their syntax (https://github.com/mvdan/sh).
+///
+/// FAM builds the official Go module with Go into ~/.local/bin.
+/// Go 1.26 or later must exist.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "shfmt"
+description = "Format shell scripts and validate their syntax"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "mvdan.cc/sh/v3/cmd/shfmt"
+      manager = "go"
+    }
+    install = #"GOTOOLCHAIN=local GOBIN="$HOME/.local/bin" go install mvdan.cc/sh/v3/cmd/shfmt@latest"#
+    update = #"GOTOOLCHAIN=local GOBIN="$HOME/.local/bin" go install mvdan.cc/sh/v3/cmd/shfmt@latest"#
+    binary = "shfmt"
+  }
+}
+
+verify {
+  new { name = "version"; script = "shfmt --version" }
+}

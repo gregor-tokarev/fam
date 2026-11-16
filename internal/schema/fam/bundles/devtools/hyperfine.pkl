@@ -1,0 +1,23 @@
+/// hyperfine: Benchmark shell commands and export machine-readable timing results (https://github.com/sharkdp/hyperfine).
+///
+/// FAM builds the official hyperfine crate with Cargo into ~/.local/bin.
+/// Cargo, Rust 1.97 or later, and a C compiler must exist.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "hyperfine"
+description = "Benchmark shell commands and export machine-readable timing results"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "hyperfine"
+      manager = "cargo"
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "hyperfine --version" }
+}

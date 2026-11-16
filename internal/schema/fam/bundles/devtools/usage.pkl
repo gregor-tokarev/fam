@@ -1,0 +1,28 @@
+/// usage: Validate CLI specifications and generate command help, documentation, and completions (https://github.com/jdx/usage).
+///
+/// FAM builds the official usage-cli crate with Cargo into ~/.local/bin.
+/// Cargo, Rust 1.91 or later, and a C compiler must exist.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "usage"
+description = "Validate CLI specifications and generate command help, documentation, and completions"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "usage-cli"
+      manager = "cargo"
+    }
+    binary = "usage"
+  }
+  new fam.GitHubSkill {
+    repo = "jdx/usage"
+    path = "skills/usage"
+  }
+}
+
+verify {
+  new { name = "version"; script = "usage --version" }
+}

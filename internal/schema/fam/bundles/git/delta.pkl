@@ -1,0 +1,25 @@
+/// delta: Display Git and diff output with syntax and line highlights (https://github.com/dandavison/delta).
+///
+/// FAM builds the official git-delta crate with Cargo into ~/.local/bin.
+/// Cargo, Rust, and a C compiler must exist.
+/// Git integration stays separate. Use --paging=never for commands without a terminal.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "delta"
+description = "Display Git and diff output with syntax and line highlights"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "git-delta"
+      manager = "cargo"
+    }
+    binary = "delta"
+  }
+}
+
+verify {
+  new { name = "version"; script = "delta --version" }
+}

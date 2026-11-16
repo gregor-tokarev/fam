@@ -1,0 +1,28 @@
+/// just: Run project commands and recipes from a justfile (https://github.com/casey/just).
+///
+/// FAM builds the official just crate with Cargo into ~/.local/bin.
+/// Cargo, Rust 1.89 or later, and a C compiler must exist.
+/// Recipes need their declared shell or interpreter.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "just"
+description = "Run project commands and recipes from a justfile"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "just"
+      manager = "cargo"
+    }
+  }
+  new fam.GitHubSkill {
+    repo = "casey/just"
+    path = "skills/just"
+  }
+}
+
+verify {
+  new { name = "version"; script = "just --version" }
+}

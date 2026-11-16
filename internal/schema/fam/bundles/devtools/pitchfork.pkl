@@ -1,0 +1,29 @@
+/// pitchfork: Start, inspect, and stop project services with readiness and dependency checks (https://github.com/jdx/pitchfork).
+///
+/// FAM builds the official pitchfork-cli crate with Cargo into ~/.local/bin.
+/// Cargo, Rust 1.95 or later, and a C compiler must exist.
+/// Services need their own programs. FAM does not start a daemon or install services.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "pitchfork"
+description = "Start, inspect, and stop project services with readiness and dependency checks"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "pitchfork-cli"
+      manager = "cargo"
+    }
+    binary = "pitchfork"
+  }
+  new fam.GitHubSkill {
+    repo = "jdx/pitchfork"
+    path = "skills/pitchfork"
+  }
+}
+
+verify {
+  new { name = "version"; script = "pitchfork --version" }
+}

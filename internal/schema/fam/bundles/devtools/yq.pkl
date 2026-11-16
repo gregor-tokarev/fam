@@ -1,0 +1,26 @@
+/// yq: Read and transform YAML, JSON, XML, and other structured data (https://github.com/mikefarah/yq).
+///
+/// FAM builds the official Go module with Go into ~/.local/bin.
+/// Go 1.26 or later must exist.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "yq"
+description = "Read and transform YAML, JSON, XML, and other structured data"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/mikefarah/yq/v4"
+      manager = "go"
+    }
+    install = #"GOTOOLCHAIN=local GOBIN="$HOME/.local/bin" go install github.com/mikefarah/yq/v4@latest"#
+    update = #"GOTOOLCHAIN=local GOBIN="$HOME/.local/bin" go install github.com/mikefarah/yq/v4@latest"#
+    binary = "yq"
+  }
+}
+
+verify {
+  new { name = "version"; script = "yq --version" }
+}

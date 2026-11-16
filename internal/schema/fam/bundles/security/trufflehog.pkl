@@ -1,0 +1,27 @@
+/// trufflehog: Find and verify leaked credentials in files, Git repositories, and remote sources (https://github.com/trufflesecurity/trufflehog).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// Local scans need no login. GITHUB_TOKEN is optional for GitHub sources.
+/// Credential verification can contact external services.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "trufflehog"
+description = "Find and verify leaked credentials in files, Git repositories, and remote sources"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "trufflesecurity/trufflehog"
+    binary = "trufflehog"
+    assets {
+      ["linux-amd64"] { name = "trufflehog_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "trufflehog" }
+      ["linux-arm64"] { name = "trufflehog_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "trufflehog" }
+      ["darwin-arm64"] { name = "trufflehog_{version}_darwin_arm64.tar.gz"; format = "tar.gz"; file = "trufflehog" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "trufflehog --version" }
+}

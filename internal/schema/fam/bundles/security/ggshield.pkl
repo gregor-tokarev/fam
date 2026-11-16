@@ -1,0 +1,28 @@
+/// ggshield: Scan source changes and repositories for secrets through GitGuardian (https://github.com/GitGuardian/ggshield).
+///
+/// FAM installs the official ggshield package with uv.
+/// uv must exist.
+/// Python 3.9 or later must exist. Scans need network access and GITGUARDIAN_API_KEY.
+/// Git operations also need Git. FAM does not install Python.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "ggshield"
+description = "Scan source changes and repositories for secrets through GitGuardian"
+version = "@FAM_VERSION@"
+requiredSecrets { "GITGUARDIAN_API_KEY" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "ggshield"
+      manager = "uv"
+    }
+    install = "uv tool install --no-python-downloads ggshield"
+    update = "uv tool upgrade --no-python-downloads ggshield"
+  }
+}
+
+verify {
+  new { name = "version"; script = "ggshield --version" }
+}

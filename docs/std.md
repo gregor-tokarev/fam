@@ -46,16 +46,40 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.devtools.direnv` | Load project environment variables through explicit shell or exec integration | GitHub release: `direnv/direnv` (latest) | — | — |
+| `std.devtools.fzf` | Filter and rank text candidates through fuzzy matching | GitHub release: `junegunn/fzf` (latest) | — | — |
+| `std.devtools.glow` | Render Markdown files and standard input in a terminal | go: `charm.land/glow/v3` | — | — |
+| `std.devtools.hyperfine` | Benchmark shell commands and export machine-readable timing results | cargo: `hyperfine` | — | — |
+| `std.devtools.jq` | Read, transform, and query JSON in shell workflows | GitHub release: `jqlang/jq` (latest) | — | — |
+| `std.devtools.just` | Run project commands and recipes from a justfile | cargo: `just` | just | — |
+| `std.devtools.mise` | Manage developer tools, project environments, and task execution | npm: `mise` | — | — |
+| `std.devtools.nx` | Inspect monorepos, generate projects, and execute dependency-aware build tasks | npm: `nx` | link-workspace-packages, monitor-ci, nx-generate, nx-import, nx-plugins, nx-run-tasks, nx-workspace | — |
+| `std.devtools.pitchfork` | Start, inspect, and stop project services with readiness and dependency checks | cargo: `pitchfork-cli` | pitchfork | — |
+| `std.devtools.shfmt` | Format shell scripts and validate their syntax | go: `mvdan.cc/sh/v3/cmd/shfmt` | — | — |
+| `std.devtools.turborepo` | Execute monorepo tasks with dependency ordering and build caching | npm: `turbo` | turborepo | — |
+| `std.devtools.usage` | Validate CLI specifications and generate command help, documentation, and completions | cargo: `usage-cli` | usage | — |
+| `std.devtools.watchexec` | Run commands after files change, with debounce and process control | cargo: `watchexec-cli` | — | — |
+| `std.devtools.yq` | Read and transform YAML, JSON, XML, and other structured data | go: `github.com/mikefarah/yq/v4` | — | — |
 
 ## git
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.git.delta` | Display Git and diff output with syntax and line highlights | cargo: `git-delta` | — | — |
+| `std.git.difftastic` | Compare source files through syntax-aware diffs | cargo: `difftastic` | — | — |
+| `std.git.ghStack` | Manage stacked branches and pull requests with GitHub’s official gh extension | GitHub release: `github/gh-stack` (latest) | gh-stack | GH_TOKEN, GITHUB_TOKEN |
+| `std.git.gitLfs` | Store and transfer large files through Git LFS | GitHub release: `git-lfs/git-lfs` (latest) | — | — |
+| `std.git.github` | Manage GitHub repositories, issues, pull requests, releases, and workflows | GitHub release: `cli/cli` (latest) | gh, gh-skill | GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN |
 
 ## languages
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.languages.pixi` | Manage reproducible environments and command-line tools across language ecosystems | GitHub release: `prefix-dev/pixi` (latest) | — | — |
+| `std.languages.pnpm` | Install JavaScript packages and run workspace commands with a shared package store | npm: `pnpm` | — | — |
+| `std.languages.ruff` | Lint and format Python code from a standalone command-line tool | uv: `ruff` | — | — |
+| `std.languages.rustup` | Manage Rust toolchains with Rustup | script: `curl -fsSL https://sh.rustup.rs \| CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 sh -s -- -y --no-modify-path --default-toolchain none` | — | — |
+| `std.languages.uv` | Manage Python interpreters, packages, environments, and command-line tools | GitHub release: `astral-sh/uv` (latest) | — | — |
 | `std.languages.zero` | The Zero programming language for agents | script: `curl -fsSL https://zerolang.ai/install.sh \| sh` | zero | — |
 
 ## media
@@ -81,6 +105,12 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.security.ggshield` | Scan source changes and repositories for secrets through GitGuardian | uv: `ggshield` | — | GITGUARDIAN_API_KEY |
+| `std.security.osvScanner` | Find vulnerable dependencies in source trees, lockfiles, and container images | go: `github.com/google/osv-scanner/v2/cmd/osv-scanner` | — | — |
+| `std.security.semgrep` | Scan source code for security issues through Semgrep rules | uv: `semgrep` | — | — |
+| `std.security.snyk` | Scan dependencies, source code, containers, and infrastructure with Snyk | npm: `snyk` | — | SNYK_TOKEN |
+| `std.security.trivy` | Scan files, images, dependencies, secrets, and infrastructure configuration | script: `curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \| sh -s -- -b "$HOME/.local/bin"` | — | — |
+| `std.security.trufflehog` | Find and verify leaked credentials in files, Git repositories, and remote sources | GitHub release: `trufflesecurity/trufflehog` (latest) | — | — |
 
 ## testing
 

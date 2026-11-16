@@ -1,0 +1,26 @@
+/// trivy: Scan files, images, dependencies, secrets, and infrastructure configuration
+/// (https://github.com/aquasecurity/trivy).
+///
+/// FAM runs the official install script to install trivy into ~/.local/bin.
+/// The current binary exceeds the 128 MiB limit of a FAM GitHubRelease task.
+/// The binary needs no runtime or login for public scans. Vulnerability scans normally download databases.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "trivy"
+description = "Scan files, images, dependencies, secrets, and infrastructure configuration"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    binary = "~/.local/bin/trivy"
+    install = #"curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$HOME/.local/bin""#
+    update = #"curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$HOME/.local/bin""#
+    uninstall = "rm -f ~/.local/bin/trivy"
+    versionCommand = "trivy --version"
+  }
+}
+
+verify {
+  new { name = "version"; script = "trivy --version" }
+}

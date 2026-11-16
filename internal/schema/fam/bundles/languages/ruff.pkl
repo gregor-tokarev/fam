@@ -1,0 +1,26 @@
+/// ruff: Lint and format Python code from a standalone command-line tool (https://github.com/astral-sh/ruff).
+///
+/// FAM installs the official ruff package with uv.
+/// uv must exist.
+/// Python 3.7 or later must exist. FAM does not install Python.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "ruff"
+description = "Lint and format Python code from a standalone command-line tool"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "ruff"
+      manager = "uv"
+    }
+    install = "uv tool install --no-python-downloads ruff"
+    update = "uv tool upgrade --no-python-downloads ruff"
+  }
+}
+
+verify {
+  new { name = "version"; script = "ruff --version" }
+}

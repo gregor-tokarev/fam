@@ -1,0 +1,27 @@
+/// uv: Manage Python interpreters, packages, environments, and command-line tools (https://github.com/astral-sh/uv).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// FAM installs only the package manager. Python installation stays separate.
+/// The release avoids a dependency on an existing uv installation.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "uv"
+description = "Manage Python interpreters, packages, environments, and command-line tools"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "astral-sh/uv"
+    binary = "uv"
+    assets {
+      ["linux-amd64"] { name = "uv-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-x86_64-unknown-linux-musl/uv" }
+      ["linux-arm64"] { name = "uv-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-aarch64-unknown-linux-musl/uv" }
+      ["darwin-arm64"] { name = "uv-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "uv-aarch64-apple-darwin/uv" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "uv --version" }
+}
