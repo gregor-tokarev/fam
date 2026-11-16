@@ -1,4 +1,4 @@
-//! Written by FAM 0.5.0. Do not edit. Run `fam upgrade` to update.
+//! Written by FAM 0.6.0. Do not edit. Run `fam migrate` to update.
 
 /// A bundle: a reusable part of the config. Usually one tool or one piece of machine setup, with
 /// its tasks (also skills: [t.Skill], [t.GitHubSkill]), environment, and checks.
