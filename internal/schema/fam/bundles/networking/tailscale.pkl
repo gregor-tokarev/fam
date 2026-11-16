@@ -1,0 +1,24 @@
+/// tailscale: Connect worker machines through the Tailscale private network (https://github.com/tailscale/tailscale).
+///
+/// FAM installs the CLI with Go.
+/// Installation needs Go 1.27.4 or later. Network operations need a separately configured tailscaled daemon and login.
+/// FAM installs only the CLI and does not change the network or start a daemon.
+/// Go source builds can show incomplete version metadata.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "tailscale"
+description = "Connect worker machines through the Tailscale private network"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "tailscale.com/cmd/tailscale"; manager = "go" }
+    binary = "tailscale"
+    versionCommand = "tailscale version"
+  }
+}
+
+verify {
+  new { name = "tailscale version"; script = "tailscale version" }
+}

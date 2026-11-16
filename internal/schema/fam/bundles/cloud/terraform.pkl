@@ -1,0 +1,26 @@
+/// terraform: Plan and apply infrastructure changes with Terraform (https://github.com/hashicorp/terraform).
+///
+/// FAM installs the CLI with Homebrew.
+/// It needs Homebrew on macOS or glibc Linux. Homebrew does not support Alpine.
+/// Provider credentials depend on the project. Use -input=false for automation.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "terraform"
+description = "Plan and apply infrastructure changes with Terraform"
+version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
+path { if (facts.os == "darwin") "/opt/homebrew/bin" else "/home/linuxbrew/.linuxbrew/bin" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "hashicorp/tap/terraform"; manager = "brew" }
+    binary = "terraform"
+    versionCommand = "CHECKPOINT_DISABLE=1 terraform version"
+  }
+}
+
+verify {
+  new { name = "CHECKPOINT_DISABLE=1 terraform version"; script = "CHECKPOINT_DISABLE=1 terraform version" }
+}

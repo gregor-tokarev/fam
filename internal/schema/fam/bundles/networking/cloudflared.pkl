@@ -1,0 +1,28 @@
+/// cloudflared: Expose local services through Cloudflare Tunnel (https://github.com/cloudflare/cloudflared).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// Managed tunnels use TUNNEL_TOKEN. Quick tunnels need no token. FAM does not install a service.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "cloudflared"
+description = "Expose local services through Cloudflare Tunnel"
+version = "@FAM_VERSION@"
+requiredSecrets { "TUNNEL_TOKEN" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "cloudflare/cloudflared"
+    binary = "cloudflared"
+    versionCommand = "cloudflared --version"
+    assets {
+      ["linux-amd64"] { name = "cloudflared-linux-amd64"; format = "binary" }
+      ["darwin-arm64"] { name = "cloudflared-darwin-arm64.tgz"; format = "tar.gz"; file = "cloudflared" }
+      ["linux-arm64"] { name = "cloudflared-linux-arm64"; format = "binary" }
+    }
+  }
+}
+
+verify {
+  new { name = "cloudflared --version"; script = "cloudflared --version" }
+}

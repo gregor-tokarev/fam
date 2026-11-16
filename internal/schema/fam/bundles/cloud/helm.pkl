@@ -1,0 +1,25 @@
+/// helm: Package and deploy applications on Kubernetes (https://github.com/helm/helm).
+///
+/// FAM installs Helm 4 with the official install script into ~/.local/bin.
+/// The install script needs Bash, curl, tar, and OpenSSL for checksum verification.
+/// Cluster operations need a kubeconfig and cluster credentials.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "helm"
+description = "Package and deploy applications on Kubernetes"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    binary = "helm"
+    install = #"mkdir -p "$HOME/.local/bin" && curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | HELM_INSTALL_DIR="$HOME/.local/bin" USE_SUDO=false bash"#
+    update = #"mkdir -p "$HOME/.local/bin" && curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | HELM_INSTALL_DIR="$HOME/.local/bin" USE_SUDO=false bash"#
+    uninstall = "rm -f ~/.local/bin/helm"
+    versionCommand = "helm version --short"
+  }
+}
+
+verify {
+  new { name = "helm version --short"; script = "helm version --short" }
+}

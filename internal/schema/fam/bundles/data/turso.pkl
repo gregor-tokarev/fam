@@ -1,0 +1,23 @@
+/// turso: Manage Turso databases, branches, and access tokens (https://github.com/tursodatabase/turso-cli).
+///
+/// FAM installs the CLI with Go.
+/// Installation needs Go 1.25 or later. Cloud operations need TURSO_API_TOKEN or a login.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "turso"
+description = "Manage Turso databases, branches, and access tokens"
+version = "@FAM_VERSION@"
+requiredSecrets { "TURSO_API_TOKEN" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "github.com/tursodatabase/turso-cli/cmd/turso"; manager = "go" }
+    binary = "turso"
+    versionCommand = "turso --version"
+  }
+}
+
+verify {
+  new { name = "turso --version"; script = "turso --version" }
+}

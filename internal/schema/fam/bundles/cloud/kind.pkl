@@ -1,0 +1,22 @@
+/// kind: Run local Kubernetes clusters in containers (https://github.com/kubernetes-sigs/kind).
+///
+/// FAM installs the CLI with Go. Installation needs Go 1.17 or later.
+/// Cluster operations need a separately installed Docker, Podman, or nerdctl engine.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "kind"
+description = "Run local Kubernetes clusters in containers"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "sigs.k8s.io/kind"; manager = "go" }
+    binary = "kind"
+    versionCommand = "kind version"
+  }
+}
+
+verify {
+  new { name = "kind version"; script = "kind version" }
+}

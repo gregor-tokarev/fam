@@ -1,0 +1,23 @@
+/// usql: Query many database systems through a common CLI (https://github.com/xo/usql).
+///
+/// FAM installs the CLI with Go.
+/// Installation needs Go 1.26.1 or later. The default Go build includes fewer drivers than the release build.
+/// Some database drivers need native libraries. Connection credentials depend on the database.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "usql"
+description = "Query many database systems through a common CLI"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "github.com/xo/usql"; manager = "go" }
+    binary = "usql"
+    versionCommand = "usql --version"
+  }
+}
+
+verify {
+  new { name = "usql --version"; script = "usql --version" }
+}

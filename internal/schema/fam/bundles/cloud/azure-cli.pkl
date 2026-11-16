@@ -1,0 +1,22 @@
+/// azure-cli: Manage Azure resources and deployments (https://github.com/Azure/azure-cli).
+///
+/// FAM installs the CLI with uv.
+/// It needs uv and Python 3.10 or later. Sign in with az login or a service principal.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "azure-cli"
+description = "Manage Azure resources and deployments"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "azure-cli"; manager = "uv" }
+    binary = "az"
+    versionCommand = "az --version"
+  }
+}
+
+verify {
+  new { name = "az --version"; script = "az --version" }
+}

@@ -1,0 +1,28 @@
+/// podman: Control containers through a Podman service (https://github.com/podman-container-tools/podman).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// This bundle installs only the remote client. Container operations need a separately configured Podman service.
+/// FAM does not install an engine, a virtual machine, or host configuration.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "podman"
+description = "Control containers through a Podman service"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "podman-container-tools/podman"
+    binary = "podman"
+    versionCommand = "podman --version"
+    assets {
+      ["linux-amd64"] { name = "podman-remote-static-linux_amd64.tar.gz"; format = "tar.gz"; file = "bin/podman-remote-static-linux_amd64" }
+      ["linux-arm64"] { name = "podman-remote-static-linux_arm64.tar.gz"; format = "tar.gz"; file = "bin/podman-remote-static-linux_arm64" }
+      ["darwin-arm64"] { name = "podman-remote-release-darwin_arm64.zip"; format = "zip"; file = "podman-{version}/usr/bin/podman" }
+    }
+  }
+}
+
+verify {
+  new { name = "podman --version"; script = "podman --version" }
+}

@@ -1,0 +1,24 @@
+/// aws-cli: Manage AWS services from the command line (https://github.com/aws/aws-cli).
+///
+/// FAM installs the CLI with uv.
+/// This bundle installs AWS CLI v1, not v2. It needs uv and Python 3.10 or later.
+/// Use AWS credentials or a configured profile. AWS_SESSION_TOKEN applies only to temporary credentials.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "aws-cli"
+description = "Manage AWS services with AWS CLI v1"
+version = "@FAM_VERSION@"
+requiredSecrets { "AWS_ACCESS_KEY_ID"; "AWS_SECRET_ACCESS_KEY"; "AWS_SESSION_TOKEN" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "awscli"; manager = "uv" }
+    binary = "aws"
+    versionCommand = "aws --version"
+  }
+}
+
+verify {
+  new { name = "aws --version"; script = "aws --version" }
+}

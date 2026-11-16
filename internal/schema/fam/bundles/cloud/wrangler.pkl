@@ -1,0 +1,26 @@
+/// wrangler: Develop and deploy Cloudflare Workers and related resources (https://github.com/cloudflare/workers-sdk).
+///
+/// FAM installs the CLI with npm.
+/// It needs Node.js 22.12 or later and glibc Linux or macOS. The workerd runtime does not support musl.
+/// Cloud operations need CLOUDFLARE_API_TOKEN or a login.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "wrangler"
+description = "Develop and deploy Cloudflare Workers and related resources"
+version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
+requiredSecrets { "CLOUDFLARE_API_TOKEN" }
+tasks {
+  new fam.Package {
+    package = "wrangler"
+    binary = "wrangler"
+    versionCommand = "wrangler --version"
+  }
+}
+
+verify {
+  new { name = "wrangler --version"; script = "wrangler --version" }
+}

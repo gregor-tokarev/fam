@@ -1,0 +1,27 @@
+/// opentofu: Plan and apply infrastructure changes with OpenTofu (https://github.com/opentofu/opentofu).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// Provider credentials and external programs depend on the project. Use -input=false for automation.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "opentofu"
+description = "Plan and apply infrastructure changes with OpenTofu"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "opentofu/opentofu"
+    binary = "tofu"
+    versionCommand = "tofu version"
+    assets {
+      ["linux-amd64"] { name = "tofu_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "tofu" }
+      ["darwin-arm64"] { name = "tofu_{version}_darwin_arm64.tar.gz"; format = "tar.gz"; file = "tofu" }
+      ["linux-arm64"] { name = "tofu_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "tofu" }
+    }
+  }
+}
+
+verify {
+  new { name = "tofu version"; script = "tofu version" }
+}

@@ -1,0 +1,24 @@
+/// doctl: Manage DigitalOcean compute, Kubernetes, and platform resources (https://github.com/digitalocean/doctl).
+///
+/// FAM installs the CLI with Go. Installation needs Go 1.26.10 or later.
+/// Cloud operations need DIGITALOCEAN_ACCESS_TOKEN or a configured login.
+/// Go source builds can report a development version.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "doctl"
+description = "Manage DigitalOcean compute, Kubernetes, and platform resources"
+version = "@FAM_VERSION@"
+requiredSecrets { "DIGITALOCEAN_ACCESS_TOKEN" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "github.com/digitalocean/doctl/cmd/doctl"; manager = "go" }
+    binary = "doctl"
+    versionCommand = "doctl version"
+  }
+}
+
+verify {
+  new { name = "doctl version"; script = "doctl version" }
+}

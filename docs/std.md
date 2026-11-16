@@ -21,6 +21,29 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.cloud.awsCli` | Manage AWS services with AWS CLI v1 | uv: `awscli` | — | AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN |
+| `std.cloud.azureCli` | Manage Azure resources and deployments | uv: `azure-cli` | — | — |
+| `std.cloud.cloudflareCf` | Official Cloudflare CLI for its complete API | npm: `cf` | — | CLOUDFLARE_API_TOKEN |
+| `std.cloud.crane` | Inspect, copy, and modify container images in registries | go: `github.com/google/go-containerregistry/cmd/crane` | — | — |
+| `std.cloud.docker` | Build images and control local or remote Docker engines | brew: `docker` | — | — |
+| `std.cloud.doctl` | Manage DigitalOcean compute, Kubernetes, and platform resources | go: `github.com/digitalocean/doctl/cmd/doctl` | — | DIGITALOCEAN_ACCESS_TOKEN |
+| `std.cloud.firebase` | Deploy Firebase applications and manage project resources | npm: `firebase-tools` | — | GOOGLE_APPLICATION_CREDENTIALS, FIREBASE_TOKEN |
+| `std.cloud.flyctl` | Deploy applications and manage Fly.io machines | GitHub release: `superfly/flyctl` (latest) | — | FLY_API_TOKEN |
+| `std.cloud.googleAgentsCli` | Create, evaluate, and deploy applications on Google Cloud | uv: `google-agents-cli` | google-agents-cli-adk-code, google-agents-cli-deploy, google-agents-cli-eval, google-agents-cli-observability, google-agents-cli-publish, google-agents-cli-scaffold, google-agents-cli-workflow | GOOGLE_APPLICATION_CREDENTIALS, GEMINI_API_KEY, GOOGLE_API_KEY |
+| `std.cloud.hcloud` | Manage Hetzner Cloud servers, networks, and storage | GitHub release: `hetznercloud/cli` (latest) | — | HCLOUD_TOKEN |
+| `std.cloud.helm` | Package and deploy applications on Kubernetes | script: `mkdir -p "$HOME/.local/bin" && curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 \| HELM_INSTALL_DIR="$HOME/.local/bin" USE_SUDO=false bash` | — | — |
+| `std.cloud.kind` | Run local Kubernetes clusters in containers | go: `sigs.k8s.io/kind` | — | — |
+| `std.cloud.kubectl` | Manage Kubernetes resources and clusters | brew: `kubernetes-cli` | — | — |
+| `std.cloud.kustomize` | Customize Kubernetes manifests without templates | go: `sigs.k8s.io/kustomize/kustomize/v5` | — | — |
+| `std.cloud.netlify` | Deploy and manage Netlify sites | npm: `netlify-cli` | — | NETLIFY_AUTH_TOKEN |
+| `std.cloud.openTofu` | Plan and apply infrastructure changes with OpenTofu | GitHub release: `opentofu/opentofu` (latest) | — | — |
+| `std.cloud.podman` | Control containers through a Podman service | GitHub release: `podman-container-tools/podman` (latest) | — | — |
+| `std.cloud.pulumi` | Manage cloud infrastructure through Pulumi programs | GitHub release: `pulumi/pulumi` (latest) | — | PULUMI_ACCESS_TOKEN |
+| `std.cloud.railway` | Deploy and manage Railway services and projects | npm: `@railway/cli` | — | RAILWAY_TOKEN, RAILWAY_API_TOKEN |
+| `std.cloud.render` | Deploy and manage Render services | GitHub release: `render-oss/cli` (latest) | — | RENDER_API_KEY |
+| `std.cloud.terraform` | Plan and apply infrastructure changes with Terraform | brew: `hashicorp/tap/terraform` | — | — |
+| `std.cloud.vercel` | Deploy and manage Vercel projects | npm: `vercel` | vercel-cli | VERCEL_TOKEN |
+| `std.cloud.wrangler` | Develop and deploy Cloudflare Workers and related resources | npm: `wrangler` | — | CLOUDFLARE_API_TOKEN |
 
 ## computer
 
@@ -41,6 +64,18 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.data.drizzleKit` | Generate and apply Drizzle database migrations | npm: `drizzle-kit` | — | — |
+| `std.data.duckdb` | Query local files and analytical datasets with SQL | GitHub release: `duckdb/duckdb` (latest) | — | — |
+| `std.data.goose` | Apply and track database schema migrations | go: `github.com/pressly/goose/v3/cmd/goose` | — | GOOSE_DBSTRING |
+| `std.data.litestream` | Replicate SQLite databases to external storage | GitHub release: `benbjohnson/litestream` (latest) | — | — |
+| `std.data.migrate` | Run versioned database migrations | GitHub release: `golang-migrate/migrate` (latest) | — | — |
+| `std.data.neonctl` | Manage Neon PostgreSQL projects, branches, and database resources | npm: `neonctl` | — | NEON_API_KEY |
+| `std.data.pscale` | Manage PlanetScale databases, branches, and schema changes | GitHub release: `planetscale/cli` (latest) | — | PLANETSCALE_SERVICE_TOKEN_ID, PLANETSCALE_SERVICE_TOKEN |
+| `std.data.rclone` | Copy and synchronize files across cloud storage services | GitHub release: `rclone/rclone` (latest) | — | — |
+| `std.data.sqliteUtils` | Import, transform, and query SQLite databases from the CLI | uv: `sqlite-utils` | — | — |
+| `std.data.supabase` | Manage Supabase projects, migrations, functions, and local databases | script: `set -e; supabase_release=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/supabase/cli/releases/latest); curl -fsSL "https://github.com/supabase/cli/releases/download/${supabase_release##*/}/install" \| SUPABASE_INSTALL_DIR="$HOME/.local/bin" bash -s -- --no-modify-path --version "${supabase_release##*/}"` | — | SUPABASE_ACCESS_TOKEN |
+| `std.data.turso` | Manage Turso databases, branches, and access tokens | go: `github.com/tursodatabase/turso-cli/cmd/turso` | — | TURSO_API_TOKEN |
+| `std.data.usql` | Query many database systems through a common CLI | go: `github.com/xo/usql` | — | — |
 
 ## devtools
 
@@ -70,7 +105,9 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.networking.cloudflared` | Expose local services through Cloudflare Tunnel | GitHub release: `cloudflare/cloudflared` (latest) | — | TUNNEL_TOKEN |
 | `std.networking.portless` | Named local URLs instead of port numbers | npm: `portless` | portless | — |
+| `std.networking.tailscale` | Connect worker machines through the Tailscale private network | go: `tailscale.com/cmd/tailscale` | — | — |
 
 ## observability
 

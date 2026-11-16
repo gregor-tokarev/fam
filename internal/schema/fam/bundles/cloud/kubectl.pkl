@@ -1,0 +1,26 @@
+/// kubectl: Manage Kubernetes resources and clusters (https://github.com/kubernetes/kubernetes).
+///
+/// FAM installs the CLI with Homebrew.
+/// It needs Homebrew on macOS or glibc Linux. Homebrew does not support Alpine.
+/// Cluster operations need a kubeconfig, cluster credentials, and a reachable cluster.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "kubectl"
+description = "Manage Kubernetes resources and clusters"
+version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
+path { if (facts.os == "darwin") "/opt/homebrew/bin" else "/home/linuxbrew/.linuxbrew/bin" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "kubernetes-cli"; manager = "brew" }
+    binary = "kubectl"
+    versionCommand = "kubectl version --client --output=yaml"
+  }
+}
+
+verify {
+  new { name = "kubectl version --client --output=yaml"; script = "kubectl version --client --output=yaml" }
+}

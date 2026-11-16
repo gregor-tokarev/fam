@@ -1,0 +1,22 @@
+/// drizzle-kit: Generate and apply Drizzle database migrations (https://github.com/drizzle-team/drizzle-orm).
+///
+/// FAM installs the CLI with npm.
+/// It needs Node.js. Database drivers, a project configuration, and credentials depend on the database.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "drizzle-kit"
+description = "Generate and apply Drizzle database migrations"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "drizzle-kit"
+    binary = "drizzle-kit"
+    versionCommand = "drizzle-kit --version"
+  }
+}
+
+verify {
+  new { name = "drizzle-kit --version"; script = "drizzle-kit --version" }
+}

@@ -1,0 +1,28 @@
+/// hcloud: Manage Hetzner Cloud servers, networks, and storage (https://github.com/hetznercloud/cli).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// Cloud operations need HCLOUD_TOKEN or a configured context.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "hcloud"
+description = "Manage Hetzner Cloud servers, networks, and storage"
+version = "@FAM_VERSION@"
+requiredSecrets { "HCLOUD_TOKEN" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "hetznercloud/cli"
+    binary = "hcloud"
+    versionCommand = "hcloud version"
+    assets {
+      ["linux-amd64"] { name = "hcloud-linux-amd64.tar.gz"; format = "tar.gz"; file = "hcloud" }
+      ["darwin-arm64"] { name = "hcloud-darwin-arm64.tar.gz"; format = "tar.gz"; file = "hcloud" }
+      ["linux-arm64"] { name = "hcloud-linux-arm64.tar.gz"; format = "tar.gz"; file = "hcloud" }
+    }
+  }
+}
+
+verify {
+  new { name = "hcloud version"; script = "hcloud version" }
+}

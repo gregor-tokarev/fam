@@ -1,0 +1,23 @@
+/// railway: Deploy and manage Railway services and projects (https://github.com/railwayapp/cli).
+///
+/// FAM installs the CLI with npm.
+/// It needs Node.js 16 or later. Use RAILWAY_TOKEN for a project or RAILWAY_API_TOKEN for an account.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "railway"
+description = "Deploy and manage Railway services and projects"
+version = "@FAM_VERSION@"
+requiredSecrets { "RAILWAY_TOKEN"; "RAILWAY_API_TOKEN" }
+tasks {
+  new fam.Package {
+    package = "@railway/cli"
+    binary = "railway"
+    versionCommand = "railway --version"
+  }
+}
+
+verify {
+  new { name = "railway --version"; script = "railway --version" }
+}

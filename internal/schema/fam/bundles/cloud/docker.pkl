@@ -1,0 +1,26 @@
+/// docker: Build images and control local or remote Docker engines (https://github.com/docker/cli).
+///
+/// FAM installs the CLI with Homebrew.
+/// It needs Homebrew on macOS or glibc Linux. Homebrew does not support Alpine.
+/// Container operations need a separately configured local or remote Docker engine. FAM installs only the CLI.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "docker"
+description = "Build images and control local or remote Docker engines"
+version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
+path { if (facts.os == "darwin") "/opt/homebrew/bin" else "/home/linuxbrew/.linuxbrew/bin" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "docker"; manager = "brew" }
+    binary = "docker"
+    versionCommand = "docker --version"
+  }
+}
+
+verify {
+  new { name = "docker --version"; script = "docker --version" }
+}

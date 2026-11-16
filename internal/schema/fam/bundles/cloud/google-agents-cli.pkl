@@ -1,0 +1,52 @@
+/// google-agents-cli: Create, evaluate, and deploy applications on Google Cloud (https://github.com/google/agents-cli).
+///
+/// FAM installs the CLI with uv. It copies the core skills from the latest GitHub release.
+/// It needs uv and Python 3.11 or later. Deployment also needs gcloud and application credentials.
+/// Model access uses GEMINI_API_KEY or GOOGLE_API_KEY. Generated projects can need Node.js or Terraform.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "google-agents-cli"
+description = "Create, evaluate, and deploy applications on Google Cloud"
+version = "@FAM_VERSION@"
+requiredSecrets { "GOOGLE_APPLICATION_CREDENTIALS"; "GEMINI_API_KEY"; "GOOGLE_API_KEY" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "google-agents-cli"; manager = "uv" }
+    binary = "agents-cli"
+    versionCommand = "agents-cli --version"
+  }
+  new fam.GitHubSkill {
+    repo = "google/agents-cli"
+    path = "skills/google-agents-cli-adk-code"
+  }
+  new fam.GitHubSkill {
+    repo = "google/agents-cli"
+    path = "skills/google-agents-cli-deploy"
+  }
+  new fam.GitHubSkill {
+    repo = "google/agents-cli"
+    path = "skills/google-agents-cli-eval"
+  }
+  new fam.GitHubSkill {
+    repo = "google/agents-cli"
+    path = "skills/google-agents-cli-observability"
+  }
+  new fam.GitHubSkill {
+    repo = "google/agents-cli"
+    path = "skills/google-agents-cli-publish"
+  }
+  new fam.GitHubSkill {
+    repo = "google/agents-cli"
+    path = "skills/google-agents-cli-scaffold"
+  }
+  new fam.GitHubSkill {
+    repo = "google/agents-cli"
+    path = "skills/google-agents-cli-workflow"
+  }
+}
+
+verify {
+  new { name = "agents-cli --version"; script = "agents-cli --version" }
+}

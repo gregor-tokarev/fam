@@ -1,0 +1,22 @@
+/// kustomize: Customize Kubernetes manifests without templates (https://github.com/kubernetes-sigs/kustomize).
+///
+/// FAM installs the CLI with Go. Installation needs Go 1.27 or later.
+/// Installation needs Go. Local manifest builds need no cluster or login.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "kustomize"
+description = "Customize Kubernetes manifests without templates"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "sigs.k8s.io/kustomize/kustomize/v5"; manager = "go" }
+    binary = "kustomize"
+    versionCommand = "kustomize version"
+  }
+}
+
+verify {
+  new { name = "kustomize version"; script = "kustomize version" }
+}
