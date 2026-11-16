@@ -50,7 +50,7 @@ func updateCmd() *cobra.Command {
 				return err
 			}
 			fmt.Fprintf(out, "Updated %s from fam %s to fam %s\n", exe, cur, want)
-			fmt.Fprintln(out, "Run `fam upgrade` in each project to update its .fam/ folder")
+			fmt.Fprintln(out, "When this release changes the schema, `fam plan` asks you to run `fam upgrade` in a project")
 			return nil
 		},
 	}
