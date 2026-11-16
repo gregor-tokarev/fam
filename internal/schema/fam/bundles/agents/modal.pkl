@@ -1,0 +1,34 @@
+/// modal: a CLI for Modal serverless jobs and resources (https://github.com/modal-labs/modal-client).
+///
+/// FAM installs modal with uv.
+/// FAM needs uv and Python >=3.10,<3.16.
+/// Credentials: MODAL_TOKEN_ID, MODAL_TOKEN_SECRET.
+/// FAM copies the core skills from the upstream repository.
+/// The skill uses main because this repository has no GitHub releases.
+/// Generated local documentation is not part of the skill folder.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "modal"
+description = "Deploy serverless jobs and manage Modal functions, sandboxes, volumes, and secrets"
+version = "@FAM_VERSION@"
+requiredSecrets { "MODAL_TOKEN_ID"; "MODAL_TOKEN_SECRET" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "modal"
+      manager = "uv"
+    }
+    binary = "modal"
+  }
+  new fam.GitHubSkill {
+    repo = "modal-labs/modal-client"
+    path = "py/modal/skills/modal"
+    ref = "main"
+  }
+}
+
+verify {
+  new { name = "version"; script = "modal --version" }
+}

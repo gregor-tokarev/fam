@@ -1,0 +1,27 @@
+/// llm: a CLI for model prompts, tools, and response logs (https://github.com/simonw/llm).
+///
+/// FAM installs llm with uv.
+/// FAM needs uv and Python >=3.11.
+/// Credentials: OPENAI_API_KEY.
+/// OPENAI_API_KEY is for the default OpenAI provider. Other providers use their own credentials.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "llm"
+description = "Send model prompts, use tools, and store prompt and response logs"
+version = "@FAM_VERSION@"
+requiredSecrets { "OPENAI_API_KEY" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "llm"
+      manager = "uv"
+    }
+    binary = "llm"
+  }
+}
+
+verify {
+  new { name = "version"; script = "llm --version" }
+}

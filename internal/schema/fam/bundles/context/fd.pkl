@@ -1,0 +1,29 @@
+/// fd: a file search tool (https://github.com/sharkdp/fd).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// FAM uses static musl builds on Linux, including glibc workers.
+/// Upstream does not publish checksum files.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "fd"
+description = "Find files and directories through a concise headless CLI"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "sharkdp/fd"
+    binary = "fd"
+    assets {
+      ["linux-amd64"] { name = "fd-{tag}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "fd-{tag}-x86_64-unknown-linux-musl/fd" }
+      ["linux-arm64"] { name = "fd-{tag}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "fd-{tag}-aarch64-unknown-linux-musl/fd" }
+      ["linux-amd64-musl"] { name = "fd-{tag}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "fd-{tag}-x86_64-unknown-linux-musl/fd" }
+      ["linux-arm64-musl"] { name = "fd-{tag}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "fd-{tag}-aarch64-unknown-linux-musl/fd" }
+      ["darwin-arm64"] { name = "fd-{tag}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "fd-{tag}-aarch64-apple-darwin/fd" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "fd --version" }
+}

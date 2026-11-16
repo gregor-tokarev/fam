@@ -1,0 +1,30 @@
+/// honeymarker: a CLI for Honeycomb deployment markers (https://github.com/honeycombio/honeymarker).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Linux binaries are static and also run on musl.
+/// Upstream does not publish checksum files.
+/// Credentials: HONEYCOMB_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "honeymarker"
+description = "Manage Honeycomb deployment markers and annotations"
+version = "@FAM_VERSION@"
+requiredSecrets { "HONEYCOMB_API_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "honeycombio/honeymarker"
+    binary = "honeymarker"
+    versionCommand = "honeymarker version"
+    assets {
+      ["linux-amd64"] { name = "honeymarker-linux-amd64" }
+      ["linux-arm64"] { name = "honeymarker-linux-arm64" }
+      ["darwin-arm64"] { name = "honeymarker-darwin-arm64" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "honeymarker version" }
+}

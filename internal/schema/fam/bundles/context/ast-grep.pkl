@@ -1,0 +1,21 @@
+/// ast-grep: a syntax-aware code search and rewrite tool (https://github.com/ast-grep/ast-grep).
+///
+/// FAM installs @ast-grep/cli with npm.
+/// The CLI needs Node.js 20 or later.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "ast-grep"
+description = "Search and rewrite source code with syntax-tree patterns."
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "@ast-grep/cli"
+    binary = "ast-grep"
+  }
+}
+
+verify {
+  new { name = "version"; script = "ast-grep --version" }
+}

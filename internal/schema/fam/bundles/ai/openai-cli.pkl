@@ -1,0 +1,34 @@
+/// openai-cli: a CLI for OpenAI APIs and administration (https://github.com/openai/openai-cli).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Linux binaries are static and also run on musl.
+/// Credentials: OPENAI_API_KEY, OPENAI_ADMIN_KEY.
+/// FAM copies the core skills from the upstream repository.
+/// OPENAI_ADMIN_KEY is for administration operations.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "openai-cli"
+description = "Call OpenAI APIs for responses, files, batches, images, audio, and administration"
+version = "@FAM_VERSION@"
+requiredSecrets { "OPENAI_API_KEY"; "OPENAI_ADMIN_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "openai/openai-cli"
+    binary = "openai"
+    assets {
+      ["linux-amd64"] { name = "openai_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "openai"; checksum = "openai_{version}_checksums.txt" }
+      ["linux-arm64"] { name = "openai_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "openai"; checksum = "openai_{version}_checksums.txt" }
+      ["darwin-arm64"] { name = "openai_{version}_macos_arm64.zip"; format = "zip"; file = "openai"; checksum = "openai_{version}_checksums.txt" }
+    }
+  }
+  new fam.GitHubSkill {
+    repo = "openai/openai-cli"
+    path = "skills/openai-cli"
+  }
+}
+
+verify {
+  new { name = "version"; script = "openai --version" }
+}

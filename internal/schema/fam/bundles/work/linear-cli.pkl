@@ -1,0 +1,31 @@
+/// linear-cli: a community CLI for Linear issues and projects (https://github.com/schpet/linear-cli).
+///
+/// FAM installs @schpet/linear-cli with npm.
+/// The CLI needs Node.js >=14 for the npm shim.
+/// Credentials: LINEAR_API_KEY.
+/// FAM copies the core skills from the upstream repository.
+/// The Linux executable requires glibc. Alpine is not supported.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "linear-cli"
+description = "Manage Linear issues, projects, cycles, documents, and comments"
+version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
+requiredSecrets { "LINEAR_API_KEY" }
+tasks {
+  new fam.Package {
+    package = "@schpet/linear-cli"
+    binary = "linear"
+  }
+  new fam.GitHubSkill {
+    repo = "schpet/linear-cli"
+    path = "skills/linear-cli"
+  }
+}
+
+verify {
+  new { name = "version"; script = "linear --version" }
+}

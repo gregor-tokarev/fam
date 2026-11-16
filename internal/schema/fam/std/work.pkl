@@ -1,2 +1,19 @@
 /// Tools for daily work.
 module fam.std.work
+
+import "../Bundle.pkl"
+
+/// lark-cli: Use Lark and Feishu chat, documents, spreadsheets, calendars, and tasks.
+larkCli: Bundle = import("../bundles/work/lark-cli.pkl")
+
+/// linear-cli: Manage Linear issues, projects, cycles, documents, and comments.
+linearCli: Bundle = import("../bundles/work/linear-cli.pkl")
+
+/// linear-release: Report CI deployments and release changes to Linear.
+linearRelease: Bundle = import("../bundles/work/linear-release.pkl")
+
+/// slack-cli: Call Slack APIs and develop, run, and deploy Slack applications.
+slackCli: Bundle = import("../bundles/work/slack-cli.pkl")
+
+/// stripe-cli: Manage Stripe API resources, webhooks, and local payment integration workflows.
+stripeCli: Bundle = import("../bundles/work/stripe-cli.pkl")

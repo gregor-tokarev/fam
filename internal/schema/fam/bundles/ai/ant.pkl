@@ -1,0 +1,28 @@
+/// ant: a CLI for the Claude Platform API (https://github.com/anthropics/anthropic-cli).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Linux binaries are static and also run on musl.
+/// Credentials: ANTHROPIC_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "ant"
+description = "Call the Claude Platform API for messages, files, batches, and platform resources"
+version = "@FAM_VERSION@"
+requiredSecrets { "ANTHROPIC_API_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "anthropics/anthropic-cli"
+    binary = "ant"
+    assets {
+      ["linux-amd64"] { name = "ant_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "ant"; checksum = "ant_{version}_checksums.txt" }
+      ["linux-arm64"] { name = "ant_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "ant"; checksum = "ant_{version}_checksums.txt" }
+      ["darwin-arm64"] { name = "ant_{version}_macos_arm64.zip"; format = "zip"; file = "ant"; checksum = "ant_{version}_checksums.txt" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "ant --version" }
+}

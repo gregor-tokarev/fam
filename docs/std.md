@@ -10,12 +10,21 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.agents.daytona` | Create and manage Daytona sandboxes, snapshots, and remote command execution | GitHub release: `daytonaio/daytona` (latest) | — | DAYTONA_API_KEY |
+| `std.agents.e2b` | Manage E2B cloud sandboxes and build sandbox templates | npm: `@e2b/cli` | — | E2B_API_KEY |
+| `std.agents.modal` | Deploy serverless jobs and manage Modal functions, sandboxes, volumes, and secrets | uv: `modal` | modal | MODAL_TOKEN_ID, MODAL_TOKEN_SECRET |
+| `std.agents.promptfoo` | Evaluate model prompts and agents, and run adversarial evaluations | npm: `promptfoo` | promptfoo-evals, promptfoo-provider-setup, promptfoo-redteam-run, promptfoo-redteam-setup | OPENAI_API_KEY |
 | `std.agents.skills` | The agent skills tool and its find-skills skill | npm: `skills` | find-skills | — |
 
 ## ai
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.ai.anthropicCli` | Call the Claude Platform API for messages, files, batches, and platform resources | GitHub release: `anthropics/anthropic-cli` (latest) | — | ANTHROPIC_API_KEY |
+| `std.ai.huggingFace` | Download and publish Hugging Face models, datasets, and repository files | uv: `huggingface-hub` | — | HF_TOKEN |
+| `std.ai.llm` | Send model prompts, use tools, and store prompt and response logs | uv: `llm` | — | OPENAI_API_KEY |
+| `std.ai.openaiCli` | Call OpenAI APIs for responses, files, batches, images, audio, and administration | GitHub release: `openai/openai-cli` (latest) | openai-cli | OPENAI_API_KEY, OPENAI_ADMIN_KEY |
+| `std.ai.wandb` | Inspect and synchronize Weights & Biases runs, artifacts, and experiment data | uv: `wandb` | — | WANDB_API_KEY |
 
 ## cloud
 
@@ -56,9 +65,18 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.context.astGrep` | Search and rewrite source code with syntax-tree patterns. | npm: `@ast-grep/cli` | — | — |
+| `std.context.context7` | Retrieve current library documentation and code examples from Upstash Context7. | npm: `ctx7` | context7-cli, find-docs | CONTEXT7_API_KEY |
+| `std.context.fd` | Find files and directories through a concise headless CLI | GitHub release: `sharkdp/fd` (latest) | — | — |
+| `std.context.firecrawl` | Search, scrape, crawl, and extract web content with the official Firecrawl CLI. | npm: `firecrawl-cli` | firecrawl-agent, firecrawl-alexandria, firecrawl-crawl, firecrawl-developer-index, firecrawl-download, firecrawl-interact, firecrawl-map, firecrawl-monitor, firecrawl-parse, firecrawl-research-index, firecrawl-scrape, firecrawl-search, firecrawl | FIRECRAWL_API_KEY |
 | `std.context.issueGraph` | Related issues and changes before you start work | npm: `issue-graph` | issue-graph | — |
 | `std.context.latMd` | Markdown knowledge graph of a codebase | npm: `lat.md` | lat-md | — |
 | `std.context.opensrc` | Source code of npm packages for agents | npm: `opensrc` | opensrc | — |
+| `std.context.repomix` | Pack local or remote source repositories into context for coding agents. | npm: `repomix` | repomix-explorer | — |
+| `std.context.ripgrep` | Search source trees with fast regular expressions and ignore-file support | GitHub release: `BurntSushi/ripgrep` (latest) | — | — |
+| `std.context.scc` | Count source lines and estimate code complexity with structured output | GitHub release: `boyter/scc` (latest) | — | — |
+| `std.context.tavily` | Search the web and extract content with the official Tavily CLI. | npm: `@tavily/cli` | — | TAVILY_API_KEY |
+| `std.context.tokei` | Count source lines, comments, and language totals across a repository | apt: `tokei` | — | — |
 
 ## data
 
@@ -113,6 +131,15 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.observability.axiom` | Query Axiom datasets, logs, and traces from the command line | GitHub release: `axiomhq/cli` (latest) | axiom-apl, detect-anomalies, explore-dataset, find-traces | AXIOM_TOKEN |
+| `std.observability.cx` | Query Coralogix telemetry and manage observability resources | GitHub release: `coralogix/cx-cli` (latest) | coralogix-docs, cx-ai-center, cx-alerts, cx-cases, cx-cli, cx-cost-optimization, cx-dashboards, cx-data-pipeline, cx-infra, cx-observability-setup, cx-olly, cx-platform-admin, cx-profiling, cx-rum-setup, cx-search-dashboard, cx-service-catalog, cx-slos, cx-telemetry-querying, cx-coding-agents | CX_API_KEY |
+| `std.observability.dtctl` | Query Dynatrace telemetry and manage dashboards, workflows, and SLOs | GitHub release: `Dynatrace/dtctl` (latest) | dtctl | DT_API_TOKEN |
+| `std.observability.honeymarker` | Manage Honeycomb deployment markers and annotations | GitHub release: `honeycombio/honeymarker` (latest) | — | HONEYCOMB_API_KEY |
+| `std.observability.langsmith` | Inspect LangSmith traces, runs, datasets, and evaluations | GitHub release: `langchain-ai/langsmith-cli` (latest) | — | LANGSMITH_API_KEY |
+| `std.observability.newrelic` | Query New Relic data and manage observability resources | GitHub release: `newrelic/newrelic-cli` (latest) | — | NEW_RELIC_API_KEY |
+| `std.observability.pup` | Query Datadog logs, traces, monitors, and service metadata | npm: `@datadog/pup` | dd-apm, dd-debugger, dd-docs, dd-idp, dd-logs, dd-monitors, dd-pup, dd-symdb, dd-triage-flaky-test, dd-unblock-pr | DD_API_KEY, DD_APP_KEY, DD_ACCESS_TOKEN |
+| `std.observability.sentry` | Inspect Sentry issues, events, and projects from an agent shell | npm: `sentry` | sentry-cli | SENTRY_AUTH_TOKEN, SENTRY_TOKEN |
+| `std.observability.sentryCli` | Upload Sentry source maps, debug symbols, and release artifacts | npm: `@sentry/cli` | — | SENTRY_AUTH_TOKEN |
 
 ## security
 
@@ -129,3 +156,8 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.work.larkCli` | Use Lark and Feishu chat, documents, spreadsheets, calendars, and tasks | npm: `@larksuite/cli` | lark-approval, lark-apps, lark-attendance, lark-base, lark-calendar, lark-contact, lark-doc, lark-drive, lark-event, lark-im, lark-mail, lark-markdown, lark-meeting, lark-note, lark-okr, lark-openapi-explorer, lark-shared, lark-sheets, lark-skill-maker, lark-slides, lark-task, lark-whiteboard, lark-wiki, lark-workflow-meeting-summary, lark-workflow-standup-report | LARKSUITE_CLI_APP_SECRET, LARKSUITE_CLI_USER_ACCESS_TOKEN, LARKSUITE_CLI_TENANT_ACCESS_TOKEN |
+| `std.work.linearCli` | Manage Linear issues, projects, cycles, documents, and comments | npm: `@schpet/linear-cli` | linear-cli | LINEAR_API_KEY |
+| `std.work.linearRelease` | Report CI deployments and release changes to Linear | GitHub release: `linear/linear-release` (latest) | linear-release-setup | LINEAR_ACCESS_KEY |
+| `std.work.slackCli` | Call Slack APIs and develop, run, and deploy Slack applications | GitHub release: `slackapi/slack-cli` (latest) | slack-cli | — |
+| `std.work.stripeCli` | Manage Stripe API resources, webhooks, and local payment integration workflows | npm: `@stripe/cli` | — | STRIPE_API_KEY |

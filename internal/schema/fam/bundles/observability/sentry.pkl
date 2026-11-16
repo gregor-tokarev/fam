@@ -1,0 +1,30 @@
+/// sentry: a CLI for Sentry issues, events, and projects (https://github.com/getsentry/toolkit).
+///
+/// FAM installs sentry with npm.
+/// The CLI needs Node.js 20 or later.
+/// Credentials: SENTRY_AUTH_TOKEN, SENTRY_TOKEN.
+/// FAM copies the core skills from the upstream repository.
+/// Use SENTRY_AUTH_TOKEN or SENTRY_TOKEN.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "sentry"
+description = "Inspect Sentry issues, events, and projects from an agent shell"
+version = "@FAM_VERSION@"
+requiredSecrets { "SENTRY_AUTH_TOKEN"; "SENTRY_TOKEN" }
+tasks {
+  new fam.Package {
+    package = "sentry"
+    binary = "sentry"
+    versionCommand = "SENTRY_CLI_NO_UPDATE_CHECK=1 SENTRY_CLI_NO_TELEMETRY=1 sentry --version"
+  }
+  new fam.GitHubSkill {
+    repo = "getsentry/toolkit"
+    path = "packages/cli/plugins/sentry-cli/skills/sentry-cli"
+  }
+}
+
+verify {
+  new { name = "version"; script = "SENTRY_CLI_NO_UPDATE_CHECK=1 SENTRY_CLI_NO_TELEMETRY=1 sentry --version" }
+}

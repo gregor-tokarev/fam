@@ -1,0 +1,32 @@
+/// daytona: a CLI for Daytona sandboxes and remote commands (https://github.com/daytonaio/daytona).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Credentials: DAYTONA_API_KEY.
+/// Set DAYTONA_API_URL with DAYTONA_API_KEY for headless access.
+/// The Linux release requires glibc. Alpine is not supported.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "daytona"
+description = "Create and manage Daytona sandboxes, snapshots, and remote command execution"
+version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
+requiredSecrets { "DAYTONA_API_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "daytonaio/daytona"
+    binary = "daytona"
+    versionCommand = "daytona version"
+    assets {
+      ["linux-amd64"] { name = "daytona-linux-amd64" }
+      ["linux-arm64"] { name = "daytona-linux-arm64" }
+      ["darwin-arm64"] { name = "daytona-darwin-arm64" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "daytona version" }
+}

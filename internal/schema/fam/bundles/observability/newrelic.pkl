@@ -1,0 +1,28 @@
+/// newrelic: a CLI for New Relic data and resources (https://github.com/newrelic/newrelic-cli).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Credentials: NEW_RELIC_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "newrelic"
+description = "Query New Relic data and manage observability resources"
+version = "@FAM_VERSION@"
+requiredSecrets { "NEW_RELIC_API_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "newrelic/newrelic-cli"
+    binary = "newrelic"
+    versionCommand = "newrelic version"
+    assets {
+      ["linux-amd64"] { name = "newrelic-cli_{version}_Linux_x86_64.tar.gz"; format = "tar.gz"; file = "newrelic" }
+      ["linux-arm64"] { name = "newrelic-cli_{version}_Linux_arm64.tar.gz"; format = "tar.gz"; file = "newrelic" }
+      ["darwin-arm64"] { name = "newrelic-cli_{version}_Darwin_arm64.tar.gz"; format = "tar.gz"; file = "newrelic" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "newrelic version" }
+}

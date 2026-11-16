@@ -1,0 +1,28 @@
+/// langsmith: a CLI for LangSmith traces, runs, and evaluations (https://github.com/langchain-ai/langsmith-cli).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Linux binaries are static and also run on musl.
+/// Credentials: LANGSMITH_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "langsmith"
+description = "Inspect LangSmith traces, runs, datasets, and evaluations"
+version = "@FAM_VERSION@"
+requiredSecrets { "LANGSMITH_API_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "langchain-ai/langsmith-cli"
+    binary = "langsmith"
+    assets {
+      ["linux-amd64"] { name = "langsmith_linux_amd64.tar.gz"; format = "tar.gz"; file = "langsmith"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "langsmith_linux_arm64.tar.gz"; format = "tar.gz"; file = "langsmith"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "langsmith_darwin_arm64.tar.gz"; format = "tar.gz"; file = "langsmith"; checksum = "checksums.txt" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "langsmith --version" }
+}

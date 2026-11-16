@@ -1,0 +1,23 @@
+/// sentry-cli: a CLI for Sentry releases, source maps, and debug symbols (https://github.com/getsentry/sentry-cli).
+///
+/// FAM installs @sentry/cli with npm.
+/// The CLI needs Node.js 18 or later.
+/// Credentials: SENTRY_AUTH_TOKEN.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "sentry-cli"
+description = "Upload Sentry source maps, debug symbols, and release artifacts"
+version = "@FAM_VERSION@"
+requiredSecrets { "SENTRY_AUTH_TOKEN" }
+tasks {
+  new fam.Package {
+    package = "@sentry/cli"
+    binary = "sentry-cli"
+  }
+}
+
+verify {
+  new { name = "version"; script = "sentry-cli --version" }
+}

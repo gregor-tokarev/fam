@@ -1,0 +1,107 @@
+/// cx: a CLI for Coralogix telemetry and resources (https://github.com/coralogix/cx-cli).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// FAM uses static musl builds on Linux, including glibc workers.
+/// Credentials: CX_API_KEY.
+/// FAM copies the core skills from the upstream repository.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "cx"
+description = "Query Coralogix telemetry and manage observability resources"
+version = "@FAM_VERSION@"
+requiredSecrets { "CX_API_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "coralogix/cx-cli"
+    binary = "cx"
+    assets {
+      ["linux-amd64"] { name = "cx-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
+      ["linux-arm64"] { name = "cx-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
+      ["linux-amd64-musl"] { name = "cx-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
+      ["linux-arm64-musl"] { name = "cx-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
+      ["darwin-arm64"] { name = "cx-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
+    }
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/coralogix-docs"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-ai-center"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-alerts"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-cases"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-cli"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-cost-optimization"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-dashboards"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-data-pipeline"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-infra"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-observability-setup"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-olly"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-platform-admin"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-profiling"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-rum-setup"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-search-dashboard"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-service-catalog"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-slos"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-telemetry-querying"
+  }
+  new fam.GitHubSkill {
+    repo = "coralogix/cx-cli"
+    path = "skills/cx-coding-agents"
+  }
+}
+
+verify {
+  new { name = "version"; script = "cx --version" }
+}

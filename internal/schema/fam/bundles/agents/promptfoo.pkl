@@ -1,0 +1,42 @@
+/// promptfoo: tools for prompt and agent evaluations (https://github.com/promptfoo/promptfoo).
+///
+/// FAM installs promptfoo with npm.
+/// The CLI needs Node.js >=22.22.0.
+/// Credentials: OPENAI_API_KEY.
+/// FAM copies the core skills from the upstream repository.
+/// Provider credentials depend on the evaluation. OPENAI_API_KEY is for the OpenAI provider.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "promptfoo"
+description = "Evaluate model prompts and agents, and run adversarial evaluations"
+version = "@FAM_VERSION@"
+requiredSecrets { "OPENAI_API_KEY" }
+tasks {
+  new fam.Package {
+    package = "promptfoo"
+    binary = "promptfoo"
+    versionCommand = "PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo --version"
+  }
+  new fam.GitHubSkill {
+    repo = "promptfoo/promptfoo"
+    path = "plugins/promptfoo/skills/promptfoo-evals"
+  }
+  new fam.GitHubSkill {
+    repo = "promptfoo/promptfoo"
+    path = "plugins/promptfoo/skills/promptfoo-provider-setup"
+  }
+  new fam.GitHubSkill {
+    repo = "promptfoo/promptfoo"
+    path = "plugins/promptfoo/skills/promptfoo-redteam-run"
+  }
+  new fam.GitHubSkill {
+    repo = "promptfoo/promptfoo"
+    path = "plugins/promptfoo/skills/promptfoo-redteam-setup"
+  }
+}
+
+verify {
+  new { name = "version"; script = "PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo --version" }
+}

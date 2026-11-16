@@ -1,0 +1,35 @@
+/// linear-release: the Linear release tracking CLI (https://github.com/linear/linear-release).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Credentials: LINEAR_ACCESS_KEY.
+/// FAM copies the core skills from the upstream repository.
+/// Release operations need Git and a full repository clone. No musl build is available.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "linear-release"
+description = "Report CI deployments and release changes to Linear"
+version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
+requiredSecrets { "LINEAR_ACCESS_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "linear/linear-release"
+    binary = "linear-release"
+    assets {
+      ["linux-amd64"] { name = "linear-release-linux-x64" }
+      ["linux-arm64"] { name = "linear-release-linux-arm64" }
+      ["darwin-arm64"] { name = "linear-release-darwin-arm64" }
+    }
+  }
+  new fam.GitHubSkill {
+    repo = "linear/linear-release"
+    path = "skills/linear-release-setup"
+  }
+}
+
+verify {
+  new { name = "version"; script = "linear-release --version" }
+}
