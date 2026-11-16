@@ -110,9 +110,14 @@ func Check(base string) error {
 // sameSchema reports whether dir holds the schema of this binary as FAM `v` would write it,
 // apart from doc comments in Pkl files.
 func sameSchema(dir, v string) (bool, error) {
+	// Follow a symbolic link for .fam itself, so that the walk below sees its files.
+	dir, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return false, err
+	}
 	want := map[string]bool{VersionFile: true}
 	same := true
-	err := fs.WalkDir(files, "fam", func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(files, "fam", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !same {
 			return err
 		}
@@ -157,15 +162,50 @@ func sameSchema(dir, v string) (bool, error) {
 	return same && err == nil, err
 }
 
-// withoutDocs removes the doc comment lines (`///` and `//!`) of a Pkl file.
+// withoutDocs removes the doc comment lines (`///` and `//!`) of a Pkl file, and normalizes CRLF
+// line ends. A line inside a multi-line string (`"""`, or `#"""` … `"""#`) is content, not a
+// comment, so it stays.
 func withoutDocs(b []byte) []byte {
+	b = bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
 	var out [][]byte
+	closing := "" // the end of the multi-line string that the current line is in, or ""
 	for _, line := range bytes.Split(b, []byte("\n")) {
-		t := bytes.TrimSpace(line)
-		if bytes.HasPrefix(t, []byte("///")) || bytes.HasPrefix(t, []byte("//!")) {
-			continue
+		if closing == "" {
+			t := bytes.TrimSpace(line)
+			if bytes.HasPrefix(t, []byte("///")) || bytes.HasPrefix(t, []byte("//!")) {
+				continue
+			}
 		}
 		out = append(out, line)
+		closing = scanStrings(string(line), closing)
 	}
 	return bytes.Join(out, []byte("\n"))
+}
+
+// scanStrings follows the multi-line strings through one line. closing is the end token of the
+// string that is open at the start of the line ("" when none). It returns the end token of the
+// string that is still open at the end of the line.
+func scanStrings(line, closing string) string {
+	for {
+		if closing != "" {
+			i := strings.Index(line, closing)
+			if i < 0 {
+				return closing
+			}
+			line = line[i+len(closing):]
+			closing = ""
+			continue
+		}
+		i := strings.Index(line, `"""`)
+		if i < 0 {
+			return ""
+		}
+		// Count the # before the quotes: #"""…"""# needs the same number of # at the end.
+		h := 0
+		for h < i && line[i-1-h] == '#' {
+			h++
+		}
+		closing = `"""` + strings.Repeat("#", h)
+		line = line[i+3:]
+	}
 }
