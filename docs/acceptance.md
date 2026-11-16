@@ -38,6 +38,8 @@ go run ./acceptance clean                   # delete base images and runtime fil
 - Scenario 9 stops the network card of the VM with the QEMU monitor (`set_link nic0 off`) while FAM runs a slow script.
 - The test project, its secrets file, and the run logs of each scenario are in `~/.cache/fam-acceptance/run/`. Results go to `acceptance/results/<target>.json`.
 
+Scenario 16 installs Node.js, npm, and uv inside the VM of the current run. The system package manager is also available. It installs no Go, Rust, or C compiler. The shared base images stay unchanged.
+
 Scenario 16 discovers all standard bundles from the package. `-std-groups cloud,data` or `FAM_STD_GROUPS=cloud,data` limits it to those groups. Bundles with `supported = false` for the target facts are omitted. The scenario reads expected skills from the first plan, requires every verify to pass, and requires a satisfied second plan.
 
 ## Windows

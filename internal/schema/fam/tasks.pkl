@@ -271,7 +271,7 @@ class GitHubRelease extends StateTask {
   binary: String(matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
 
   /// A command that prints the installed version. The default is `<binary> --version`.
-  /// Its output must contain the release tag as a word, with or without the leading `v`.
+  /// Its stdout or stderr must contain the release tag as a word, with or without the leading `v`.
   versionCommand: String?
 
   /// Assets by platform, for example `assets { ["linux-amd64"] { name = "tool.tar.gz"; file = "tool" } }`.
@@ -288,9 +288,9 @@ class ReleaseAsset {
   name: String(!isEmpty && !contains("/") && !contains(".."))
 
   /// The asset format.
-  format: "binary"|"tar.gz"|"zip" = "binary"
+  format: "binary"|"tar.gz"|"tar.xz"|"zip" = "binary"
 
-  /// The binary path inside an archive. Required for `tar.gz` and `zip`.
+  /// The binary path inside an archive. Required for `tar.gz`, `tar.xz`, and `zip`.
   /// It also accepts `{tag}` and `{version}`.
   file: String(!isEmpty && !startsWith("/") && !split("/").contains(".."))?
 

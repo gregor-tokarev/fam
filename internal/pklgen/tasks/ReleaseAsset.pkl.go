@@ -9,7 +9,7 @@ type ReleaseAsset struct {
 	// The asset format.
 	Format string `pkl:"format"`
 
-	// The binary path inside an archive. Required for `tar.gz` and `zip`.
+	// The binary path inside an archive. Required for `tar.gz`, `tar.xz`, and `zip`.
 	// It also accepts `{tag}` and `{version}`.
 	File *string `pkl:"file"`
 
