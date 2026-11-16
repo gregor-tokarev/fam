@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
@@ -44,6 +45,11 @@ func (t *GitHubReleaseTask) Restarts() []Unit       { return t.units }
 func (t *GitHubReleaseTask) binary(env *Env) string { return env.Home(".local/bin/" + t.Binary) }
 func (t *GitHubReleaseTask) target(ctx context.Context, env *Env) (string, tasks.ReleaseAsset, string, error) {
 	platform := env.Facts.OS + "-" + env.Facts.Arch
+	if env.Facts.OS == "linux" && env.Facts.Libc == "musl" {
+		if _, ok := t.Assets[platform+"-musl"]; ok {
+			platform += "-musl"
+		}
+	}
 	a, ok := t.Assets[platform]
 	if !ok {
 		return "", a, "", fmt.Errorf("release %s has no asset for %s", t.Repo, platform)
@@ -73,14 +79,62 @@ func expandReleaseName(name, tag string) string {
 	return strings.NewReplacer("{tag}", tag, "{version}", strings.TrimPrefix(tag, "v")).Replace(name)
 }
 
-func (t *GitHubReleaseTask) Check(ctx context.Context, env *Env) (Check, error) {
+// releaseRecord identifies a binary that FAM installed. Its digest also detects drift
+// before FAM runs the binary's version command.
+type releaseRecord struct {
+	Repo   string `json:"repo"`
+	SHA256 string `json:"sha256"`
+}
+
+func (t *GitHubReleaseTask) recordPath(env *Env) string {
+	return env.Home(".local/state/fam/releases/" + t.Binary + ".json")
+}
+
+// ownership never adopts an existing file implicitly, even if its version matches.
+func (t *GitHubReleaseTask) ownership(ctx context.Context, env *Env) (transport.FileInfo, *releaseRecord, error) {
 	fi, err := env.T.Stat(ctx, t.binary(env), false)
+	if err != nil {
+		return fi, nil, err
+	}
+	p := t.recordPath(env)
+	ri, err := env.T.Stat(ctx, p, false)
+	if err != nil {
+		return fi, nil, err
+	}
+	var record *releaseRecord
+	if ri.Exists {
+		if ri.Type != "file" {
+			return fi, nil, conflict(p + " is not a regular FAM release record. Remove it and the binary, then apply again")
+		}
+		data, exists, err := env.T.ReadFile(ctx, p, false)
+		if err != nil {
+			return fi, nil, err
+		}
+		var r releaseRecord
+		if err := json.Unmarshal(data, &r); !exists || err != nil || !releaseDigest.MatchString(r.SHA256) || !strings.EqualFold(r.Repo, t.Repo) {
+			return fi, nil, conflict(p + " is invalid or belongs to another repository. Remove the binary and its record, then apply again")
+		}
+		record = &r
+	}
+	if fi.Exists && record == nil {
+		return fi, nil, conflict(fmt.Sprintf("%s exists and FAM did not make it. Remove the file, then apply to let FAM manage it", t.binary(env)))
+	}
+	if fi.Exists && fi.Type != "file" && fi.Type != "link" {
+		return fi, nil, conflict(t.binary(env) + " is not a regular file or link. Remove it, then apply again")
+	}
+	return fi, record, nil
+}
+
+var releaseDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+func (t *GitHubReleaseTask) Check(ctx context.Context, env *Env) (Check, error) {
+	fi, record, err := t.ownership(ctx, env)
 	if err != nil {
 		return Check{}, err
 	}
 	if t.Absent {
-		if fi.Exists {
-			return Check{Status: Change, Detail: "remove binary"}, nil
+		if record != nil {
+			return Check{Status: Change, Detail: "remove binary and FAM record"}, nil
 		}
 		return Check{Status: Satisfied}, nil
 	}
@@ -90,6 +144,12 @@ func (t *GitHubReleaseTask) Check(ctx context.Context, env *Env) (Check, error) 
 	}
 	if !fi.Exists {
 		return Check{Status: Change, Detail: "install " + tag}, nil
+	}
+	if fi.Type == "link" {
+		return Check{Status: Change, Detail: "replace changed binary"}, nil
+	}
+	if fi.SHA256 != record.SHA256 {
+		return Check{Status: Change, Detail: "replace changed binary"}, nil
 	}
 	if fi.Mode.Perm()&0o111 == 0 {
 		return Check{Status: Change, Detail: "repair executable mode"}, nil
@@ -112,8 +172,15 @@ func (t *GitHubReleaseTask) Check(ctx context.Context, env *Env) (Check, error) 
 }
 
 func (t *GitHubReleaseTask) Apply(ctx context.Context, env *Env) (string, error) {
+	_, record, err := t.ownership(ctx, env)
+	if err != nil {
+		return "", err
+	}
 	if t.Absent {
-		_, err := env.ShOK(ctx, "rm -f "+transport.Quote(t.binary(env)), false, "remove "+t.Binary)
+		if record == nil {
+			return "unchanged", nil
+		}
+		_, err := env.ShOK(ctx, "rm -f -- "+transport.Quote(t.binary(env))+" "+transport.Quote(t.recordPath(env)), false, "remove "+t.Binary)
 		return "removed", err
 	}
 	tag, a, name, err := t.target(ctx, env)
@@ -154,7 +221,26 @@ func (t *GitHubReleaseTask) Apply(ctx context.Context, env *Env) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("release asset %s: %w", name, err)
 	}
+	// Recheck ownership after the download, before replacing any file.
+	fi, _, err := t.ownership(ctx, env)
+	if err != nil {
+		return "", err
+	}
+	// Remove a changed link first, so mv cannot follow a link to a directory.
+	if fi.Type == "link" {
+		if _, err := env.ShOK(ctx, "rm -f -- "+transport.Quote(t.binary(env)), false, "remove changed link "+t.Binary); err != nil {
+			return "", err
+		}
+	}
 	if err := env.T.WriteFile(ctx, t.binary(env), binary, 0o755, false); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(binary)
+	data, err = json.Marshal(releaseRecord{Repo: t.Repo, SHA256: hex.EncodeToString(sum[:])})
+	if err != nil {
+		return "", err
+	}
+	if err := env.T.WriteFile(ctx, t.recordPath(env), append(data, '\n'), 0o600, false); err != nil {
 		return "", err
 	}
 	return "installed " + tag, nil

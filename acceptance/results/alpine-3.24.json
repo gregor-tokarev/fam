@@ -5,7 +5,7 @@
     "name": "plan shows the changes and changes nothing",
     "result": "pass",
     "detail": "25 changes, 3 satisfied",
-    "duration": "20s"
+    "duration": "29s"
   },
   {
     "target": "alpine-3.24",
@@ -13,7 +13,7 @@
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
     "detail": "first apply 25 changed, second plan 28 satisfied, second apply 0 changed",
-    "duration": "31s"
+    "duration": "23s"
   },
   {
     "target": "alpine-3.24",
@@ -37,7 +37,7 @@
     "name": "absent bundle removes skill, links, files, merged keys, variables",
     "result": "pass",
     "detail": "file, link, merged keys, skill, Claude link, variables removed",
-    "duration": "31s"
+    "duration": "23s"
   },
   {
     "target": "alpine-3.24",
@@ -116,8 +116,8 @@
     "n": 16,
     "name": "all standard bundles: install, verify, satisfied, archive cache",
     "result": "pass",
-    "detail": "67 changed, 17 skills; apply 1m44s, plan 20s",
-    "duration": "2m50s"
+    "detail": "67 changed, 17 skills; apply 1m38s, plan 20s",
+    "duration": "2m44s"
   },
   {
     "target": "alpine-3.24",
@@ -125,6 +125,6 @@
     "name": "package from the OS package manager, chosen in config.pkl, then removed",
     "result": "pass",
     "detail": "tree (apk): changed, then removed",
-    "duration": "30s"
+    "duration": "38s"
   }
 ]

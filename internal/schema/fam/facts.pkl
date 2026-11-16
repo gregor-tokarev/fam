@@ -27,6 +27,9 @@ distroVersion: String = read("prop:fam.distroVersion")
 /// The CPU architecture: `"amd64"` or `"arm64"`.
 arch: String = read("prop:fam.arch")
 
+/// The Linux C library: `"glibc"`, `"musl"`, or empty when unknown or on macOS.
+libc: String = read("prop:fam.libc")
+
 /// The number of CPU cores.
 cpus: Int = read("prop:fam.cpus").toInt()
 

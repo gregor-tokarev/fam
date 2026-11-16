@@ -116,8 +116,8 @@
     "n": 16,
     "name": "all standard bundles: install, verify, satisfied, archive cache",
     "result": "pass",
-    "detail": "75 changed, 20 skills; apply 2m6s, plan 23s",
-    "duration": "3m3s"
+    "detail": "75 changed, 20 skills; apply 1m58s, plan 23s",
+    "duration": "3m1s"
   },
   {
     "target": "ubuntu-26.04",

@@ -260,7 +260,9 @@ class GitHubSkill extends StateTask {
 }
 
 /// A binary from a public GitHub release, installed into `~/.local/bin` without sudo.
-/// FAM compares the installed version with the release tag.
+/// FAM records each installed binary and its SHA-256. An existing binary without a record is a conflict.
+/// FAM replaces a managed binary after a hand change and compares its version with the release tag.
+/// Prefer static or musl builds for the plain Linux keys when available, because they run everywhere.
 class GitHubRelease extends StateTask {
   /// The repository, `owner/name`.
   repo: String(matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")))
@@ -273,7 +275,8 @@ class GitHubRelease extends StateTask {
   versionCommand: String?
 
   /// Assets by platform, for example `assets { ["linux-amd64"] { name = "tool.tar.gz"; file = "tool" } }`.
-  assets: Mapping<"linux-amd64"|"linux-arm64"|"darwin-arm64", ReleaseAsset>
+  /// On musl Linux, FAM uses the matching `-musl` key when present, else the plain Linux key.
+  assets: Mapping<"linux-amd64"|"linux-arm64"|"linux-amd64-musl"|"linux-arm64-musl"|"darwin-arm64", ReleaseAsset>
 
   /// A pinned release tag. The default is the latest release.
   tag: String(!isEmpty)?

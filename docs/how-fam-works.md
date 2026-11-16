@@ -74,11 +74,14 @@ User scripts (`Script`, `Package`) run in Bash when the machine has Bash, else i
 | `~/.claude/CLAUDE.md` | A link to `~/.agents/CLAUDE.md`. |
 | `~/.agents/skills/<name>/` | A copy of each skill, with a `.fam-managed` marker file. |
 | `~/.claude/skills/<name>` | A link to `~/.agents/skills/<name>`. |
+| `~/.local/bin/<binary>` | A binary from a `GitHubRelease` task. |
+| `~/.local/state/fam/releases/<binary>.json` | The repository and SHA-256 of a binary that FAM installed. |
 
-FAM stores no state. It finds what it manages from the content:
+FAM uses markers and release records to find what it manages:
 
 - Instruction files start with a marker line that holds the SHA-256 of the rest of the file. A file without the marker, or with a different digest, was not written by FAM (or was changed by hand). FAM saves a copy (`<file>.fam-backup-<time>`) before it replaces such a file.
 - A skill folder with `.fam-managed` belongs to FAM. A skill folder or a Claude skill link that FAM did not make is a conflict: the plan stops, and `fam apply` changes nothing on that machine. FAM removes managed skills that the config no longer lists.
+- A release binary without a FAM record is a conflict. Plan stops, and apply changes nothing on that machine. Remove the file, then apply to let FAM manage it. FAM replaces a managed binary after a hand change. An absent bundle removes only its managed binary and record.
 
 ## Instruction templates
 
@@ -87,7 +90,7 @@ FAM stores no state. It finds what it manages from the content:
 | Variable | Content |
 |---|---|
 | `.Machine.Name`, `.Machine.Role`, `.Machine.Address`, `.Machine.User` | The machine entry. |
-| `.Facts.OS`, `.Facts.Distro`, `.Facts.DistroVersion`, `.Facts.Arch`, `.Facts.CPUs`, `.Facts.Home`, `.Facts.User`, `.Facts.Hostname`, `.Facts.Init`, `.Facts.Shell`, `.Facts.Machine`, `.Facts.Role` | The facts. |
+| `.Facts.OS`, `.Facts.Distro`, `.Facts.DistroVersion`, `.Facts.Arch`, `.Facts.Libc`, `.Facts.CPUs`, `.Facts.Home`, `.Facts.User`, `.Facts.Hostname`, `.Facts.Init`, `.Facts.Shell`, `.Facts.Machine`, `.Facts.Role` | The facts. |
 
 There is no `.Agent` variable. Bundles add no instructions: a bundle's skill tells the agents about its tool.
 
@@ -166,6 +169,8 @@ FAM asks the package manager, not `PATH`, whether the package is installed. When
 Cargo uses `--root ~/.local`. Go uses `GOBIN=~/.local/bin`. A `PackageRef` can give `names` for each manager, for example `names { ["apt"] = "fd-find" }`. FAM uses the generic `package` name when no name matches the selected manager.
 
 A `GitHubRelease` task installs a release binary into `~/.local/bin`, without sudo. It supports bare binaries, tar.gz, and zip. Plan compares the installed version with the latest tag, or a pinned `tag`. FAM checks SHA-256 checksum files when present. See [Package tasks](development.md#package-tasks) for the schema and an example.
+
+On Linux, FAM detects glibc or musl from the machine. On musl, `assets` uses `linux-amd64-musl` or `linux-arm64-musl` when present. Otherwise, FAM uses the plain Linux key. Prefer static or musl builds for the plain Linux keys when available, because they run everywhere.
 
 ## Agents
 

@@ -28,7 +28,7 @@ type Entry struct {
 
 // LinuxFacts fixes the inputs of the generated documentation.
 func LinuxFacts() facts.Facts {
-	return facts.Facts{OS: "linux", Distro: "ubuntu", DistroVersion: "26.04", Arch: "amd64", CPUs: 4, Home: "/home/fam", User: "fam", Hostname: "fam-docs", Init: "systemd", Shell: "/bin/bash", Machine: "docs", Role: "worker"}
+	return facts.Facts{OS: "linux", Distro: "ubuntu", DistroVersion: "26.04", Arch: "amd64", Libc: "glibc", CPUs: 4, Home: "/home/fam", User: "fam", Hostname: "fam-docs", Init: "systemd", Shell: "/bin/bash", Machine: "docs", Role: "worker"}
 }
 
 // Read evaluates std.pkl with the given facts. It needs no project or network downloads.

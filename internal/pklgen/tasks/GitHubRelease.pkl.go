@@ -20,7 +20,9 @@ type GitHubRelease interface {
 var _ GitHubRelease = GitHubReleaseImpl{}
 
 // A binary from a public GitHub release, installed into `~/.local/bin` without sudo.
-// FAM compares the installed version with the release tag.
+// FAM records each installed binary and its SHA-256. An existing binary without a record is a conflict.
+// FAM replaces a managed binary after a hand change and compares its version with the release tag.
+// Prefer static or musl builds for the plain Linux keys when available, because they run everywhere.
 type GitHubReleaseImpl struct {
 	// The repository, `owner/name`.
 	Repo string `pkl:"repo"`
@@ -33,6 +35,7 @@ type GitHubReleaseImpl struct {
 	VersionCommand *string `pkl:"versionCommand"`
 
 	// Assets by platform, for example `assets { ["linux-amd64"] { name = "tool.tar.gz"; file = "tool" } }`.
+	// On musl Linux, FAM uses the matching `-musl` key when present, else the plain Linux key.
 	Assets map[string]ReleaseAsset `pkl:"assets"`
 
 	// A pinned release tag. The default is the latest release.
@@ -75,6 +78,7 @@ func (rcv GitHubReleaseImpl) GetVersionCommand() *string {
 }
 
 // Assets by platform, for example `assets { ["linux-amd64"] { name = "tool.tar.gz"; file = "tool" } }`.
+// On musl Linux, FAM uses the matching `-musl` key when present, else the plain Linux key.
 func (rcv GitHubReleaseImpl) GetAssets() map[string]ReleaseAsset {
 	return rcv.Assets
 }
