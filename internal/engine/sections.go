@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -39,7 +40,7 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section,
 	}
 	var verify []VerifySpec
 	for _, u := range spec.Bundles {
-		s, err := BundleSection(u, spec.PackageManagers)
+		s, err := BundleSection(ctx, u, spec.PackageManagers)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -57,15 +58,43 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section,
 			verify = append(verify, VerifySpec{Bundle: u.Bundle.Name, Name: name, Event: string(v.Event), Script: v.Script})
 		}
 	}
-	sk, err := skillsSection(ctx, env, spec)
+	// The skills of the bundle tasks: each name once, across all bundles and skills/.
+	bundleSkills := map[string]string{}
+	var skillNames []string
+	for _, sec := range out {
+		for _, t := range sec.Tasks {
+			if st, ok := t.(*SkillTask); ok {
+				if prev, ok := bundleSkills[st.Skill.Name]; ok {
+					return nil, nil, fmt.Errorf("two skills have the name %q: %s and %s", st.Skill.Name, prev, st.Skill.Dir)
+				}
+				bundleSkills[st.Skill.Name] = st.Skill.Dir
+				skillNames = append(skillNames, st.Skill.Name)
+			}
+		}
+	}
+	sk, err := skillsSection(env, bundleSkills)
 	if err != nil {
 		return nil, nil, err
 	}
-	var skillNames []string
 	for _, t := range sk.Tasks {
 		if st, ok := t.(*SkillTask); ok {
 			skillNames = append(skillNames, st.Skill.Name)
 		}
+	}
+	// A skill that an absent bundle removes but another bundle or skills/ installs stays.
+	installed := map[string]bool{}
+	for _, n := range skillNames {
+		installed[n] = true
+	}
+	for i := range out {
+		kept := out[i].Tasks[:0]
+		for _, t := range out[i].Tasks {
+			if rt, ok := t.(*SkillRemoveTask); ok && installed[rt.Name_] {
+				continue
+			}
+			kept = append(kept, t)
+		}
+		out[i].Tasks = kept
 	}
 	out = append(out, sk)
 	in, err := instructionsSection(env, spec)

@@ -207,7 +207,7 @@ func s1Plan(c *Ctx) error {
 	if r.Code != 0 || m.Status != "changes" || m.Counts.Error != 0 || m.Counts.Conflict != 0 {
 		return fmt.Errorf("plan: exit %d, status %s\n%s", r.Code, m.Status, describe(r.Res))
 	}
-	for _, want := range [][2]string{{"file", "~/.local/bin/fam-tool"}, {"merge", "~/.cargo/config.toml"}, {"skill", "tool-skill"}, {"skill", "fleet-skill"}, {"file", "~/.agents/AGENTS.md"}, {"script", "system marker"}} {
+	for _, want := range [][2]string{{"file", "~/.local/bin/fam-tool"}, {"merge", "~/.cargo/config.toml"}, {"skill", "tool-skill"}, {"skill", "tool-notes"}, {"skill", "fleet-skill"}, {"file", "~/.agents/AGENTS.md"}, {"script", "system marker"}} {
 		t := findTask(m, want[0], want[1])
 		if t == nil || t.Status != "change" {
 			return fmt.Errorf("plan: no change for %s %s\n%s", want[0], want[1], describe(r.Res))
@@ -363,7 +363,7 @@ func s5Absent(c *Ctx) error {
 	if _, err := c.applyOK("--config", "config-absent.pkl"); err != nil {
 		return err
 	}
-	out, _ := c.ssh(`for p in ~/.local/bin/fam-tool ~/.local/bin/fam-tool-link ~/.agents/skills/tool-skill ~/.claude/skills/tool-skill; do if [ -e "$p" ] || [ -L "$p" ]; then echo "present $p"; fi; done
+	out, _ := c.ssh(`for p in ~/.local/bin/fam-tool ~/.local/bin/fam-tool-link ~/.agents/skills/tool-skill ~/.claude/skills/tool-skill ~/.agents/skills/tool-notes ~/.claude/skills/tool-notes; do if [ -e "$p" ] || [ -L "$p" ]; then echo "present $p"; fi; done
 echo "vars=$(grep -c FAM_TOOL_MODE ~/.config/fam/env.sh)"
 cat ~/.config/fam-tool/config.json`)
 	if strings.Contains(out, "present ") {
@@ -685,10 +685,11 @@ func s14Std(c *Ctx) error {
 	if err != nil || !strings.Contains(out, "skill") || !strings.Contains(out, "link") {
 		return fmt.Errorf("agentBrowser: %v %s", err, out)
 	}
-	// The bundle installs only the CLI and its skill: no browser, no system packages, no variables.
+	// The bundle installs only the CLI and its skill (with the Claude link): no browser, no
+	// system packages, no variables.
 	for _, t := range m.Tasks {
-		if t.Group == "bundle agent-browser" && t.Kind != "package" {
-			return fmt.Errorf("agentBrowser has a task other than the CLI: %s %s", t.Kind, t.Name)
+		if t.Group == "bundle agent-browser" && t.Kind != "package" && t.Kind != "skill" && !(t.Kind == "symlink" && strings.Contains(t.Name, ".claude/skills/agent-browser")) {
+			return fmt.Errorf("agentBrowser has a task other than the CLI and its skill: %s %s", t.Kind, t.Name)
 		}
 	}
 	if extra, _ := c.ssh(`test -d ~/.agent-browser/browsers && echo browser; bash -lc 'env' | grep '^AGENT_BROWSER_'`); strings.TrimSpace(extra) != "" {

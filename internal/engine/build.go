@@ -1,7 +1,10 @@
 package engine
 
 import (
+	"context"
 	"fmt"
+	"path"
+	"path/filepath"
 
 	"github.com/gregor-tokarev/fam/internal/config"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
@@ -112,15 +115,63 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string) (Tas
 	return nil, fmt.Errorf("%s: unknown task type %T", group, t)
 }
 
+// skillTasks turns a Skill or GitHubSkill task into engine tasks: the copy and the Claude link,
+// or the removal when the task or the bundle is absent. ok is false for other task types.
+func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group string, absent bool) (out []Task, ok bool, err error) {
+	g := base{group: group}
+	var name, origin = "", "bundle " + u.Bundle.Name
+	var load func(name string) (*SkillSource, error)
+	switch x := t.(type) {
+	// GitHubSkill first: its interface also matches tasks.Skill (GetPath, GetName).
+	case tasks.GitHubSkill:
+		absent = absent || x.GetState() == "absent"
+		name = path.Base(x.GetPath())
+		if n := x.GetName(); n != nil {
+			name = *n
+		}
+		load = func(name string) (*SkillSource, error) {
+			return loadGitHubSkill(ctx, x.GetRepo(), x.GetPath(), x.GetRef(), name, origin)
+		}
+	case tasks.Skill:
+		absent = absent || x.GetState() == "absent"
+		dir := filepath.Join(u.Dir, x.GetPath())
+		name = filepath.Base(filepath.Clean(dir))
+		if name == "skill" || name == "." {
+			name = u.Bundle.Name
+		}
+		if n := x.GetName(); n != nil {
+			name = *n
+		}
+		load = func(name string) (*SkillSource, error) { return loadSkill(name, dir, origin) }
+	default:
+		return nil, false, nil
+	}
+	if absent {
+		return []Task{&SkillRemoveTask{base: g, Name_: name}}, true, nil
+	}
+	src, err := load(name)
+	if err != nil {
+		return nil, true, err
+	}
+	return []Task{&SkillTask{base: g, Skill: src}, &SkillLinkTask{base: g, Name_: name}}, true, nil
+}
+
 // BundleSection returns the tasks of one bundle. An absent bundle undoes its typed tasks
 // in reverse order, then runs its uninstall tasks. A present bundle restarts the units of its
 // changed tasks once, at its end. A restart of a unit that a Service task of the same bundle
 // manages uses the scope of that task.
-func BundleSection(u config.BundleUse, pm map[string]string) (Section, error) {
+func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string) (Section, error) {
 	group := "bundle " + u.Bundle.Name
 	sec := Section{Name: group}
 	if u.State == "absent" {
 		for i := len(u.Bundle.Tasks) - 1; i >= 0; i-- {
+			if st, ok, err := skillTasks(ctx, u.Bundle.Tasks[i], u, group, true); ok || err != nil {
+				if err != nil {
+					return sec, err
+				}
+				sec.Tasks = append(sec.Tasks, st...)
+				continue
+			}
 			t, err := convert(u.Bundle.Tasks[i], group, true, pm)
 			if err != nil {
 				return sec, err
@@ -130,6 +181,13 @@ func BundleSection(u config.BundleUse, pm map[string]string) (Section, error) {
 			}
 		}
 		for _, ut := range u.Bundle.Uninstall {
+			if st, ok, err := skillTasks(ctx, ut, u, group, false); ok || err != nil {
+				if err != nil {
+					return sec, err
+				}
+				sec.Tasks = append(sec.Tasks, st...)
+				continue
+			}
 			t, err := convert(ut, group, false, pm)
 			if err != nil {
 				return sec, err
@@ -155,6 +213,13 @@ func BundleSection(u config.BundleUse, pm map[string]string) (Section, error) {
 		delete(scopes, n)
 	}
 	for _, bt := range u.Bundle.Tasks {
+		if st, ok, err := skillTasks(ctx, bt, u, group, false); ok || err != nil {
+			if err != nil {
+				return sec, err
+			}
+			sec.Tasks = append(sec.Tasks, st...)
+			continue
+		}
 		t, err := convert(bt, group, false, pm)
 		if err != nil {
 			return sec, err

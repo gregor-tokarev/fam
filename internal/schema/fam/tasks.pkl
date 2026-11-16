@@ -212,3 +212,44 @@ class Script extends Task {
   /// The apply command.
   apply: String(check != null || creates != null)
 }
+
+/// A skill folder of this bundle, relative to the bundle file. The folder must contain `SKILL.md`.
+///
+/// ```
+/// new fam.Skill { path = "skills/release-notes" }
+/// ```
+///
+/// FAM copies it to `~/.agents/skills/<name>`, marks it as managed, and links
+/// `~/.claude/skills/<name>` to it. With `state = "absent"`, FAM removes the copy and the link,
+/// but only when FAM made them.
+class Skill extends StateTask {
+  /// The folder, relative to the bundle file.
+  path: String(!isEmpty)
+
+  /// The skill name. The default is the folder name, and a folder named `skill` gets the name
+  /// of the bundle.
+  name: String(matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))?
+}
+
+/// A skill folder in a public GitHub repository. The folder must contain `SKILL.md`.
+///
+/// ```
+/// new fam.GitHubSkill { repo = "vercel-labs/agent-browser"; path = "skills/agent-browser" }
+/// ```
+///
+/// On each run, the cockpit downloads the repository archive once (`codeload.github.com`) and
+/// copies the folder like a [Skill].
+class GitHubSkill extends StateTask {
+  /// The repository, `owner/name`.
+  repo: String(matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")))
+
+  /// The skill folder in the repository, for example `"skills/agent-browser"`.
+  path: String(!isEmpty && !startsWith("/") && !split("/").contains(".."))
+
+  /// A tag, branch, or commit. When it is `null`, FAM uses the tag of the latest GitHub release,
+  /// which is usually the latest version of the tool.
+  ref: String?
+
+  /// The skill name. The default is the last part of [path].
+  name: String(matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))?
+}

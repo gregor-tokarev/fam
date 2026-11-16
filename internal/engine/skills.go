@@ -13,8 +13,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gregor-tokarev/fam/internal/config"
-	"github.com/gregor-tokarev/fam/internal/pklgen/bundle"
 	"github.com/gregor-tokarev/fam/internal/transport"
 )
 
@@ -346,20 +344,15 @@ func (t *SkillPruneTask) Apply(ctx context.Context, env *Env) (string, error) {
 	return "removed " + strings.Join(s, ", "), err
 }
 
-// skillsSection copies the project skills and the skills of present bundles,
-// and removes the skills of absent bundles and old skills.
-func skillsSection(ctx context.Context, env *Env, spec *config.Spec) (Section, error) {
+// skillsSection copies the project skills (the folders of skills/) and removes the managed
+// skills that the config no longer lists. bundleSkills are the skills of the bundle tasks:
+// name -> source, for the name check and for the list of skills to keep.
+func skillsSection(env *Env, bundleSkills map[string]string) (Section, error) {
 	g := base{group: "skills"}
 	sec := Section{Name: "skills"}
-	var list []*SkillSource
-	byName := map[string]*SkillSource{}
-	add := func(s *SkillSource) error {
-		if prev, ok := byName[s.Name]; ok {
-			return fmt.Errorf("two skills have the name %q: %s and %s", s.Name, prev.Dir, s.Dir)
-		}
-		byName[s.Name] = s
-		list = append(list, s)
-		return nil
+	keep := map[string]bool{}
+	for n := range bundleSkills {
+		keep[n] = true
 	}
 	if env.Project.SkillsDir != "" {
 		entries, err := os.ReadDir(env.Project.SkillsDir)
@@ -378,50 +371,54 @@ func skillsSection(ctx context.Context, env *Env, spec *config.Spec) (Section, e
 			if err != nil {
 				return sec, err
 			}
-			if err := add(s); err != nil {
-				return sec, err
+			if src, ok := bundleSkills[s.Name]; ok {
+				return sec, fmt.Errorf("two skills have the name %q: %s and %s", s.Name, s.Dir, src)
 			}
+			keep[s.Name] = true
+			sec.Tasks = append(sec.Tasks, &SkillTask{base: g, Skill: s}, &SkillLinkTask{base: g, Name_: s.Name})
 		}
-	}
-	for _, u := range spec.Bundles {
-		if u.State != "present" || u.Bundle.Skill == nil {
-			continue
-		}
-		var s *SkillSource
-		switch sk := (*u.Bundle.Skill).(type) {
-		case string:
-			dir := filepath.Join(u.Dir, sk)
-			name := filepath.Base(filepath.Clean(dir))
-			if name == "skill" || name == "." {
-				name = u.Bundle.Name
-			}
-			ls, err := loadSkill(name, dir, "bundle "+u.Bundle.Name)
-			if err != nil {
-				return sec, err
-			}
-			s = ls
-		case bundle.GitHubSkill, *bundle.GitHubSkill:
-			gs, _ := sk.(bundle.GitHubSkill)
-			if p, ok := sk.(*bundle.GitHubSkill); ok {
-				gs = *p
-			}
-			gsrc, err := loadGitHubSkill(ctx, gs, "bundle "+u.Bundle.Name)
-			if err != nil {
-				return sec, err
-			}
-			s = gsrc
-		default:
-			return sec, fmt.Errorf("bundle %s: skill has the type %T. Use a folder name or new Bundle.GitHubSkill { … }", u.Bundle.Name, sk)
-		}
-		if err := add(s); err != nil {
-			return sec, err
-		}
-	}
-	keep := map[string]bool{}
-	for _, s := range list {
-		keep[s.Name] = true
-		sec.Tasks = append(sec.Tasks, &SkillTask{base: g, Skill: s}, &SkillLinkTask{base: g, Name_: s.Name})
 	}
 	sec.Tasks = append(sec.Tasks, &SkillPruneTask{base: g, Keep: keep})
 	return sec, nil
+}
+
+// SkillRemoveTask removes one skill that FAM manages, and its Claude link: a skill task with
+// the state "absent", or a skill of an absent bundle. A folder that FAM did not make stays.
+type SkillRemoveTask struct {
+	base
+	Name_ string
+}
+
+// Kind implements Task.
+func (t *SkillRemoveTask) Kind() string { return "skill" }
+
+// Name implements Task.
+func (t *SkillRemoveTask) Name() string { return t.Name_ }
+
+func (t *SkillRemoveTask) script(env *Env) string {
+	d := transport.Quote(env.Home(agentsSkills + "/" + t.Name_))
+	l := transport.Quote(env.Home(".claude/skills/" + t.Name_))
+	return fmt.Sprintf(`d=%[1]s; l=%[2]s
+mine=; [ -f "$d/%[3]s" ] && mine=1
+link=; [ -L "$l" ] && [ "$(readlink -- "$l")" = "$d" ] && link=1`, d, l, managedMarker)
+}
+
+// Check implements Task.
+func (t *SkillRemoveTask) Check(ctx context.Context, env *Env) (Check, error) {
+	r, err := env.ShOK(ctx, t.script(env)+"\n"+`[ -n "$mine$link" ] && echo change; exit 0`, false, "check skill "+t.Name_)
+	if err != nil {
+		return Check{}, err
+	}
+	if strings.TrimSpace(r.Out()) == "change" {
+		return Check{Status: Change, Detail: "remove"}, nil
+	}
+	return Check{Status: Satisfied}, nil
+}
+
+// Apply implements Task.
+func (t *SkillRemoveTask) Apply(ctx context.Context, env *Env) (string, error) {
+	_, err := env.ShOK(ctx, t.script(env)+"\n"+`set -e
+[ -z "$link" ] || rm -f -- "$l"
+[ -z "$mine" ] || rm -rf -- "$d"`, false, "remove skill "+t.Name_)
+	return "removed", err
 }

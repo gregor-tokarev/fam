@@ -4,7 +4,7 @@
     "n": 1,
     "name": "plan shows the changes and changes nothing",
     "result": "pass",
-    "detail": "23 changes, 3 satisfied",
+    "detail": "25 changes, 3 satisfied",
     "duration": "28s"
   },
   {
@@ -12,7 +12,7 @@
     "n": 2,
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
-    "detail": "first apply 23 changed, second plan 26 satisfied, second apply 0 changed",
+    "detail": "first apply 25 changed, second plan 28 satisfied, second apply 0 changed",
     "duration": "31s"
   },
   {
@@ -37,7 +37,7 @@
     "name": "absent bundle removes skill, links, files, merged keys, variables",
     "result": "pass",
     "detail": "file, link, merged keys, skill, Claude link, variables removed",
-    "duration": "23s"
+    "duration": "24s"
   },
   {
     "target": "alpine-3.24",
@@ -77,7 +77,7 @@
     "name": "foreign skill folder makes the plan stop with a conflict",
     "result": "pass",
     "detail": "conflict: the skill folder /home/fam/.agents/skills/tool-skill exists and FAM did not make it. Remove or rename it, or rename the skill",
-    "duration": "21s"
+    "duration": "29s"
   },
   {
     "target": "alpine-3.24",
@@ -100,7 +100,7 @@
     "n": 14,
     "name": "standard bundle agentBrowser",
     "result": "pass",
-    "detail": "28 changed; agent-browser 0.43.0",
+    "detail": "30 changed; agent-browser 0.43.0",
     "duration": "38s"
   },
   {

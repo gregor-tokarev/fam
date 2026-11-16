@@ -9,7 +9,7 @@ import (
 )
 
 // A bundle: a reusable part of the config. Usually one tool or one piece of machine setup, with
-// its tasks, environment, skill, and checks.
+// its tasks (also skills: [t.Skill], [t.GitHubSkill]), environment, and checks.
 //
 // `config.pkl` selects the machines: `bundles` (every machine), `roles` (every machine with a
 // role), or the `bundles` of one machine. A bundle itself does not know the machines.
@@ -50,18 +50,6 @@ type Bundle struct {
 	// Directories that FAM adds to the start of `PATH` in every shell and in FAM scripts,
 	// for example `"~/.cargo/bin"`. `~/` is the home directory.
 	Path []string `pkl:"path"`
-
-	// The skill of the bundle: a folder relative to this file, or a folder in a GitHub repository.
-	// The folder must contain `SKILL.md`.
-	//
-	// ```
-	// skill = "skill"
-	// skill = new Bundle.GitHubSkill { repo = "vercel-labs/agent-browser"; path = "skills/agent-browser" }
-	// ```
-	//
-	// FAM copies it to `~/.agents/skills/<folder name>` (a local folder named `skill` uses the
-	// bundle name).
-	Skill *any `pkl:"skill"`
 
 	// The install tasks, in order.
 	Tasks []tasks.Task `pkl:"tasks"`
