@@ -37,7 +37,7 @@ fam new      # create a project
 fam plan     # show what is different on each machine
 fam apply    # make the machines match, then prove that the tools work
 fam verify   # prove it again
-fam migrate  # move a project to the schema of a new FAM version
+fam migrate  # pin the schema of a new FAM version in a project
 fam update   # update FAM itself
 ```
 

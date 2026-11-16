@@ -1,8 +1,8 @@
 // curl jq rg rsync tar unzip, Python, Git, GitHub CLI, a C/C++ compiler, make, pkg-config, socat.
 // Uses the OS package manager.
-amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
-import "../.fam/facts.pkl"
+amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
+import "@fam/facts.pkl"
 
 name = "base-packages"
 description = "Common command line tools from the OS package manager"

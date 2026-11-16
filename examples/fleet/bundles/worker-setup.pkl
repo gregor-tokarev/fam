@@ -1,7 +1,7 @@
 // Setup for the worker machines. config.pkl lists it in `roles`, so the laptop does not get it.
-amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
-import "../.fam/facts.pkl"
+amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
+import "@fam/facts.pkl"
 
 name = "worker-setup"
 description = "Worker setup: SSH access, background jobs, no sleep, build limits"

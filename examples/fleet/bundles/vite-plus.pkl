@@ -1,6 +1,6 @@
 // Vite+ with Node.js LTS managed by Vite+ (https://github.com/voidzero-dev/vite-plus).
-amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "vite-plus"
 description = "Vite+ and the Node.js LTS that it manages"

@@ -135,6 +135,9 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 		}
 	case tasks.Skill:
 		absent = absent || x.GetState() == "absent"
+		if u.Dir == "" {
+			return nil, true, fmt.Errorf("%s: the bundle comes from a package, so it has no folder for the skill %q. Use fam.GitHubSkill", group, x.GetPath())
+		}
 		dir := filepath.Join(u.Dir, x.GetPath())
 		name = filepath.Base(filepath.Clean(dir))
 		if name == "skill" || name == "." {

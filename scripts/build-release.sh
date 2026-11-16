@@ -25,6 +25,9 @@ for p in $platforms; do
   rm -rf "$work"
 done
 
+# The files of the fam Pkl package. The archives above have the same embedded files.
+go run -ldflags "-X github.com/gregor-tokarev/fam/internal/version.Version=$version" ./cmd/fam internal package "$out"
+
 cd "$out"
 if command -v sha256sum >/dev/null 2>&1; then
   sha256sum fam_*.tar.gz > checksums.txt

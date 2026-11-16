@@ -79,13 +79,21 @@ func Run(ctx context.Context, opts Options) *output.Run {
 	fail := func(err error) *output.Run { res.Error = err.Error(); return res }
 
 	// 1. Validate the config.
-	if err := schema.Check(opts.Project.Base); err != nil {
+	pkg, err := schema.Current()
+	if err != nil {
+		return fail(err)
+	}
+	// Put the fam package of this binary into the Pkl cache, so that Pkl needs no download.
+	if err := schema.SeedAll(pkg); err != nil {
+		return fail(fmt.Errorf("write the fam package into the Pkl cache: %w", err))
+	}
+	if err := schema.Check(opts.Project.Base, pkg); err != nil {
 		return fail(err)
 	}
 	if _, err := os.Stat(opts.Project.ConfigPath); err != nil {
 		return fail(fmt.Errorf("no config entrypoint: %w", err))
 	}
-	ev, err := config.NewEvaluator(ctx, opts.Project.ConfigPath, opts.Progress)
+	ev, err := config.NewEvaluator(ctx, opts.Project.Base, opts.Project.ConfigPath, opts.Progress)
 	if err != nil {
 		return fail(err)
 	}

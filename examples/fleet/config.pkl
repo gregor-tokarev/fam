@@ -1,6 +1,6 @@
 // An example fleet: one laptop that runs FAM and two worker machines for coding agents.
-amends ".fam/Config.pkl"
-import ".fam/std.pkl"
+amends "@fam/Config.pkl"
+import "@fam/std.pkl"
 
 // Tools for every machine.
 bundles {

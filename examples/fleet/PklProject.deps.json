@@ -1,0 +1,12 @@
+{
+  "resolvedDependencies": {
+    "package://github.com/gregor-tokarev/fam/releases/download/v0.9.0/fam@0": {
+      "checksums": {
+        "sha256": "2dba8a04ed88bf47e6f6ce9050a5514d67d1830cc5cd72426939b4b5b7f0db88"
+      },
+      "type": "remote",
+      "uri": "projectpackage://github.com/gregor-tokarev/fam/releases/download/v0.9.0/fam@0.9.0"
+    }
+  },
+  "schemaVersion": 1
+}

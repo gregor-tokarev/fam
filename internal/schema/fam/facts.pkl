@@ -1,5 +1,3 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
-
 /// Facts about the machine that FAM evaluates the config for.
 ///
 /// FAM collects the facts over SSH before evaluation and gives them to Pkl

@@ -14,7 +14,7 @@ func updateCmd() *cobra.Command {
 	var check bool
 	c := &cobra.Command{
 		Use:   "update",
-		Short: "Update fam itself to the latest release (`fam migrate` updates the .fam/ folder of a project)",
+		Short: "Update fam itself to the latest release (`fam migrate` updates the FAM version of a project)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			out := cmd.OutOrStdout()

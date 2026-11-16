@@ -13,6 +13,7 @@ import (
 
 	"github.com/gregor-tokarev/fam/internal/pklbin"
 	"github.com/gregor-tokarev/fam/internal/project"
+	"github.com/gregor-tokarev/fam/internal/schema"
 	"github.com/gregor-tokarev/fam/internal/version"
 )
 
@@ -54,7 +55,7 @@ func Execute() int {
 	pf.StringVar(&opts.SudoPasswordFile, "sudo-password-file", "", "file with the sudo password of the cockpit, for runs without a terminal")
 	pf.StringVar(&opts.SSHConfig, "ssh-config", os.Getenv("FAM_SSH_CONFIG"), "ssh config file that FAM gives to `ssh -F` (default: the normal ssh configuration)")
 
-	root.AddCommand(newCmd(opts), migrateCmd(opts), upgradeCmd(), updateCmd(), versionCmd(), internalCmd())
+	root.AddCommand(newCmd(opts), migrateCmd(opts), updateCmd(), versionCmd(), internalCmd())
 	addRunCommands(root, opts)
 
 	if err := root.ExecuteContext(context.Background()); err != nil {
@@ -119,7 +120,7 @@ func newCmd(opts *Options) *cobra.Command {
 func migrateCmd(opts *Options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "migrate",
-		Short: "Migrate .fam/ of a project to the schema of this FAM version",
+		Short: "Pin the fam package of this FAM version in the PklProject of a project",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := opts.resolve(); err != nil {
@@ -132,21 +133,8 @@ func migrateCmd(opts *Options) *cobra.Command {
 			if old == "" {
 				old = "none"
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Migrated %s from FAM %s to FAM %s\n", filepath.Join(opts.Base, ".fam"), old, version.Version)
+			fmt.Fprintf(cmd.OutOrStdout(), "Migrated %s from FAM %s to FAM %s\n", opts.Base, old, version.Version)
 			return nil
-		},
-	}
-}
-
-// upgradeCmd is the old name of `fam migrate`. It only tells the new name.
-func upgradeCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:                "upgrade",
-		Short:              "Renamed to `fam migrate`",
-		Hidden:             true,
-		DisableFlagParsing: true,
-		RunE: func(*cobra.Command, []string) error {
-			return fmt.Errorf("`fam upgrade` is now `fam migrate`")
 		},
 	}
 }
@@ -164,6 +152,18 @@ func versionCmd() *cobra.Command {
 
 func internalCmd() *cobra.Command {
 	c := &cobra.Command{Use: "internal", Hidden: true}
+	c.AddCommand(&cobra.Command{
+		Use:   "package <dir>",
+		Short: "Write the files of the fam Pkl package that a release publishes",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			p, err := schema.Current()
+			if err != nil {
+				return err
+			}
+			return schema.WriteFiles(args[0], p)
+		},
+	})
 	c.AddCommand(&cobra.Command{
 		Use:   "pkl-path",
 		Short: "Download the pinned pkl binary when necessary and print its path",

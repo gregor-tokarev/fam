@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -14,21 +15,55 @@ import (
 	"github.com/gregor-tokarev/fam/internal/pklbin"
 	"github.com/gregor-tokarev/fam/internal/pklgen/base"
 	"github.com/gregor-tokarev/fam/internal/pklgen/config"
+	"github.com/gregor-tokarev/fam/internal/schema"
 )
 
 // Evaluator evaluates the config entrypoint with external properties.
 type Evaluator struct {
-	manager pkl.EvaluatorManager
-	path    string
+	manager  pkl.EvaluatorManager
+	path     string
+	project  *pkl.Project
+	cacheDir string
 }
 
-// NewEvaluator starts the pinned pkl binary. Close it after use.
-func NewEvaluator(ctx context.Context, configPath string, progress io.Writer) (*Evaluator, error) {
+// NewEvaluator starts the pinned pkl binary, and reads the PklProject in base (the dependency on
+// the fam package). Close it after use.
+func NewEvaluator(ctx context.Context, base, configPath string, progress io.Writer) (*Evaluator, error) {
 	bin, err := pklbin.Path(ctx, progress)
 	if err != nil {
 		return nil, err
 	}
-	return &Evaluator{manager: pkl.NewEvaluatorManagerWithCommand([]string{bin}), path: configPath}, nil
+	cacheDir, err := schema.CacheDir()
+	if err != nil {
+		return nil, err
+	}
+	e := &Evaluator{manager: pkl.NewEvaluatorManagerWithCommand([]string{bin}), path: configPath, cacheDir: cacheDir}
+	ev, err := e.manager.NewEvaluator(ctx, pkl.PreconfiguredOptions)
+	if err != nil {
+		e.Close()
+		return nil, fmt.Errorf("start the Pkl evaluator: %w", err)
+	}
+	defer ev.Close()
+	pp := filepath.Join(base, "PklProject")
+	e.project, err = pkl.LoadProjectFromEvaluator(ctx, ev, pkl.FileSource(pp))
+	if err != nil {
+		e.Close()
+		return nil, &EvalError{Path: pp, Err: err}
+	}
+	return e, nil
+}
+
+// options are the evaluator options of each evaluation.
+func (e *Evaluator) options(props map[string]string) []func(*pkl.EvaluatorOptions) {
+	return []func(*pkl.EvaluatorOptions){
+		pkl.WithDefaultAllowedModules, pkl.WithDefaultAllowedResources,
+		pkl.WithProjectDependencies(e.project),
+		func(o *pkl.EvaluatorOptions) {
+			o.CacheDir = e.cacheDir
+			o.Properties = props
+			o.Logger = pkl.NoopLogger
+		},
+	}
 }
 
 // Close stops the pkl process.
@@ -36,11 +71,7 @@ func (e *Evaluator) Close() error { return e.manager.Close() }
 
 // Eval evaluates the entrypoint once with the given properties.
 func (e *Evaluator) Eval(ctx context.Context, props map[string]string) (*config.Config, error) {
-	ev, err := e.manager.NewEvaluator(ctx, pkl.WithDefaultAllowedModules, pkl.WithDefaultAllowedResources, pkl.WithDefaultCacheDir,
-		func(o *pkl.EvaluatorOptions) {
-			o.Properties = props
-			o.Logger = pkl.NoopLogger
-		})
+	ev, err := e.manager.NewEvaluator(ctx, e.options(props)...)
 	if err != nil {
 		return nil, fmt.Errorf("start the Pkl evaluator: %w", err)
 	}
@@ -55,11 +86,7 @@ func (e *Evaluator) Eval(ctx context.Context, props map[string]string) (*config.
 // MachineList evaluates only the machines mapping: name, role, address, and user of each machine.
 // Pkl is lazy, so this does not evaluate bundles that depend on the machine facts.
 func (e *Evaluator) MachineList(ctx context.Context, props map[string]string) ([]Machine, error) {
-	ev, err := e.manager.NewEvaluator(ctx, pkl.WithDefaultAllowedModules, pkl.WithDefaultAllowedResources, pkl.WithDefaultCacheDir,
-		func(o *pkl.EvaluatorOptions) {
-			o.Properties = props
-			o.Logger = pkl.NoopLogger
-		})
+	ev, err := e.manager.NewEvaluator(ctx, e.options(props)...)
 	if err != nil {
 		return nil, fmt.Errorf("start the Pkl evaluator: %w", err)
 	}
@@ -79,11 +106,7 @@ func (e *Evaluator) MachineList(ctx context.Context, props map[string]string) ([
 
 // Secrets evaluates only the secrets property. It does not depend on the machine facts.
 func (e *Evaluator) Secrets(ctx context.Context, props map[string]string) (*base.Secrets, error) {
-	ev, err := e.manager.NewEvaluator(ctx, pkl.WithDefaultAllowedModules, pkl.WithDefaultAllowedResources, pkl.WithDefaultCacheDir,
-		func(o *pkl.EvaluatorOptions) {
-			o.Properties = props
-			o.Logger = pkl.NoopLogger
-		})
+	ev, err := e.manager.NewEvaluator(ctx, e.options(props)...)
 	if err != nil {
 		return nil, fmt.Errorf("start the Pkl evaluator: %w", err)
 	}
@@ -103,24 +126,6 @@ type EvalError struct {
 
 func (e *EvalError) Error() string {
 	msg := fmt.Sprintf("evaluate %s:\n%s", e.Path, strings.TrimSpace(e.Err.Error()))
-	if strings.Contains(msg, "playbooks") || strings.Contains(msg, "Playbook.pkl") {
-		msg += "\n\nFAM 0.2.0 has no playbooks. Make each playbook a bundle (amends \".fam/Bundle.pkl\" with a `name`), " +
-			"and list it in `roles { [\"worker\"] { bundles { … } } }` of config.pkl, or in the `bundles` of a machine"
-	}
-	if strings.Contains(msg, "Cannot find property `skill`") {
-		msg += "\n\nFAM 0.5.0 installs skills with tasks: replace `skill = \"folder\"` with `new fam.Skill { path = \"folder\" }` " +
-			"in `tasks`, and `skill = new Bundle.GitHubSkill { … }` with `new fam.GitHubSkill { … }`"
-	}
-	if strings.Contains(msg, "Cannot find property `instructions`") {
-		msg += "\n\nFAM 0.4.0 bundles have no `instructions`. Put the lines into instructions/AGENTS.md of the project, " +
-			"or rely on the skill of the bundle"
-	}
-	if strings.Contains(msg, "Cannot find property `agentSkills` in module `fam.std`") || strings.Contains(msg, "Cannot find property `d3k` in module `fam.std`") {
-		msg += "\n\nFAM 0.8.0 has no std.agentSkills and no std.d3k: a standard bundle installs a tool, not only skills. " +
-			"Add the skills to a bundle of your own, for example " +
-			"`new fam.GitHubSkill { repo = \"vercel-labs/dev3000\"; path = \"skills/d3k\" }` or " +
-			"`new fam.GitHubSkill { repo = \"vercel-labs/agent-skills\"; path = \"skills/react-best-practices\"; name = \"vercel-react-best-practices\" }`"
-	}
 	return msg
 }
 

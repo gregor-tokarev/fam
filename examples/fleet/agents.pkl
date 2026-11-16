@@ -1,4 +1,4 @@
-amends ".fam/Agents.pkl"
+amends "@fam/Agents.pkl"
 
 // FAM installs each agent, updates it on each `fam apply`, and merges `settings` into its settings file.
 agents {
