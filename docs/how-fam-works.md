@@ -168,7 +168,7 @@ FAM asks the package manager, not `PATH`, whether the package is installed. When
 
 Cargo uses `--root ~/.local`. Go uses `GOBIN=~/.local/bin`. A `PackageRef` can give `names` for each manager, for example `names { ["apt"] = "fd-find" }`. FAM uses the generic `package` name when no name matches the selected manager.
 
-A `GitHubRelease` task installs a release binary into `~/.local/bin`, without sudo. It supports bare binaries, tar.gz, and zip. Plan compares the installed version with the latest tag, or a pinned `tag`. FAM checks SHA-256 checksum files when present. See [Package tasks](development.md#package-tasks) for the schema and an example.
+A `GitHubRelease` task installs a release binary into `~/.local/bin`, without sudo. It supports bare binaries, tar.gz, tar.xz, and zip. Plan compares the installed version with the latest tag, or a pinned `tag`. FAM checks SHA-256 checksum files when present. See [Package tasks](development.md#package-tasks) for the schema and an example.
 
 On Linux, FAM detects glibc or musl from the machine. On musl, `assets` uses `linux-amd64-musl` or `linux-arm64-musl` when present. Otherwise, FAM uses the plain Linux key. Prefer static or musl builds for the plain Linux keys when available, because they run everywhere.
 

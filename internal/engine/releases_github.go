@@ -3,7 +3,6 @@ package engine
 import (
 	"archive/tar"
 	"archive/zip"
-	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -15,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"regexp"
 	"sort"
@@ -23,10 +23,11 @@ import (
 
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
 	"github.com/gregor-tokarev/fam/internal/transport"
+	"github.com/ulikunitz/xz"
 )
 
-const maxReleaseBinary = 128 << 20
-const maxReleaseAsset = 256 << 20
+const maxReleaseBinary = 512 << 20
+const maxReleaseAsset = 1 << 30
 
 // GitHubReleaseTask installs one binary and compares its version with a release tag.
 type GitHubReleaseTask struct {
@@ -72,6 +73,7 @@ func (t *GitHubReleaseTask) target(ctx context.Context, env *Env) (string, tasks
 		a.File = &file
 	}
 	name := expandReleaseName(a.Name, tag)
+	a.Name = name
 	return tag, a, name, nil
 }
 
@@ -165,8 +167,9 @@ func (t *GitHubReleaseTask) Check(ctx context.Context, env *Env) (Check, error) 
 	if r.Code != 0 {
 		return Check{}, &ExitError{Label: "version of " + t.Binary, Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}
 	}
-	if !versionIs(r.Out(), tag) {
-		return Check{Status: Change, Detail: "installed " + firstLine(r.Out()) + ", release " + tag}, nil
+	version := strings.TrimSpace(r.Out() + "\n" + r.Err())
+	if !versionIs(version, tag) {
+		return Check{Status: Change, Detail: "installed " + firstLine(version) + ", release " + tag}, nil
 	}
 	return Check{Status: Satisfied, Detail: tag}, nil
 }
@@ -199,6 +202,7 @@ func (t *GitHubReleaseTask) Apply(ctx context.Context, env *Env) (string, error)
 	if err != nil {
 		return "", err
 	}
+	defer removeReleaseDownload(data)
 	checksum := ""
 	if a.Checksum != nil {
 		checksum = expandReleaseName(*a.Checksum, tag)
@@ -209,13 +213,21 @@ func (t *GitHubReleaseTask) Apply(ctx context.Context, env *Env) (string, error)
 		checksum = findChecksum(assets, name)
 	}
 	if checksum != "" {
-		checks, err := releaseDownload(ctx, t.Repo, tag, checksum, maxSkillFile)
+		checksFile, err := releaseDownload(ctx, t.Repo, tag, checksum, maxSkillFile)
+		if err != nil {
+			return "", err
+		}
+		defer removeReleaseDownload(checksFile)
+		checks, err := io.ReadAll(checksFile)
 		if err != nil {
 			return "", err
 		}
 		if err := checkReleaseDigest(data, checks, name, strings.HasPrefix(checksum, name+".")); err != nil {
 			return "", err
 		}
+	}
+	if _, err := data.Seek(0, io.SeekStart); err != nil {
+		return "", err
 	}
 	binary, err := releaseBinary(data, a)
 	if err != nil {
@@ -236,11 +248,11 @@ func (t *GitHubReleaseTask) Apply(ctx context.Context, env *Env) (string, error)
 		return "", err
 	}
 	sum := sha256.Sum256(binary)
-	data, err = json.Marshal(releaseRecord{Repo: t.Repo, SHA256: hex.EncodeToString(sum[:])})
+	recordData, err := json.Marshal(releaseRecord{Repo: t.Repo, SHA256: hex.EncodeToString(sum[:])})
 	if err != nil {
 		return "", err
 	}
-	if err := env.T.WriteFile(ctx, t.recordPath(env), append(data, '\n'), 0o600, false); err != nil {
+	if err := env.T.WriteFile(ctx, t.recordPath(env), append(recordData, '\n'), 0o600, false); err != nil {
 		return "", err
 	}
 	return "installed " + tag, nil
@@ -262,7 +274,8 @@ func releaseAssets(ctx context.Context, repo, tag string) (map[string]bool, erro
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("list release assets %s: HTTP %d", u, resp.StatusCode)
 	}
-	data, err := io.ReadAll(&capReader{r: resp.Body, left: maxSkillFile})
+	data, err := io.ReadAll(&capReader{r: resp.Body, left: maxSkillFile,
+		limitError: fmt.Errorf("release asset list %s is larger than the limit of %d bytes", u, maxSkillFile)})
 	if err != nil {
 		return nil, err
 	}
@@ -284,9 +297,12 @@ func releaseAssets(ctx context.Context, repo, tag string) (map[string]bool, erro
 }
 
 // releaseDownload shares the ETag cache, retry rules, and stall limit of skill downloads.
-func releaseDownload(ctx context.Context, repo, tag, name string, limit int64) ([]byte, error) {
+// Keep the asset on disk, so only the extracted binary needs a large memory buffer.
+func releaseDownload(ctx context.Context, repo, tag, name string, limit int64) (*os.File, error) {
 	u := GitHubBase + "/" + repo + "/releases/download/" + url.PathEscape(tag) + "/" + url.PathEscape(name)
 	a, direct, err := cachedDownloadFor(ctx, "release:"+repo, tag+"\x00"+name, u, false, limit)
+	tooLarge := fmt.Errorf("release asset %s is larger than the limit of %d bytes", name, limit)
+	var r io.Reader
 	if errors.Is(err, errNoCache) {
 		if direct == nil {
 			direct, err = fetchArchive(ctx, u, "")
@@ -295,12 +311,33 @@ func releaseDownload(ctx context.Context, repo, tag, name string, limit int64) (
 			}
 		}
 		defer direct.Close()
-		return io.ReadAll(&capReader{r: direct, left: limit})
+		r = direct
+	} else if err != nil {
+		if errors.Is(err, errArchiveTooLarge) {
+			return nil, tooLarge
+		}
+		return nil, err
+	} else {
+		r = a.reader()
 	}
+	f, err := os.CreateTemp("", "fam-release-*")
 	if err != nil {
 		return nil, err
 	}
-	return io.ReadAll(&capReader{r: a.reader(), left: limit})
+	if _, err := io.Copy(f, &capReader{r: r, left: limit, limitError: tooLarge}); err != nil {
+		removeReleaseDownload(f)
+		return nil, fmt.Errorf("download %s: %w", u, err)
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		removeReleaseDownload(f)
+		return nil, err
+	}
+	return f, nil
+}
+
+func removeReleaseDownload(f *os.File) {
+	f.Close()
+	os.Remove(f.Name())
 }
 
 func findChecksum(assets map[string]bool, name string) string {
@@ -326,9 +363,12 @@ func findChecksum(assets map[string]bool, name string) string {
 	return ""
 }
 
-func checkReleaseDigest(data, checks []byte, name string, single bool) error {
-	sum := sha256.Sum256(data)
-	want := hex.EncodeToString(sum[:])
+func checkReleaseDigest(data io.Reader, checks []byte, name string, single bool) error {
+	h := sha256.New()
+	if _, err := io.Copy(h, data); err != nil {
+		return err
+	}
+	want := hex.EncodeToString(h.Sum(nil))
 	for _, line := range strings.Split(string(checks), "\n") {
 		fields := strings.Fields(strings.TrimSpace(line))
 		digest := ""
@@ -352,32 +392,55 @@ func checkReleaseDigest(data, checks []byte, name string, single bool) error {
 	return fmt.Errorf("the checksum file has no SHA-256 for release asset %s", name)
 }
 
-func releaseBinary(data []byte, a tasks.ReleaseAsset) ([]byte, error) {
-	if a.Format == "binary" {
-		if len(data) == 0 || len(data) > maxReleaseBinary {
-			return nil, fmt.Errorf("binary size must be between 1 and %d bytes", maxReleaseBinary)
+func releaseBinary(data *os.File, a tasks.ReleaseAsset) ([]byte, error) {
+	read := func(r io.Reader, size int64, name string) ([]byte, error) {
+		if size <= 0 || size > maxReleaseBinary {
+			return nil, fmt.Errorf("binary %s has %d bytes; size must be between 1 and %d bytes", name, size, maxReleaseBinary)
 		}
-		return data, nil
+		b := make([]byte, int(size))
+		if _, err := io.ReadFull(r, b); err != nil {
+			return nil, err
+		}
+		// Read through EOF to check the checksum of a zip member.
+		var probe [1]byte
+		if n, err := r.Read(probe[:]); n != 0 || err != io.EOF {
+			if err != nil && err != io.EOF {
+				return nil, err
+			}
+			return nil, fmt.Errorf("binary %s does not match its declared size of %d bytes", name, size)
+		}
+		return b, nil
+	}
+	if a.Format == "binary" {
+		st, err := data.Stat()
+		if err != nil {
+			return nil, err
+		}
+		return read(data, st.Size(), a.Name)
 	}
 	if a.File == nil {
 		return nil, fmt.Errorf("an archive needs file")
 	}
 	wanted := path.Clean(*a.File)
-	read := func(r io.Reader) ([]byte, error) {
-		b, err := io.ReadAll(&capReader{r: r, left: maxReleaseBinary})
-		if err == nil && len(b) == 0 {
-			err = fmt.Errorf("the binary is empty")
-		}
-		return b, err
-	}
 	switch a.Format {
-	case "tar.gz":
-		gz, err := gzip.NewReader(bytes.NewReader(data))
-		if err != nil {
-			return nil, err
+	case "tar.gz", "tar.xz":
+		var decoded io.Reader
+		if a.Format == "tar.gz" {
+			gz, err := gzip.NewReader(data)
+			if err != nil {
+				return nil, err
+			}
+			defer gz.Close()
+			decoded = gz
+		} else {
+			xr, err := xz.NewReader(data)
+			if err != nil {
+				return nil, err
+			}
+			decoded = xr
 		}
-		defer gz.Close()
-		capped := &capReader{r: gz, left: maxArchive}
+		capped := &capReader{r: decoded, left: maxReleaseAsset,
+			limitError: fmt.Errorf("uncompressed archive is larger than the limit of %d bytes", maxReleaseAsset)}
 		tr := tar.NewReader(capped)
 		var binary []byte
 		entries := 0
@@ -399,7 +462,7 @@ func releaseBinary(data []byte, a tasks.ReleaseAsset) ([]byte, error) {
 			if h.Typeflag != tar.TypeReg || binary != nil {
 				return nil, fmt.Errorf("%s must be one regular file", wanted)
 			}
-			binary, err = read(tr)
+			binary, err = read(tr, h.Size, wanted)
 			if err != nil {
 				return nil, err
 			}
@@ -411,7 +474,11 @@ func releaseBinary(data []byte, a tasks.ReleaseAsset) ([]byte, error) {
 			return binary, nil
 		}
 	case "zip":
-		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		st, err := data.Stat()
+		if err != nil {
+			return nil, err
+		}
+		zr, err := zip.NewReader(data, st.Size())
 		if err != nil {
 			return nil, err
 		}
@@ -430,7 +497,11 @@ func releaseBinary(data []byte, a tasks.ReleaseAsset) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			binary, err = read(r)
+			if f.UncompressedSize64 == 0 || f.UncompressedSize64 > maxReleaseBinary {
+				r.Close()
+				return nil, fmt.Errorf("binary %s has %d bytes; size must be between 1 and %d bytes", wanted, f.UncompressedSize64, maxReleaseBinary)
+			}
+			binary, err = read(r, int64(f.UncompressedSize64), wanted)
 			r.Close()
 			if err != nil {
 				return nil, err

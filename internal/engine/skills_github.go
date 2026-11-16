@@ -655,15 +655,28 @@ func readSkill(archive io.Reader, folder, u string) ([]skillFile, error) {
 // errArchiveTooLarge: the archive has more than maxArchive bytes.
 var errArchiveTooLarge = fmt.Errorf("the archive is larger than %d bytes", int64(maxArchive))
 
-// capReader stops with errArchiveTooLarge after `left` bytes.
+// capReader limits a stream to `left` bytes. limitError overrides errArchiveTooLarge.
 type capReader struct {
-	r    io.Reader
-	left int64
+	r          io.Reader
+	left       int64
+	limitError error
 }
 
 func (c *capReader) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if c.left <= 0 {
-		return 0, errArchiveTooLarge
+		// Probe for EOF, so a file at the exact limit is valid.
+		var probe [1]byte
+		n, err := c.r.Read(probe[:])
+		if n > 0 {
+			if c.limitError != nil {
+				return 0, c.limitError
+			}
+			return 0, errArchiveTooLarge
+		}
+		return 0, err
 	}
 	if int64(len(p)) > c.left {
 		p = p[:c.left]
