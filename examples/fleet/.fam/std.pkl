@@ -1,6 +1,6 @@
-//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+//! Written by FAM 0.8.0. Do not edit. Run `fam migrate` to update.
 
-/// The standard bundles of FAM 0.7.0.
+/// The standard bundles of FAM 0.8.0.
 ///
 /// ```
 /// import ".fam/std.pkl"
@@ -17,14 +17,8 @@ agentBrowser: Bundle = import("bundles/agent-browser.pkl")
 /// agent-desktop: computer use for agents through the accessibility tree, with its skills.
 agentDesktop: Bundle = import("bundles/agent-desktop.pkl")
 
-/// The official agent skills of Vercel: React, React Native, web design, writing, deployments.
-agentSkills: Bundle = import("bundles/agent-skills.pkl")
-
 /// ai-cli: generate text, images, and more from the terminal, with its skill.
 aiCli: Bundle = import("bundles/ai-cli.pkl")
-
-/// d3k (dev3000): the skill for a managed browser and a timeline of the dev server.
-d3k: Bundle = import("bundles/d3k.pkl")
 
 /// emulate: local API emulation for CI and sandboxes, with its skill.
 emulate: Bundle = import("bundles/emulate.pkl")

@@ -102,15 +102,13 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 
 ## Standard bundles
 
-`.fam/std.pkl` has ready bundles for agent tools: `bundles { std.portless; std.hyperframes }`. Each one installs the CLI (with npm, unless `packageManagers` selects another manager) and copies its skills from the latest GitHub release. None installs a browser, a runtime, or system packages.
+`.fam/std.pkl` has ready bundles for agent tools: `bundles { std.portless; std.hyperframes }`. Each one installs the CLI (with npm, unless `packageManagers` selects another manager) and copies its skills from the latest GitHub release. None installs a browser, a runtime, or system packages. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
 
 | Bundle | Installs | Skills |
 |---|---|---|
 | `std.agentBrowser` | `agent-browser` | agent-browser |
 | `std.agentDesktop` | `agent-desktop` (glibc only) | agent-desktop, and agent-desktop-linux or agent-desktop-macos |
-| `std.agentSkills` | (skills only) | the 9 skills of `vercel-labs/agent-skills` |
 | `std.aiCli` | `ai` (npm `ai-cli`) | ai-cli |
-| `std.d3k` | (skill only: it brings its own runtime) | d3k |
 | `std.emulate` | `emulate` | emulate |
 | `std.hyperframes` | `hyperframes` | hyperframes, hyperframes-cli, hyperframes-registry, media-use, reverse-any-video, style-sampling |
 | `std.issueGraph` | `issue-graph` | issue-graph |

@@ -56,7 +56,7 @@ FAM downloads `pkl` 0.33.0 from the GitHub release on first use into `<user cach
 
 ## Standard bundles
 
-A standard bundle installs only its tool, and `fam.GitHubSkill` tasks get the skills from the tool's GitHub repository. FAM vendors no skills, and a standard bundle does not install a browser, a runtime, or system packages. Without a `ref`, the skills come from the latest GitHub release. That is usually the version that the package manager installs, but a registry can be ahead of or behind GitHub.
+A standard bundle installs only its tool, and `fam.GitHubSkill` tasks get the skills from the tool's GitHub repository. FAM vendors no skills, and a standard bundle does not install a browser, a runtime, or system packages. A standard bundle always installs a tool: a skill alone is not a standard bundle. Without a `ref`, the skills come from the latest GitHub release. That is usually the version that the package manager installs, but a registry can be ahead of or behind GitHub.
 
 Acceptance scenario 16 applies all standard bundles. A new standard bundle goes into `std.pkl`, the fixture `config-std-all.pkl`, and the skill list of the scenario.
 

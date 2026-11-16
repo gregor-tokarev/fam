@@ -129,9 +129,7 @@ bundles {
     std.agentDesktop
     std.latMd
   }
-  std.agentSkills
   std.aiCli
-  std.d3k
   std.emulate
   std.hyperframes
   std.issueGraph

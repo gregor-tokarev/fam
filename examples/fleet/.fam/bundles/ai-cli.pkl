@@ -1,4 +1,4 @@
-//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+//! Written by FAM 0.8.0. Do not edit. Run `fam migrate` to update.
 
 /// ai-cli: generate text, images, and more from the terminal (https://github.com/vercel-labs/ai-cli).
 ///
@@ -10,7 +10,7 @@ import "../tasks.pkl" as fam
 
 name = "ai-cli"
 description = "Generate anything from the terminal"
-version = "0.7.0"
+version = "0.8.0"
 tasks {
   new fam.Package {
     package = "ai-cli"

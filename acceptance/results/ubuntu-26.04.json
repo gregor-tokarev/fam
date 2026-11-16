@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "23s"
+    "duration": "26s"
   },
   {
     "target": "ubuntu-26.04",
@@ -116,8 +116,8 @@
     "n": 16,
     "name": "all standard bundles: install, verify, satisfied, archive cache",
     "result": "pass",
-    "detail": "95 changed, 28 skills; apply 2m33s, plan 29s",
-    "duration": "3m19s"
+    "detail": "75 changed, 18 skills; apply 2m35s, plan 25s",
+    "duration": "3m15s"
   },
   {
     "target": "ubuntu-26.04",
