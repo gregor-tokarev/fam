@@ -1,0 +1,28 @@
+/// pixi: Manage reproducible environments and command-line tools across language ecosystems (https://github.com/prefix-dev/pixi).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime. Project environments can need a newer libc than Pixi itself.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "pixi"
+description = "Manage reproducible environments and command-line tools across language ecosystems"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "prefix-dev/pixi"
+    binary = "pixi"
+    assets {
+      ["linux-amd64"] { name = "pixi-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "pixi" }
+      ["linux-arm64"] { name = "pixi-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "pixi" }
+      ["linux-amd64-musl"] { name = "pixi-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "pixi" }
+      ["linux-arm64-musl"] { name = "pixi-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "pixi" }
+      ["darwin-arm64"] { name = "pixi-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "pixi" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "pixi --version" }
+}

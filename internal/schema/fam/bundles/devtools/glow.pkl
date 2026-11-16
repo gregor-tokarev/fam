@@ -1,0 +1,26 @@
+/// glow: Render Markdown files and standard input in a terminal (https://github.com/charmbracelet/glow).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime or compiler.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "glow"
+description = "Render Markdown files and standard input in a terminal"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "charmbracelet/glow"
+    binary = "glow"
+    assets {
+      ["linux-amd64"] { name = "glow_{version}_Linux_x86_64.tar.gz"; format = "tar.gz"; file = "glow_{version}_Linux_x86_64/glow"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "glow_{version}_Linux_arm64.tar.gz"; format = "tar.gz"; file = "glow_{version}_Linux_arm64/glow"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "glow_{version}_Darwin_arm64.tar.gz"; format = "tar.gz"; file = "glow_{version}_Darwin_arm64/glow"; checksum = "checksums.txt" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "glow --version" }
+}

@@ -99,16 +99,43 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.devtools.direnv` | Load project environment variables through explicit shell or exec integration | GitHub release: `direnv/direnv` (latest) | — | — |
+| `std.devtools.fzf` | Filter and rank text candidates through fuzzy matching | GitHub release: `junegunn/fzf` (latest) | — | — |
+| `std.devtools.glow` | Render Markdown files and standard input in a terminal | GitHub release: `charmbracelet/glow` (latest) | — | — |
+| `std.devtools.hyperfine` | Benchmark shell commands and export machine-readable timing results | GitHub release: `sharkdp/hyperfine` (latest) | — | — |
+| `std.devtools.jq` | Read, transform, and query JSON in shell workflows | GitHub release: `jqlang/jq` (latest) | — | — |
+| `std.devtools.just` | Run project commands and recipes from a justfile | GitHub release: `casey/just` (latest) | just | — |
+| `std.devtools.mise` | Manage developer tools, project environments, and task execution | npm: `mise` | — | — |
+| `std.devtools.nx` | Inspect monorepos, generate projects, and execute dependency-aware build tasks | npm: `nx` | link-workspace-packages, monitor-ci, nx-generate, nx-import, nx-plugins, nx-run-tasks, nx-workspace | — |
+| `std.devtools.pitchfork` | Start, inspect, and stop project services with readiness and dependency checks | GitHub release: `jdx/pitchfork` (latest) | pitchfork | — |
+| `std.devtools.shfmt` | Format shell scripts and validate their syntax | GitHub release: `mvdan/sh` (latest) | — | — |
+| `std.devtools.turborepo` | Execute monorepo tasks with dependency ordering and build caching | npm: `turbo` | turborepo | — |
+| `std.devtools.usage` | Validate CLI specifications and generate command help, documentation, and completions | GitHub release: `jdx/usage` (latest) | usage | — |
+| `std.devtools.watchexec` | Run commands after files change, with debounce and process control | script: `set -eu case "$(uname -s)-$(uname -m)" in   Linux-x86_64) target=x86_64-unknown-linux-musl ;;   Linux-aarch64\|Linux-arm64) target=aarch64-unknown-linux-musl ;;   Darwin-arm64) target=aarch64-apple-darwin ;;   *) echo "Unsupported watchexec platform" >&2; exit 1 ;; esac release=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/watchexec/watchexec/releases/latest) tag=${release##*/} version=${tag#v} asset="watchexec-$version-$target.tar.xz" mkdir -p "$HOME/.local/bin" stage=$(mktemp -d "$HOME/.local/bin/.watchexec.XXXXXX") trap 'rm -rf "$stage"' EXIT HUP INT TERM url="https://github.com/watchexec/watchexec/releases/download/$tag" curl -fsSL "$url/$asset" -o "$stage/$asset" curl -fsSL "$url/SHA256SUMS" -o "$stage/SHA256SUMS" expected=$(awk -v asset="$asset" '$2 == asset { print $1 }' "$stage/SHA256SUMS") [ "${#expected}" -eq 64 ] if command -v sha256sum >/dev/null 2>&1; then   actual=$(sha256sum "$stage/$asset" \| awk '{print $1}') else   actual=$(shasum -a 256 "$stage/$asset" \| awk '{print $1}') fi [ "$actual" = "$expected" ] \|\| { echo "watchexec SHA-256 mismatch" >&2; exit 1; } tar -xJf "$stage/$asset" -C "$stage" "watchexec-$version-$target/watchexec" chmod 755 "$stage/watchexec-$version-$target/watchexec" mv -f "$stage/watchexec-$version-$target/watchexec" "$HOME/.local/bin/watchexec"` | — | — |
+| `std.devtools.yq` | Read and transform YAML, JSON, XML, and other structured data | GitHub release: `mikefarah/yq` (latest) | — | — |
 
 ## git
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.git.delta` | Display Git and diff output with syntax and line highlights | GitHub release: `dandavison/delta` (latest) | — | — |
+| `std.git.difftastic` | Compare source files through syntax-aware diffs | GitHub release: `Wilfred/difftastic` (latest) | — | — |
+| `std.git.ghStack` | Manage stacked branches and pull requests with GitHub’s official gh extension | GitHub release: `github/gh-stack` (latest) | gh-stack | GH_TOKEN, GITHUB_TOKEN |
+| `std.git.gitLfs` | Store and transfer large files through Git LFS | GitHub release: `git-lfs/git-lfs` (latest) | — | — |
+| `std.git.github` | Manage GitHub repositories, issues, pull requests, releases, and workflows | GitHub release: `cli/cli` (latest) | gh, gh-skill | GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN |
 
 ## languages
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.languages.bun` | Run JavaScript and TypeScript with the Bun toolchain | GitHub release: `oven-sh/bun` (latest) | — | — |
+| `std.languages.deno` | Run JavaScript and TypeScript with the Deno toolchain | GitHub release: `denoland/deno` (latest) | — | — |
+| `std.languages.go` | Build and format Go programs with the official toolchain | script: `set -eu case "$(uname -s)-$(uname -m)" in   Linux-x86_64) os=linux; arch=amd64 ;;   Linux-aarch64\|Linux-arm64) os=linux; arch=arm64 ;;   Darwin-arm64) os=darwin; arch=arm64 ;;   *) echo "Unsupported Go platform" >&2; exit 1 ;; esac root="$HOME/.local/share/fam/go" mkdir -p "$root" "$HOME/.local/bin" stage=$(mktemp -d "$root/.install.XXXXXX") trap 'rm -rf "$stage"' EXIT HUP INT TERM curl -fsSL 'https://go.dev/dl/?mode=json' -o "$stage/releases.json" # The official response puts each field on its own line. Select the first stable release. awk -F '"' -v os="$os" -v arch="$arch" '   /"stable":/ { stable = ($0 ~ /true/) }   /"filename":/ { filename = $4; fileos = ""; filearch = ""; hash = ""; kind = "" }   /"os":/ { fileos = $4 }   /"arch":/ { filearch = $4 }   /"sha256":/ { hash = $4 }   /"kind":/ { kind = $4 }   /}/ && stable && fileos == os && filearch == arch && kind == "archive" {     print filename, hash     exit   } ' "$stage/releases.json" > "$stage/selected" read -r asset expected < "$stage/selected" case "$asset" in go[0-9]*."$os"-"$arch".tar.gz) ;; *) echo "No stable Go archive" >&2; exit 1 ;; esac [ "${#expected}" -eq 64 ] # The version is the prefix before the platform suffix, including all patch digits. release=${asset%.$os-$arch.tar.gz} case "$(readlink "$HOME/.local/bin/go" 2>/dev/null \|\| true)" in   "$root"/*/toolchain/bin/go)     if [ "$("$HOME/.local/bin/go" version)" = "go version $release $os/$arch" ] &&        [ "$(readlink "$HOME/.local/bin/gofmt" 2>/dev/null \|\| true)" = "$(dirname "$(readlink "$HOME/.local/bin/go")")/gofmt" ]; then       exit 0     fi ;; esac curl -fsSL "https://go.dev/dl/$asset" -o "$stage/go.tar.gz" if command -v sha256sum >/dev/null 2>&1; then   actual=$(sha256sum "$stage/go.tar.gz" \| awk '{print $1}') else   actual=$(shasum -a 256 "$stage/go.tar.gz" \| awk '{print $1}') fi [ "$actual" = "$expected" ] \|\| { echo "Go SHA-256 mismatch" >&2; exit 1; } tar -xzf "$stage/go.tar.gz" -C "$stage" # A distinct directory preserves the previous toolchain until the new links replace it. installDir=$(mktemp -d "$root/$release.XXXXXX") mv "$stage/go" "$installDir/toolchain" for binary in go gofmt; do   ln -s "$installDir/toolchain/bin/$binary" "$stage/$binary-link"   mv -f "$stage/$binary-link" "$HOME/.local/bin/$binary" done` | — | — |
+| `std.languages.pixi` | Manage reproducible environments and command-line tools across language ecosystems | GitHub release: `prefix-dev/pixi` (latest) | — | — |
+| `std.languages.pnpm` | Install JavaScript packages and run workspace commands with a shared package store | npm: `pnpm` | — | — |
+| `std.languages.ruff` | Lint and format Python code from a standalone command-line tool | uv: `ruff` | — | — |
+| `std.languages.rustup` | Manage Rust toolchains with Rustup | script: `curl -fsSL https://sh.rustup.rs \| CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 sh -s -- -y --no-modify-path --default-toolchain none` | — | — |
+| `std.languages.uv` | Manage Python interpreters, packages, environments, and command-line tools | GitHub release: `astral-sh/uv` (latest) | — | — |
 | `std.languages.zero` | The Zero programming language for agents | script: `curl -fsSL https://zerolang.ai/install.sh \| sh` | zero | — |
 
 ## media
@@ -145,6 +172,12 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.security.ggshield` | Scan source changes and repositories for secrets through GitGuardian | uv: `ggshield` | — | GITGUARDIAN_API_KEY |
+| `std.security.osvScanner` | Find vulnerable dependencies in source trees, lockfiles, and container images | GitHub release: `google/osv-scanner` (latest) | — | — |
+| `std.security.semgrep` | Scan source code for security issues through Semgrep rules | uv: `semgrep` | — | — |
+| `std.security.snyk` | Scan dependencies, source code, containers, and infrastructure with Snyk | npm: `snyk` | — | SNYK_TOKEN |
+| `std.security.trivy` | Scan files, images, dependencies, secrets, and infrastructure configuration | script: `curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \| sh -s -- -b "$HOME/.local/bin"` | — | — |
+| `std.security.trufflehog` | Find and verify leaked credentials in files, Git repositories, and remote sources | GitHub release: `trufflesecurity/trufflehog` (latest) | — | — |
 
 ## testing
 

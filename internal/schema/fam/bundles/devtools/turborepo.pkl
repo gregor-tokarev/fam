@@ -1,0 +1,25 @@
+/// turborepo: Execute monorepo tasks with dependency ordering and build caching (https://github.com/vercel/turborepo).
+///
+/// FAM installs the official turbo package with global npm.
+/// Node.js must exist.
+/// Local tasks need no login. Remote caching can use TURBO_TOKEN and TURBO_TEAM.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "turborepo"
+description = "Execute monorepo tasks with dependency ordering and build caching"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "turbo"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel/turborepo"
+    path = "skills/turborepo"
+  }
+}
+
+verify {
+  new { name = "version"; script = "turbo --version" }
+}

@@ -1,0 +1,56 @@
+/// watchexec: Run commands after files change, with debounce and process control (https://github.com/watchexec/watchexec).
+///
+/// FAM installs the vendor's release archive and checks its SHA-256.
+/// The vendor supplies tar.xz archives, which GitHubRelease cannot extract yet.
+/// curl, tar, and xz must exist. Linux uses static musl builds. No compiler is necessary.
+/// Watched commands need their own shell or interpreter.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "watchexec"
+description = "Run commands after files change, with debounce and process control"
+version = "@FAM_VERSION@"
+local installScript = #"""
+  set -eu
+  case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64) target=x86_64-unknown-linux-musl ;;
+    Linux-aarch64|Linux-arm64) target=aarch64-unknown-linux-musl ;;
+    Darwin-arm64) target=aarch64-apple-darwin ;;
+    *) echo "Unsupported watchexec platform" >&2; exit 1 ;;
+  esac
+  release=$(curl -fsSL -o /dev/null -w '%{url_effective}' https://github.com/watchexec/watchexec/releases/latest)
+  tag=${release##*/}
+  version=${tag#v}
+  asset="watchexec-$version-$target.tar.xz"
+  mkdir -p "$HOME/.local/bin"
+  stage=$(mktemp -d "$HOME/.local/bin/.watchexec.XXXXXX")
+  trap 'rm -rf "$stage"' EXIT HUP INT TERM
+  url="https://github.com/watchexec/watchexec/releases/download/$tag"
+  curl -fsSL "$url/$asset" -o "$stage/$asset"
+  curl -fsSL "$url/SHA256SUMS" -o "$stage/SHA256SUMS"
+  expected=$(awk -v asset="$asset" '$2 == asset { print $1 }' "$stage/SHA256SUMS")
+  [ "${#expected}" -eq 64 ]
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum "$stage/$asset" | awk '{print $1}')
+  else
+    actual=$(shasum -a 256 "$stage/$asset" | awk '{print $1}')
+  fi
+  [ "$actual" = "$expected" ] || { echo "watchexec SHA-256 mismatch" >&2; exit 1; }
+  tar -xJf "$stage/$asset" -C "$stage" "watchexec-$version-$target/watchexec"
+  chmod 755 "$stage/watchexec-$version-$target/watchexec"
+  mv -f "$stage/watchexec-$version-$target/watchexec" "$HOME/.local/bin/watchexec"
+  """#
+tasks {
+  new fam.Package {
+    binary = "~/.local/bin/watchexec"
+    install = installScript
+    update = installScript
+    uninstall = "rm -f ~/.local/bin/watchexec"
+    versionCommand = "watchexec --version"
+  }
+}
+
+verify {
+  new { name = "version"; script = "watchexec --version" }
+}

@@ -1,0 +1,33 @@
+/// just: Run project commands and recipes from a justfile (https://github.com/casey/just).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime or compiler.
+/// Recipes need their declared shell or interpreter.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "just"
+description = "Run project commands and recipes from a justfile"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "casey/just"
+    binary = "just"
+    assets {
+      ["linux-amd64"] { name = "just-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
+      ["linux-arm64"] { name = "just-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
+      ["linux-amd64-musl"] { name = "just-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
+      ["linux-arm64-musl"] { name = "just-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
+      ["darwin-arm64"] { name = "just-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "just" }
+    }
+  }
+  new fam.GitHubSkill {
+    repo = "casey/just"
+    path = "skills/just"
+  }
+}
+
+verify {
+  new { name = "version"; script = "just --version" }
+}

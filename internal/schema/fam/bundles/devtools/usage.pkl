@@ -1,0 +1,32 @@
+/// usage: Validate CLI specifications and generate command help, documentation, and completions (https://github.com/jdx/usage).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime or compiler.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "usage"
+description = "Validate CLI specifications and generate command help, documentation, and completions"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "jdx/usage"
+    binary = "usage"
+    assets {
+      ["linux-amd64"] { name = "usage-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "usage" }
+      ["linux-arm64"] { name = "usage-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "usage" }
+      ["linux-amd64-musl"] { name = "usage-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "usage" }
+      ["linux-arm64-musl"] { name = "usage-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "usage" }
+      ["darwin-arm64"] { name = "usage-universal-apple-darwin.tar.gz"; format = "tar.gz"; file = "usage" }
+    }
+  }
+  new fam.GitHubSkill {
+    repo = "jdx/usage"
+    path = "skills/usage"
+  }
+}
+
+verify {
+  new { name = "version"; script = "usage --version" }
+}

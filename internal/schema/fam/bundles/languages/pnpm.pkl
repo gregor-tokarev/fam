@@ -1,0 +1,22 @@
+/// pnpm: Install JavaScript packages and run workspace commands with a shared package store (https://github.com/pnpm/pnpm).
+///
+/// FAM installs the official pnpm package with global npm.
+/// Node.js 18 or later must exist. The version check ignores project version pins.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "pnpm"
+description = "Install JavaScript packages and run workspace commands with a shared package store"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "pnpm"
+    binary = "pnpm"
+    versionCommand = "pnpm --pm-on-fail=ignore --version"
+  }
+}
+
+verify {
+  new { name = "version"; script = "pnpm --pm-on-fail=ignore --version" }
+}

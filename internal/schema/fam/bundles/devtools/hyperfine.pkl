@@ -1,0 +1,28 @@
+/// hyperfine: Benchmark shell commands and export machine-readable timing results (https://github.com/sharkdp/hyperfine).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime or compiler.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "hyperfine"
+description = "Benchmark shell commands and export machine-readable timing results"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "sharkdp/hyperfine"
+    binary = "hyperfine"
+    assets {
+      ["linux-amd64"] { name = "hyperfine-{tag}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "hyperfine-{tag}-x86_64-unknown-linux-musl/hyperfine" }
+      ["linux-arm64"] { name = "hyperfine-{tag}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "hyperfine-{tag}-aarch64-unknown-linux-musl/hyperfine" }
+      ["linux-amd64-musl"] { name = "hyperfine-{tag}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "hyperfine-{tag}-x86_64-unknown-linux-musl/hyperfine" }
+      ["linux-arm64-musl"] { name = "hyperfine-{tag}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "hyperfine-{tag}-aarch64-unknown-linux-musl/hyperfine" }
+      ["darwin-arm64"] { name = "hyperfine-{tag}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "hyperfine-{tag}-aarch64-apple-darwin/hyperfine" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "hyperfine --version" }
+}

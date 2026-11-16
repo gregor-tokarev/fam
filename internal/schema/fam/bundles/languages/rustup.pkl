@@ -1,0 +1,27 @@
+/// rustup: manage Rust toolchains (https://github.com/rust-lang/rustup).
+///
+/// FAM runs the official installer with --default-toolchain none. It installs only the manager.
+/// The manager and its proxies use ~/.local/share/fam/rustup/bin, without changes to shell files.
+/// FAM does not install a Rust compiler. Cargo bundles need a separate Rust toolchain.
+/// Removal deletes only this prefix. Existing toolchains and Cargo programs keep their own homes.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "rustup"
+description = "Manage Rust toolchains with Rustup"
+version = "@FAM_VERSION@"
+path { "~/.local/share/fam/rustup/bin" }
+tasks {
+  new fam.Package {
+    binary = "~/.local/share/fam/rustup/bin/rustup"
+    install = #"curl -fsSL https://sh.rustup.rs | CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 sh -s -- -y --no-modify-path --default-toolchain none"#
+    update = #"CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 rustup self update"#
+    uninstall = #"rm -rf "$HOME/.local/share/fam/rustup""#
+    versionCommand = #"CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 rustup --version"#
+  }
+}
+
+verify {
+  new { name = "version"; script = #"CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 rustup --version"# }
+}

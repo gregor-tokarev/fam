@@ -1,0 +1,38 @@
+/// gh-stack: Manage stacked branches and pull requests with GitHub’s official gh extension (https://github.com/github/gh-stack).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// GitHub CLI 2 or later and Git 2.36 or later must exist.
+/// FAM registers a local extension in the default GitHub CLI data directory.
+/// Use GH_TOKEN or GITHUB_TOKEN, or an existing GitHub CLI login, for remote operations.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "gh-stack"
+description = "Manage stacked branches and pull requests with GitHub’s official gh extension"
+version = "@FAM_VERSION@"
+requiredSecrets { "GH_TOKEN"; "GITHUB_TOKEN" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "github/gh-stack"
+    binary = "gh-stack"
+    assets {
+      ["linux-amd64"] { name = "linux-amd64" }
+      ["linux-arm64"] { name = "linux-arm64" }
+      ["darwin-arm64"] { name = "darwin-arm64" }
+    }
+  }
+  new fam.File {
+    path = "~/.local/share/gh/extensions/gh-stack"
+    content = "\(facts.home)/.local/bin\n"
+  }
+  new fam.GitHubSkill {
+    repo = "github/gh-stack"
+    path = "skills/gh-stack"
+  }
+}
+
+verify {
+  new { name = "version"; script = "GH_PROMPT_DISABLED=1 gh stack --version" }
+}

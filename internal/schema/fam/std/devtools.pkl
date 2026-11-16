@@ -1,2 +1,46 @@
 /// Tools for software development.
 module fam.std.devtools
+
+import "../Bundle.pkl"
+
+/// direnv: Load project environment variables through explicit shell or exec integration.
+direnv: Bundle = import("../bundles/devtools/direnv.pkl")
+
+/// fzf: Filter and rank text candidates through fuzzy matching.
+fzf: Bundle = import("../bundles/devtools/fzf.pkl")
+
+/// glow: Render Markdown files and standard input in a terminal.
+glow: Bundle = import("../bundles/devtools/glow.pkl")
+
+/// hyperfine: Benchmark shell commands and export machine-readable timing results.
+hyperfine: Bundle = import("../bundles/devtools/hyperfine.pkl")
+
+/// jq: Read, transform, and query JSON in shell workflows.
+jq: Bundle = import("../bundles/devtools/jq.pkl")
+
+/// just: Run project commands and recipes from a justfile.
+just: Bundle = import("../bundles/devtools/just.pkl")
+
+/// mise: Manage developer tools, project environments, and task execution.
+mise: Bundle = import("../bundles/devtools/mise.pkl")
+
+/// nx: Inspect monorepos, generate projects, and execute dependency-aware build tasks.
+nx: Bundle = import("../bundles/devtools/nx.pkl")
+
+/// pitchfork: Start, inspect, and stop project services with readiness and dependency checks.
+pitchfork: Bundle = import("../bundles/devtools/pitchfork.pkl")
+
+/// shfmt: Format shell scripts and validate their syntax.
+shfmt: Bundle = import("../bundles/devtools/shfmt.pkl")
+
+/// turborepo: Execute monorepo tasks with dependency ordering and build caching.
+turborepo: Bundle = import("../bundles/devtools/turborepo.pkl")
+
+/// usage: Validate CLI specifications and generate command help, documentation, and completions.
+usage: Bundle = import("../bundles/devtools/usage.pkl")
+
+/// watchexec: Run commands after files change, with debounce and process control.
+watchexec: Bundle = import("../bundles/devtools/watchexec.pkl")
+
+/// yq: Read and transform YAML, JSON, XML, and other structured data.
+yq: Bundle = import("../bundles/devtools/yq.pkl")

@@ -1,2 +1,19 @@
 /// Git repositories and code review.
 module fam.std.git
+
+import "../Bundle.pkl"
+
+/// delta: Display Git and diff output with syntax and line highlights.
+delta: Bundle = import("../bundles/git/delta.pkl")
+
+/// difftastic: Compare source files through syntax-aware diffs.
+difftastic: Bundle = import("../bundles/git/difftastic.pkl")
+
+/// gh-stack: Manage stacked branches and pull requests with GitHub’s official gh extension.
+ghStack: Bundle = import("../bundles/git/gh-stack.pkl")
+
+/// git-lfs: Store and transfer large files through Git LFS.
+gitLfs: Bundle = import("../bundles/git/git-lfs.pkl")
+
+/// github: Manage GitHub repositories, issues, pull requests, releases, and workflows.
+github: Bundle = import("../bundles/git/github.pkl")

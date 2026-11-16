@@ -5,3 +5,27 @@ import "../Bundle.pkl"
 
 /// Zero: the programming language for agents, with its skill.
 zero: Bundle = import("../bundles/languages/zero.pkl")
+
+/// pixi: Manage reproducible environments and command-line tools across language ecosystems.
+pixi: Bundle = import("../bundles/languages/pixi.pkl")
+
+/// pnpm: Install JavaScript packages and run workspace commands with a shared package store.
+pnpm: Bundle = import("../bundles/languages/pnpm.pkl")
+
+/// ruff: Lint and format Python code from a standalone command-line tool.
+ruff: Bundle = import("../bundles/languages/ruff.pkl")
+
+/// Rustup: manage Rust toolchains without a default compiler.
+rustup: Bundle = import("../bundles/languages/rustup.pkl")
+
+/// uv: Manage Python interpreters, packages, environments, and command-line tools.
+uv: Bundle = import("../bundles/languages/uv.pkl")
+
+/// Bun: run JavaScript and TypeScript with the Bun toolchain.
+bun: Bundle = import("../bundles/languages/bun.pkl")
+
+/// Deno: run JavaScript and TypeScript with the Deno toolchain.
+deno: Bundle = import("../bundles/languages/deno.pkl")
+
+/// Go: build and format Go programs with the official toolchain.
+go: Bundle = import("../bundles/languages/go.pkl")

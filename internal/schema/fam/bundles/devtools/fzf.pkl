@@ -1,0 +1,26 @@
+/// fzf: Filter and rank text candidates through fuzzy matching (https://github.com/junegunn/fzf).
+///
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime. Use --filter for commands without a terminal.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "fzf"
+description = "Filter and rank text candidates through fuzzy matching"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "junegunn/fzf"
+    binary = "fzf"
+    assets {
+      ["linux-amd64"] { name = "fzf-{version}-linux_amd64.tar.gz"; format = "tar.gz"; file = "fzf" }
+      ["linux-arm64"] { name = "fzf-{version}-linux_arm64.tar.gz"; format = "tar.gz"; file = "fzf" }
+      ["darwin-arm64"] { name = "fzf-{version}-darwin_arm64.tar.gz"; format = "tar.gz"; file = "fzf" }
+    }
+  }
+}
+
+verify {
+  new { name = "version"; script = "fzf --version" }
+}
