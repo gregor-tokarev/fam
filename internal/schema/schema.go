@@ -174,7 +174,8 @@ func withoutDocs(b []byte) []byte {
 	closing := "" // the end of the multi-line string that the current line is in, or ""
 	for _, line := range bytes.Split(b, []byte("\n")) {
 		if closing == "" {
-			t := bytes.TrimSpace(line)
+			// Only the whitespace of Pkl (space, tab, form feed) may come before a comment.
+			t := bytes.TrimLeft(line, " \t\f")
 			if bytes.HasPrefix(t, []byte("///")) || bytes.HasPrefix(t, []byte("//!")) {
 				continue
 			}
