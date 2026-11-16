@@ -14,7 +14,7 @@ tasks {
   new fam.GitHubRelease {
     repo = "digitalocean/doctl"
     binary = "doctl"
-    versionCommand = "doctl version | sed -n '1s/-release//p'"
+    versionCommand = "doctl version"
     assets {
       ["linux-amd64"] { name = "doctl-{version}-linux-amd64.tar.gz"; format = "tar.gz"; file = "doctl"; checksum = "doctl-{version}-checksums.sha256" }
       ["linux-arm64"] { name = "doctl-{version}-linux-arm64.tar.gz"; format = "tar.gz"; file = "doctl"; checksum = "doctl-{version}-checksums.sha256" }

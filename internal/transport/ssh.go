@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -30,11 +31,23 @@ func NewSSH(machine, target, configFile string, obs Observer) *SSH {
 }
 
 func controlDir() (string, error) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("fam-%d", os.Getuid()))
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	// Keep the socket path short, including on macOS with a long TMPDIR.
+	dir := filepath.Join("/tmp", fmt.Sprintf("fam-%d", os.Getuid()))
+	if err := os.Mkdir(dir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", err
 	}
-	return dir, os.Chmod(dir, 0o700)
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("SSH control directory %s must be a directory, not a symlink", dir)
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat.Uid != uint32(os.Getuid()) || info.Mode().Perm() != 0o700 {
+		return "", fmt.Errorf("SSH control directory %s must belong to the current user and have mode 0700", dir)
+	}
+	return dir, nil
 }
 
 func (s *SSH) baseArgs() ([]string, error) {

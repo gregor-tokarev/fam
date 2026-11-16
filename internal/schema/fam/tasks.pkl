@@ -271,7 +271,8 @@ class GitHubRelease extends StateTask {
   binary: String(matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
 
   /// A command that prints the installed version. The default is `<binary> --version`.
-  /// Its stdout or stderr must contain the release tag as a word, with or without the leading `v`.
+  /// Its stdout or stderr must contain the version, with or without the leading `v`.
+  /// FAM removes the tag prefix through the last `/` and accepts release or build suffixes.
   versionCommand: String?
 
   /// Assets by platform, for example `assets { ["linux-amd64"] { name = "tool.tar.gz"; file = "tool" } }`.
@@ -284,13 +285,14 @@ class GitHubRelease extends StateTask {
 
 /// One release asset. FAM checks a SHA-256 checksum file when the release supplies one.
 class ReleaseAsset {
-  /// The asset name. `{tag}` and `{version}` expand to the tag and the tag without `v`.
+  /// The asset name. `{tag}` expands to the full tag.
+  /// `{version}` uses the part after the last `/`, without a leading `v`.
   name: String(!isEmpty && !contains("/") && !contains(".."))
 
   /// The asset format.
-  format: "binary"|"tar.gz"|"tar.xz"|"zip" = "binary"
+  format: "binary"|"tar.gz"|"tar.xz"|"tar.bz2"|"zip" = "binary"
 
-  /// The binary path inside an archive. Required for `tar.gz`, `tar.xz`, and `zip`.
+  /// The binary path inside an archive. Required for `tar.gz`, `tar.xz`, `tar.bz2`, and `zip`.
   /// It also accepts `{tag}` and `{version}`.
   file: String(!isEmpty && !startsWith("/") && !split("/").contains(".."))?
 

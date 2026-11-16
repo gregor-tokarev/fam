@@ -31,7 +31,8 @@ type GitHubReleaseImpl struct {
 	Binary string `pkl:"binary"`
 
 	// A command that prints the installed version. The default is `<binary> --version`.
-	// Its stdout or stderr must contain the release tag as a word, with or without the leading `v`.
+	// Its stdout or stderr must contain the version, with or without the leading `v`.
+	// FAM removes the tag prefix through the last `/` and accepts release or build suffixes.
 	VersionCommand *string `pkl:"versionCommand"`
 
 	// Assets by platform, for example `assets { ["linux-amd64"] { name = "tool.tar.gz"; file = "tool" } }`.
@@ -72,7 +73,8 @@ func (rcv GitHubReleaseImpl) GetBinary() string {
 }
 
 // A command that prints the installed version. The default is `<binary> --version`.
-// Its stdout or stderr must contain the release tag as a word, with or without the leading `v`.
+// Its stdout or stderr must contain the version, with or without the leading `v`.
+// FAM removes the tag prefix through the last `/` and accepts release or build suffixes.
 func (rcv GitHubReleaseImpl) GetVersionCommand() *string {
 	return rcv.VersionCommand
 }
