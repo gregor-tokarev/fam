@@ -20,7 +20,7 @@ import (
 // import ".fam/std.pkl"
 //
 // bundles { std.agentBrowser }
-// roles { ["worker"] { bundles { import("setup/worker.pkl") } } }
+// roles { ["worker"] { bundles { import("bundles/worker-setup.pkl") } } }
 // machines = import("machines.pkl").machines
 // agents = import("agents.pkl").agents
 // ```
@@ -51,7 +51,7 @@ type Config struct {
 	//
 	// ```
 	// roles {
-	//   ["worker"] { bundles { import("setup/worker.pkl") } }
+	//   ["worker"] { bundles { import("bundles/worker-setup.pkl") } }
 	// }
 	// ```
 	//

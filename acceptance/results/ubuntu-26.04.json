@@ -69,7 +69,7 @@
     "name": "network stop gives a connection error (255)",
     "result": "pass",
     "detail": "error: connection error to vm (fam@fam-ubuntu-26-04): ssh exit code 255: mux_client_request_session: read from master failed: Broken pipe\r",
-    "duration": "35s"
+    "duration": "34s"
   },
   {
     "target": "ubuntu-26.04",

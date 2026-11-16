@@ -42,7 +42,7 @@ func New(opts NewOptions) ([]string, error) {
 		"skills/.gitkeep":            "",
 		"bundles/hello.pkl":          helloBundle,
 		"bundles/files/fam-hello.sh": helloScript,
-		"setup/worker.pkl":           workerSetup,
+		"bundles/worker-setup.pkl":   workerSetup,
 		".gitignore":                 "",
 	}
 	names := make([]string, 0, len(files))
@@ -142,7 +142,7 @@ agents = import("agents.pkl").agents
 
 // Bundles for every machine with a role, after the bundles of every machine.
 roles {
-  ["worker"] { bundles { import("setup/worker.pkl") } }
+  ["worker"] { bundles { import("bundles/worker-setup.pkl") } }
 }
 `
 

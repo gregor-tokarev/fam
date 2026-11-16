@@ -109,7 +109,7 @@
     "name": "systemd tasks fail with a clear error without systemd",
     "result": "pass",
     "detail": "error: the Service task fam-demo.service needs systemd or launchd, but vm (alpine 3.24.4) has no supported service manager (init: none)",
-    "duration": "21s"
+    "duration": "29s"
   },
   {
     "target": "alpine-3.24",
