@@ -202,8 +202,11 @@ func writeAtomic(path string, data []byte) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// uriPattern finds the fam dependency in a PklProject file.
-var uriPattern = regexp.MustCompile(`package://` + regexp.QuoteMeta("github.com/gregor-tokarev/fam/releases/download/v") + `[^"/]+/fam@[^"]+`)
+// uriPattern finds the URI of the fam dependency in a PklProject file: `uri = "package://…"`.
+var uriPattern = regexp.MustCompile(`(uri\s*=\s*")package://` + regexp.QuoteMeta(releaseBase) + `[^"/\s]+/fam@[^"\s]+(")`)
+
+// versionPattern is a semantic version (1.2.3, 1.2.3-rc.1).
+var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
 
 // projectFile is the PklProject that `fam new` and `fam migrate` write.
 func projectFile(v string) string {
@@ -227,8 +230,10 @@ func WriteProject(base string, p *Package) error {
 		b = []byte(projectFile(p.Version))
 	case err != nil:
 		return err
+	case len(uriPattern.FindAll(b, -1)) == 1:
+		b = uriPattern.ReplaceAll(b, []byte("${1}"+URI(p.Version)+"${2}"))
 	case uriPattern.Match(b):
-		b = uriPattern.ReplaceAll(b, []byte(URI(p.Version)))
+		return fmt.Errorf("%s has more than one fam dependency URI. Keep one: `[\"fam\"] { uri = %q }`", pp, URI(p.Version))
 	default:
 		return fmt.Errorf("%s has no fam dependency. Add `[\"fam\"] { uri = %q }` to its `dependencies`, then run `fam migrate` again", pp, URI(p.Version))
 	}
@@ -237,6 +242,9 @@ func WriteProject(base string, p *Package) error {
 	if old, err := os.ReadFile(dp); err == nil {
 		if err := json.Unmarshal(old, &deps); err != nil {
 			return fmt.Errorf("read %s: %w", dp, err)
+		}
+		if deps == nil {
+			return fmt.Errorf("read %s: the file is not a JSON object", dp)
 		}
 	}
 	resolved, _ := deps["resolvedDependencies"].(map[string]any)
@@ -283,17 +291,26 @@ func Pinned(base string) (v, checksum string, err error) {
 	if err := json.Unmarshal(b, &deps); err != nil {
 		return "", "", fmt.Errorf("read %s: %w", filepath.Join(base, DepsFile), err)
 	}
+	dp := filepath.Join(base, DepsFile)
+	found := 0
 	for k, d := range deps.ResolvedDependencies {
 		if !strings.HasPrefix(k, "package://"+releaseBase) {
 			continue
 		}
-		_, v, ok := strings.Cut(d.URI, "/fam@")
-		if !ok {
-			continue
+		found++
+		_, v, _ = strings.Cut(d.URI, "/fam@")
+		checksum = d.Checksums["sha256"]
+		if !versionPattern.MatchString(v) || k != depsKey(v) || d.URI != "projectpackage://"+strings.TrimPrefix(URI(v), "package://") {
+			return "", "", fmt.Errorf("%s has an invalid fam entry %q. Run `fam migrate`", dp, k)
 		}
-		return v, d.Checksums["sha256"], nil
 	}
-	return "", "", fmt.Errorf("%s has no fam package. Run `fam migrate`", filepath.Join(base, DepsFile))
+	switch found {
+	case 0:
+		return "", "", fmt.Errorf("%s has no fam package. Run `fam migrate`", dp)
+	case 1:
+		return v, checksum, nil
+	}
+	return "", "", fmt.Errorf("%s has more than one fam package. Run `fam migrate`", dp)
 }
 
 // Check stops when the fam package that a project pins does not fit this binary. A package of

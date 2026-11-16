@@ -16,8 +16,8 @@ import (
 // `config.pkl` amends this module:
 //
 // ```
-// amends ".fam/Config.pkl"
-// import ".fam/std.pkl"
+// amends "@fam/Config.pkl"
+// import "@fam/std.pkl"
 //
 // bundles { std.agentBrowser }
 // roles { ["worker"] { bundles { import("bundles/worker-setup.pkl") } } }

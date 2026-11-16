@@ -17,8 +17,8 @@ import (
 // A bundle file amends this module:
 //
 // ```
-// amends "../.fam/Bundle.pkl"
-// import "../.fam/tasks.pkl" as fam
+// amends "@fam/Bundle.pkl"
+// import "@fam/tasks.pkl" as fam
 //
 // name = "posthog"
 //

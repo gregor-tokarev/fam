@@ -37,8 +37,12 @@ func NewEvaluator(ctx context.Context, base, configPath string, progress io.Writ
 	if err != nil {
 		return nil, err
 	}
+	// Pkl gives the dependencies of PklProject only to modules in the project folder.
+	if rel, err := filepath.Rel(base, configPath); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, fmt.Errorf("the config %s is not in the project %s: it must be in the folder of PklProject, or below it", configPath, base)
+	}
 	e := &Evaluator{manager: pkl.NewEvaluatorManagerWithCommand([]string{bin}), path: configPath, cacheDir: cacheDir}
-	ev, err := e.manager.NewEvaluator(ctx, pkl.PreconfiguredOptions)
+	ev, err := e.manager.NewEvaluator(ctx, pkl.PreconfiguredOptions, func(o *pkl.EvaluatorOptions) { o.CacheDir = cacheDir })
 	if err != nil {
 		e.Close()
 		return nil, fmt.Errorf("start the Pkl evaluator: %w", err)

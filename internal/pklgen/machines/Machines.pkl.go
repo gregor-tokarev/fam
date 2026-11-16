@@ -11,7 +11,7 @@ import (
 // The machines of the fleet, in a separate file.
 //
 // ```
-// amends ".fam/Machines.pkl"
+// amends "@fam/Machines.pkl"
 //
 //	machines {
 //	  ["cockpit"] { role = "cockpit" }
