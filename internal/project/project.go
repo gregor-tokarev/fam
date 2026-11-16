@@ -170,10 +170,6 @@ env {
   ["FAM_HELLO_GREETING"] = "Hello from FAM"
 }
 
-instructions {
-  "Run ` + "`fam-hello`" + ` to check that FAM bundles work on this machine."
-}
-
 tasks {
   new fam.File {
     path = "~/.local/bin/fam-hello"

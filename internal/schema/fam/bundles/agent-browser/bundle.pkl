@@ -25,10 +25,6 @@ skill = new Bundle.GitHubSkill {
   path = "skills/agent-browser"
 }
 
-instructions {
-  "Use `agent-browser` for browser work. Run `agent-browser skills get core` before the first command."
-}
-
 tasks {
   // npm by default. Another manager: package = new { package = "agent-browser"; manager = "brew" }
   new fam.Package {

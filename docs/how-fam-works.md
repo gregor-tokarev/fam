@@ -51,7 +51,7 @@ User scripts (`Script`, `Package`) run in Bash when the machine has Bash, else i
 | `~/.config/fam/secrets.env` | `export NAME='value'` lines, mode `0600`. |
 | `~/.zshenv`, `~/.bashrc`, `~/.profile` | A marked block (`# >>> fam >>>`) that loads `env.sh`. In `~/.bashrc` the block is the first lines, before any line that stops noninteractive shells. FAM also writes the block into `~/.profile` (login shells), and into `~/.bash_profile` and `~/.bash_login` when they exist, because Bash then does not read `~/.profile`. In the other files the block is the last lines. An installer in the same apply (for example the Vite+ installer) can add lines after it, so FAM checks the blocks again at the end of the apply and moves them back. |
 | `~/.ssh/environment` and `/etc/ssh/sshd_config.d/50-fam-bash-env.conf` | Only on Linux machines where the login shell is Bash and Bash does not read `~/.bashrc` for noninteractive SSH commands (Bash built without `SSH_SOURCE_BASHRC`, for example on Arch Linux and Alpine). A marked block in `~/.ssh/environment` sets `BASH_ENV` to `~/.config/fam/env.sh`, and the sshd drop-in allows only that variable (`PermitUserEnvironment BASH_ENV`). FAM tests the sshd configuration before the reload, and opens a new connection before verify. FAM finds such a Bash from the facts: a Bash with this feature contains the string `SSH2_CLIENT`. |
-| `~/.agents/AGENTS.md` | The rendered `instructions/AGENTS.md` and the instruction lines of the bundles. |
+| `~/.agents/AGENTS.md` | The rendered `instructions/AGENTS.md`. |
 | `~/.agents/CLAUDE.md` | The same content, then the rendered `instructions/CLAUDE.md`. |
 | `~/.codex/AGENTS.md` | A link to `~/.agents/AGENTS.md`. |
 | `~/.claude/CLAUDE.md` | A link to `~/.agents/CLAUDE.md`. |
@@ -72,7 +72,7 @@ FAM stores no state. It finds what it manages from the content:
 | `.Machine.Name`, `.Machine.Role`, `.Machine.Address`, `.Machine.User` | The machine entry. |
 | `.Facts.OS`, `.Facts.Distro`, `.Facts.DistroVersion`, `.Facts.Arch`, `.Facts.CPUs`, `.Facts.Home`, `.Facts.User`, `.Facts.Hostname`, `.Facts.Init`, `.Facts.Shell`, `.Facts.Machine`, `.Facts.Role` | The facts. |
 
-There is no `.Agent` variable. Bundle instruction lines go into a `## Tools on this machine` section, with one `### <bundle>` heading for each bundle.
+There is no `.Agent` variable. Bundles add no instructions: a bundle's skill tells the agents about its tool.
 
 ## Skills
 
@@ -96,7 +96,7 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 - A bundle entry is a bundle module or `new { bundle = …; state = … }`.
 - The `name` identifies a bundle. Two files with the same name are an error.
 - A machine entry wins over the global entry with the same name.
-- An absent bundle undoes its typed tasks in reverse order (`File`, `Symlink`, `Merge` keys, `Service`, `Linger`, `Package` with an `uninstall` command), then runs its `uninstall` tasks. FAM cannot undo a `Script`, so it skips scripts. FAM also removes the skill, the Claude link, the instruction lines, and the variables of the bundle.
+- An absent bundle undoes its typed tasks in reverse order (`File`, `Symlink`, `Merge` keys, `Service`, `Linger`, `Package` with an `uninstall` command), then runs its `uninstall` tasks. FAM cannot undo a `Script`, so it skips scripts. FAM also removes the skill, the Claude link, and the variables of the bundle.
 
 ## Services
 

@@ -107,6 +107,10 @@ func (e *EvalError) Error() string {
 		msg += "\n\nFAM 0.2.0 has no playbooks. Make each playbook a bundle (amends \".fam/Bundle.pkl\" with a `name`), " +
 			"and list it in `roles { [\"worker\"] { bundles { … } } }` of config.pkl, or in the `bundles` of a machine"
 	}
+	if strings.Contains(msg, "Cannot find property `instructions`") {
+		msg += "\n\nFAM 0.4.0 bundles have no `instructions`. Put the lines into instructions/AGENTS.md of the project, " +
+			"or rely on the skill of the bundle"
+	}
 	return msg
 }
 

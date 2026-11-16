@@ -69,7 +69,7 @@ FAM as the cockpit inside the Mac: the Mac is an Intel (x86-64) VM, and pkl 0.33
 | 2 | `fam apply`, then a second plan shows only "satisfied", and a second apply changes nothing. Units restart once (on macOS, a restart request before the launchd Service task does not restart the job again). A skill file name with a backslash and spaces stays "satisfied". |
 | 3 | `fam verify` passes `fresh_shell` (noninteractive and interactive) and `reconnect`. |
 | 4 | Drift: hand changes to a file, a merged key, a skill file, an instruction file, and a mode. Plan finds them, apply repairs them. |
-| 5 | A bundle becomes `absent`: FAM removes its file, link, merged keys, skill, Claude link, instruction lines, and variables. |
+| 5 | A bundle becomes `absent`: FAM removes its file, link, merged keys, skill, Claude link, and variables. |
 | 6 | A machine entry removes a global bundle from one machine. |
 | 7 | Secrets: six shells export both test secrets. The values are not in the plan, `--json`, `--toon`, or the run logs. |
 | 8 | A check with exit code 1 never starts its apply. A failed apply stops the tasks after it. |

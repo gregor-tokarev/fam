@@ -1,7 +1,7 @@
-//! Written by FAM 0.3.0. Do not edit. Run `fam upgrade` to update.
+//! Written by FAM 0.4.0. Do not edit. Run `fam upgrade` to update.
 
 /// A bundle: a reusable part of the config. Usually one tool or one piece of machine setup, with
-/// its tasks, environment, skill, instructions, and checks.
+/// its tasks, environment, skill, and checks.
 ///
 /// `config.pkl` selects the machines: `bundles` (every machine), `roles` (every machine with a
 /// role), or the `bundles` of one machine. A bundle itself does not know the machines.
@@ -56,9 +56,6 @@ path: Listing<String>
 /// FAM copies it to `~/.agents/skills/<folder name>` (a local folder named `skill` uses the
 /// bundle name).
 skill: (String|GitHubSkill)?
-
-/// Lines that FAM adds to the agent instructions of the machine.
-instructions: Listing<String>
 
 /// The install tasks, in order.
 tasks: Listing<t.Task>
