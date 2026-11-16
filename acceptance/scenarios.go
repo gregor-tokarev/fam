@@ -718,7 +718,10 @@ func s16StdAll(c *Ctx) error {
 		return err
 	}
 	applied := time.Since(start)
-	m, _ := machineOf(r)
+	m, err := machineOf(r)
+	if err != nil {
+		return err
+	}
 	want := stdSkills
 	switch {
 	case c.t.BootScript != "":
@@ -742,8 +745,8 @@ func s16StdAll(c *Ctx) error {
 		return err
 	}
 	planned := time.Since(start)
-	pm, _ := machineOf(p.Res)
-	if pm.Counts.Change != 0 || pm.Counts.Error != 0 || pm.Counts.Conflict != 0 {
+	pm, err := machineOf(p.Res)
+	if err != nil || p.Code != 0 || !p.Res.OK || pm.Counts.Change != 0 || pm.Counts.Error != 0 || pm.Counts.Conflict != 0 {
 		return fmt.Errorf("plan after the apply:\n%s", describe(p.Res))
 	}
 	c.notes = append(c.notes, fmt.Sprintf("%d changed, %d skills; apply %s, plan %s", m.Counts.Changed, len(want), applied.Round(time.Second), planned.Round(time.Second)))

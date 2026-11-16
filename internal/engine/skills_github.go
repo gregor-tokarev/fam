@@ -4,19 +4,22 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -57,16 +60,13 @@ func loadGitHubSkill(ctx context.Context, repo, folder string, refp *string, nam
 	githubSkills.Unlock()
 	r.once.Do(func() {
 		r.ref = ref
-		// A release tag or a commit does not change, so FAM keeps its archive on disk.
-		keep := commitRef.MatchString(ref)
 		if r.ref == "" {
 			r.ref, r.err = latestReleaseOnce(ctx, repo)
 			if r.err != nil {
 				return
 			}
-			keep = true
 		}
-		r.files, r.err = downloadSkill(ctx, repo, folder, r.ref, keep)
+		r.files, r.err = downloadSkill(ctx, repo, folder, r.ref)
 	})
 	if r.err != nil && ctx.Err() != nil {
 		// Do not keep a canceled download: a later call tries again.
@@ -85,9 +85,6 @@ func loadGitHubSkill(ctx context.Context, repo, folder string, refp *string, nam
 	}
 	return &SkillSource{Name: name, Dir: src, Origin: origin, files: r.files}, nil
 }
-
-// commitRef matches a full commit hash.
-var commitRef = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // latestTags holds the latest release tag of each repository for this run.
 var latestTags = struct {
@@ -160,33 +157,50 @@ const (
 	maxSkillFiles = 5000
 )
 
-// downloadSkill reads the files of one folder from the archive of a repository at a ref. When
-// keep is true, the ref does not change, and FAM keeps the archive in its cache folder, so that
-// the next run does not download it again.
-func downloadSkill(ctx context.Context, repo, folder, ref string, keep bool) ([]skillFile, error) {
+// downloadSkill reads the files of one folder from the archive of a repository at a ref. FAM
+// keeps the archive in its cache folder, and asks GitHub once in a run whether it changed.
+func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, error) {
 	segs := strings.Split(ref, "/")
 	for i, sg := range segs {
 		segs[i] = url.PathEscape(sg)
 	}
 	u := CodeloadBase + "/" + repo + "/tar.gz/" + strings.Join(segs, "/")
-	if keep {
-		if files, err := cachedSkill(ctx, repo, folder, ref, u); err == nil || !errors.Is(err, errNoCache) {
-			return files, err
-		}
-	}
-	body, err := fetchArchive(ctx, u)
+	dir, err := os.UserCacheDir()
 	if err != nil {
-		return nil, err
+		// No cache folder: read the download directly.
+		body, _, err := fetchArchive(ctx, u, "")
+		if err != nil {
+			return nil, err
+		}
+		defer body.Close()
+		return readSkill(body, folder, u)
 	}
-	defer body.Close()
-	return readSkill(body, repo, folder, ref, u)
+	// The file name is a hash, so that no repository or ref can give a path outside the folder.
+	sum := sha256.Sum256([]byte(repo + "\x00" + ref))
+	file := filepath.Join(dir, "fam", "github", hex.EncodeToString(sum[:16])+".tar.gz")
+	for attempt := 0; ; attempt++ {
+		f, err := openArchive(ctx, file, u)
+		if err != nil {
+			return nil, err
+		}
+		files, err := readSkill(f, folder, u)
+		var ae *archiveError
+		if err != nil && errors.As(err, &ae) && attempt == 0 {
+			// A damaged file in the cache: remove it and download it again.
+			dropArchive(file, f)
+			f.Close()
+			continue
+		}
+		f.Close()
+		return files, err
+	}
 }
-
-// errNoCache: the cache folder is not usable, so FAM downloads the archive without it.
-var errNoCache = errors.New("no cache folder")
 
 // archiveError is an error of the archive data (gzip or tar), not of the skill folder in it.
 type archiveError struct{ err error }
+
+func (e *archiveError) Error() string { return e.err.Error() }
+func (e *archiveError) Unwrap() error { return e.err }
 
 // badArchive marks an error of the archive data. A too large archive is not damaged: a second
 // download does not help.
@@ -198,118 +212,148 @@ func badArchive(u string, err error) error {
 	return &archiveError{err}
 }
 
-func (e *archiveError) Error() string { return e.err.Error() }
-func (e *archiveError) Unwrap() error { return e.err }
-
-// githubArchives holds the archive downloads of this run, so that the skills of one repository
-// share one download.
-var githubArchives = struct {
+// archiveCache holds the state of each cached archive in this run. The lock of an entry makes
+// the skills of one repository and ref wait for one download.
+var archiveCache = struct {
 	sync.Mutex
-	done map[string]*archiveDownload
-}{done: map[string]*archiveDownload{}}
+	entries map[string]*cachedArchive
+}{entries: map[string]*cachedArchive{}}
 
-type archiveDownload struct {
-	once sync.Once
-	err  error
+type cachedArchive struct {
+	sync.Mutex
+	checked bool // GitHub confirmed the file in this run
 }
 
-// cachedSkill reads a skill folder from the cached archive of a repository at a ref, and
-// downloads the archive first when the cache does not have it.
-func cachedSkill(ctx context.Context, repo, folder, ref, u string) ([]skillFile, error) {
-	dir, err := os.UserCacheDir()
-	if err != nil {
-		return nil, errNoCache
+func archiveEntry(file string) *cachedArchive {
+	archiveCache.Lock()
+	defer archiveCache.Unlock()
+	e, ok := archiveCache.entries[file]
+	if !ok {
+		e = &cachedArchive{}
+		archiveCache.entries[file] = e
 	}
-	dir = filepath.Join(dir, "fam", "github", filepath.FromSlash(repo))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, errNoCache
-	}
-	file := filepath.Join(dir, url.PathEscape(ref)+".tar.gz")
+	return e
+}
+
+// A cached archive file starts with a line that holds the ETag of the download. The gzip data
+// follows.
+
+// openArchive returns the cached archive, after the first check in this run with GitHub. The
+// file is positioned at the gzip data. An open file stays readable when another process
+// replaces or removes the cache file.
+func openArchive(ctx context.Context, file, u string) (*os.File, error) {
+	e := archiveEntry(file)
+	e.Lock()
+	defer e.Unlock()
 	for attempt := 0; ; attempt++ {
-		if err := ensureArchive(ctx, file, u); err != nil {
-			return nil, err
+		if !e.checked {
+			if err := refreshArchive(ctx, file, u); err != nil {
+				return nil, err
+			}
+			e.checked = true
 		}
 		f, err := os.Open(file)
+		if errors.Is(err, fs.ErrNotExist) && attempt == 0 {
+			// Another process pruned the file after the check.
+			e.checked = false
+			continue
+		}
 		if err != nil {
+			return nil, err
+		}
+		if _, err := readETag(f); err != nil {
+			f.Close()
+			if attempt == 0 {
+				_ = os.Remove(file)
+				e.checked = false
+				continue
+			}
 			return nil, err
 		}
 		now := time.Now()
 		_ = os.Chtimes(file, now, now)
-		files, err := readSkill(f, repo, folder, ref, u)
+		return f, nil
+	}
+}
+
+// refreshArchive asks GitHub for the archive with the ETag of the cached file. GitHub answers
+// 304 when the archive did not change (also for a branch, or a tag that did not move);
+// otherwise FAM saves the new archive.
+func refreshArchive(ctx context.Context, file, u string) error {
+	etag := ""
+	if f, err := os.Open(file); err == nil {
+		etag, _ = readETag(f)
 		f.Close()
-		var ae *archiveError
-		if err != nil && errors.As(err, &ae) && attempt == 0 {
-			// A damaged file in the cache: remove it and download it again.
-			forgetArchive(file)
-			continue
-		}
-		return files, err
 	}
-}
-
-// ensureArchive downloads an archive into file when file does not exist. A run downloads each
-// archive once.
-func ensureArchive(ctx context.Context, file, u string) error {
-	githubArchives.Lock()
-	d, ok := githubArchives.done[file]
-	if !ok {
-		d = &archiveDownload{}
-		githubArchives.done[file] = d
-	}
-	githubArchives.Unlock()
-	d.once.Do(func() {
-		if _, err := os.Stat(file); err == nil {
-			return
-		}
-		d.err = saveArchive(ctx, file, u)
-		if d.err == nil {
-			pruneArchives(filepath.Dir(file))
-		}
-	})
-	if d.err != nil {
-		githubArchives.Lock()
-		if githubArchives.done[file] == d {
-			delete(githubArchives.done, file)
-		}
-		githubArchives.Unlock()
-	}
-	return d.err
-}
-
-// forgetArchive removes a cached archive, so that the next ensureArchive downloads it again.
-func forgetArchive(file string) {
-	githubArchives.Lock()
-	delete(githubArchives.done, file)
-	githubArchives.Unlock()
-	_ = os.Remove(file)
-}
-
-// saveArchive downloads an archive into a temporary file next to file, then renames it.
-func saveArchive(ctx context.Context, file, u string) error {
-	body, err := fetchArchive(ctx, u)
+	body, newTag, err := fetchArchive(ctx, u, etag)
 	if err != nil {
 		return err
 	}
+	if body == nil {
+		return nil // 304: the cached file is current
+	}
 	defer body.Close()
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		return err
+	}
 	tmp, err := os.CreateTemp(filepath.Dir(file), ".download-*")
 	if err != nil {
 		return err
 	}
 	defer os.Remove(tmp.Name())
-	if _, err := io.Copy(tmp, &capReader{r: body, left: maxArchive}); err != nil {
+	_, err = fmt.Fprintf(tmp, "%s\n", strings.ReplaceAll(newTag, "\n", ""))
+	if err == nil {
+		_, err = io.Copy(tmp, &capReader{r: body, left: maxArchive})
+	}
+	if err != nil {
 		tmp.Close()
 		return fmt.Errorf("download %s: %w", u, err)
 	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), file)
+	if err := os.Rename(tmp.Name(), file); err != nil {
+		return err
+	}
+	pruneArchives(filepath.Dir(file))
+	return nil
+}
+
+// readETag reads the first line of a cached archive file.
+func readETag(f *os.File) (string, error) {
+	var b [1]byte
+	var line []byte
+	for len(line) < 1024 {
+		if _, err := io.ReadFull(f, b[:]); err != nil {
+			return "", fmt.Errorf("the cached archive %s has no ETag line: %w", f.Name(), err)
+		}
+		if b[0] == '\n' {
+			return string(line), nil
+		}
+		line = append(line, b[0])
+	}
+	return "", fmt.Errorf("the cached archive %s has no ETag line", f.Name())
+}
+
+// dropArchive removes a damaged cache file, but only when it is still the file that f read: a
+// newer download stays. The next openArchive asks GitHub again.
+func dropArchive(file string, f *os.File) {
+	e := archiveEntry(file)
+	e.Lock()
+	defer e.Unlock()
+	e.checked = false
+	a, err1 := f.Stat()
+	b, err2 := os.Stat(file)
+	if err1 == nil && err2 == nil && os.SameFile(a, b) {
+		_ = os.Remove(file)
+	}
 }
 
 // archiveMaxAge: FAM removes a cached archive that no run used for this time.
 const archiveMaxAge = 30 * 24 * time.Hour
 
-// pruneArchives removes the old archives of one repository from the cache.
+// pruneArchives removes old archives and old temporary files from the cache folder. A run that
+// still reads a removed file keeps its open file; a later open downloads the archive again.
 func pruneArchives(dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -326,31 +370,79 @@ func pruneArchives(dir string) {
 	}
 }
 
-// fetchArchive starts the download of an archive.
-func fetchArchive(ctx context.Context, u string) (io.ReadCloser, error) {
+// archiveStall: a download fails when no data arrives for this time. A large archive on a slow
+// line can take many minutes, so there is no limit for the whole download.
+const archiveStall = time.Minute
+
+// fetchArchive starts the download of an archive. With an ETag, it returns a nil body when
+// GitHub answers 304 (not modified).
+func fetchArchive(ctx context.Context, u, etag string) (io.ReadCloser, string, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return nil, err
+		cancel()
+		return nil, "", err
 	}
-	resp, err := doRetry(ctx, &http.Client{Timeout: 5 * time.Minute}, req)
+	if etag != "" {
+		req.Header.Set("If-None-Match", etag)
+	}
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.ResponseHeaderTimeout = archiveStall
+	resp, err := doRetry(ctx, &http.Client{Transport: tr}, req)
 	if err != nil {
-		return nil, fmt.Errorf("download %s: %w", u, err)
+		cancel()
+		return nil, "", fmt.Errorf("download %s: %w", u, err)
+	}
+	if resp.StatusCode == http.StatusNotModified && etag != "" {
+		resp.Body.Close()
+		cancel()
+		return nil, etag, nil
 	}
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("download %s: HTTP %d", u, resp.StatusCode)
+		cancel()
+		return nil, "", fmt.Errorf("download %s: HTTP %d", u, resp.StatusCode)
 	}
-	return resp.Body, nil
+	sr := &stallReader{body: resp.Body, cancel: cancel}
+	sr.timer = time.AfterFunc(archiveStall, func() { sr.stalled.Store(true); cancel() })
+	return sr, resp.Header.Get("ETag"), nil
+}
+
+// stallReader cancels its download when no data arrives for archiveStall.
+type stallReader struct {
+	body    io.ReadCloser
+	timer   *time.Timer
+	cancel  context.CancelFunc
+	stalled atomic.Bool
+}
+
+func (s *stallReader) Read(p []byte) (int, error) {
+	n, err := s.body.Read(p)
+	if n > 0 {
+		s.timer.Reset(archiveStall)
+	}
+	if err != nil && err != io.EOF && s.stalled.Load() {
+		err = fmt.Errorf("no data for %s", archiveStall)
+	}
+	return n, err
+}
+
+func (s *stallReader) Close() error {
+	s.timer.Stop()
+	err := s.body.Close()
+	s.cancel()
+	return err
 }
 
 // readSkill reads the files of one folder from a .tar.gz archive of a repository.
-func readSkill(archive io.Reader, repo, folder, ref, u string) ([]skillFile, error) {
-	gz, err := gzip.NewReader(archive)
+func readSkill(archive io.Reader, folder, u string) ([]skillFile, error) {
+	capped := &capReader{r: archive, left: maxArchive}
+	gz, err := gzip.NewReader(capped)
 	if err != nil {
 		return nil, badArchive(u, err)
 	}
 	fail := func(format string, a ...any) ([]skillFile, error) {
-		return nil, fmt.Errorf("skill %s of %s@%s: %s", folder, repo, ref, fmt.Sprintf(format, a...))
+		return nil, fmt.Errorf("skill %s in %s: %s", folder, u, fmt.Sprintf(format, a...))
 	}
 	prefix := strings.Trim(folder, "/") + "/"
 	var files []skillFile
@@ -358,10 +450,15 @@ func readSkill(archive io.Reader, repo, folder, ref, u string) ([]skillFile, err
 	links := map[string]string{} // rel path in the folder -> link target in the repository
 	total := 0
 	root := ""
-	tr := tar.NewReader(&capReader{r: gz, left: maxArchive})
+	data := &capReader{r: gz, left: maxArchive}
+	tr := tar.NewReader(data)
 	for {
 		h, err := tr.Next()
 		if errors.Is(err, io.EOF) {
+			// Read the rest of the gzip stream, so that its checksum finds a damaged archive.
+			if _, err := io.Copy(io.Discard, data); err != nil {
+				return nil, badArchive(u, err)
+			}
 			break
 		}
 		if err != nil {
