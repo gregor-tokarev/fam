@@ -12,6 +12,7 @@ name = "asciinema"
 description = "Terminal recording CLI with a headless mode for scripts and CI"
 version = "@FAM_VERSION@"
 supported = facts.os != "linux" || facts.libc != "musl" || facts.arch != "arm64"
+unsupportedReason = "Linux arm64 has no musl build."
 tasks {
   new fam.GitHubRelease {
     repo = "asciinema/asciinema"

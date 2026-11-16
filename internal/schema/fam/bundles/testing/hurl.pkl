@@ -14,6 +14,7 @@ description = "HTTP request runner and API test CLI with plain text input"
 version = "@FAM_VERSION@"
 supported = (facts.os != "linux" || facts.libc != "musl")
   && (facts.distro != "ubuntu" || facts.distroVersion.split(".")[0].toInt() < 26)
+unsupportedReason = "No musl build is available. Ubuntu 26 and later lack libxml2.so.2."
 tasks {
   new fam.GitHubRelease {
     repo = "Orange-OpenSource/hurl"

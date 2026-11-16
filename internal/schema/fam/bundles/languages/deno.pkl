@@ -8,6 +8,7 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 supported = !(facts.os == "linux" && facts.libc == "musl")
+unsupportedReason = "The vendor supplies no musl build."
 
 name = "deno"
 description = "Run JavaScript and TypeScript with the Deno toolchain"

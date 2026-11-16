@@ -311,7 +311,7 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 			supplied[secret.Name] = true
 		}
 		for _, u := range spec.Bundles {
-			if u.State != "present" {
+			if u.State != "present" || u.Skipped() {
 				continue
 			}
 			seen := map[string]bool{}
@@ -339,6 +339,9 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 		applyMachine(ctx, mr)
 	case ModeVerify:
 		mr.res.Status = "ok"
+		for _, s := range mr.sects {
+			recordSkippedSection(mr.res, s)
+		}
 		verifyMachine(ctx, mr)
 	}
 }
@@ -364,11 +367,24 @@ func check(ctx context.Context, env *Env, t Task) (Check, error) {
 	return c, nil
 }
 
+// recordSkippedSection reports an unsupported bundle in every output format.
+func recordSkippedSection(r *output.MachineResult, s Section) bool {
+	if s.SkipReason == "" {
+		return false
+	}
+	r.Tasks = append(r.Tasks, output.TaskResult{Group: s.Name, Kind: "bundle", Name: strings.TrimPrefix(s.Name, "bundle "), Status: string(Skipped), Detail: s.SkipReason})
+	r.Counts.Add(string(Skipped))
+	return true
+}
+
 // 4. Plan: run every check.
 func planMachine(ctx context.Context, mr *machineRun) {
 	r := mr.res
 	r.Status = "ok"
 	for _, s := range mr.sects {
+		if recordSkippedSection(r, s) {
+			continue
+		}
 		for _, t := range s.Tasks {
 			c, err := check(ctx, mr.env, t)
 			r.Tasks = append(r.Tasks, taskResult(t, c.Status, c.Detail, err))
@@ -422,6 +438,9 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	// A change of the sshd configuration applies only to new connections.
 	reconnect := false
 	for _, s := range mr.sects {
+		if recordSkippedSection(r, s) {
+			continue
+		}
 		var units []Unit
 		failedInSection := false
 		env.restarted = nil

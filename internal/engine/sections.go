@@ -24,7 +24,7 @@ type VerifySpec struct {
 // skills, instructions.
 func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section, []VerifySpec, error) {
 	var out []Section
-	envSec, err := environmentSection(env, spec, env.Secrets)
+	envSec, err := environmentSection(ctx, env, spec, env.Secrets)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -44,10 +44,10 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section,
 		if err != nil {
 			return nil, nil, err
 		}
-		if len(s.Tasks) > 0 {
+		if len(s.Tasks) > 0 || s.SkipReason != "" {
 			out = append(out, s)
 		}
-		if u.State != "present" {
+		if u.State != "present" || u.Skipped() {
 			continue
 		}
 		for _, v := range u.Bundle.Verify {
@@ -72,7 +72,19 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section,
 			}
 		}
 	}
-	sk, err := skillsSection(env, bundleSkills)
+	// Keep existing skills of skipped bundles without loading their sources or verifying them.
+	preservedSkills := map[string]bool{}
+	for _, u := range spec.Bundles {
+		if !u.Skipped() {
+			continue
+		}
+		for _, task := range u.Bundle.Tasks {
+			if name, ok := bundleSkillName(task, u); ok {
+				preservedSkills[name] = true
+			}
+		}
+	}
+	sk, err := skillsSection(env, bundleSkills, preservedSkills)
 	if err != nil {
 		return nil, nil, err
 	}

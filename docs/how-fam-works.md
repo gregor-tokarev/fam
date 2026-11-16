@@ -123,6 +123,10 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 - A bundle entry is a bundle module or `new { bundle = …; state = … }`.
 - The `name` identifies a bundle. Two files with the same name are an error.
 - A machine entry wins over the global entry with the same name.
+- `supported` defaults to `true`. Set it from the machine facts, for example `supported = facts.libc != "musl"`.
+- When `supported` is `false`, FAM skips a present bundle and its verify scripts. Plan, apply, and verify show the skip. Text, JSON, and TOON show its reason. A skip does not fail the run.
+- `unsupportedReason: String?` gives the reason, for example `"no musl build"`. Without a reason, FAM says the bundle does not support the machine.
+- A skip leaves an earlier installation, its skills, and its existing environment entries on the machine. FAM does not install, update, or remove the bundle. Use `state = "absent"` to remove it. Absent bundles ignore `supported`.
 - An absent bundle undoes its typed tasks in reverse order (`File`, `Symlink`, `Merge` keys, `Service`, `Linger`, `Package` with an `uninstall` command, `GitHubRelease`), then runs its `uninstall` tasks. FAM cannot undo a `Script`, so it skips scripts. FAM also removes the skill, the Claude link, and the variables of the bundle.
 
 ## Standard bundles

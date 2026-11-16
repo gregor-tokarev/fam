@@ -43,6 +43,17 @@ type BundleUse struct {
 	Dir string
 }
 
+// Skipped reports whether a present bundle does not support this machine.
+func (u BundleUse) Skipped() bool { return u.State == "present" && !u.Bundle.Supported }
+
+// SkipReason returns the explanation for an unsupported bundle.
+func (u BundleUse) SkipReason() string {
+	if reason := u.Bundle.UnsupportedReason; reason != nil && strings.TrimSpace(*reason) != "" {
+		return *reason
+	}
+	return "the bundle does not support this machine"
+}
+
 // Spec is the evaluated config for one machine.
 type Spec struct {
 	Machine Machine

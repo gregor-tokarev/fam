@@ -39,8 +39,12 @@ type Bundle struct {
 	Description *string `pkl:"description"`
 
 	// Whether the tool supports the current machine facts.
-	// The acceptance harness omits unsupported bundles.
+	// When false, FAM skips a present bundle and its verify scripts without an error.
+	// FAM does not remove an earlier installation. An absent bundle ignores this field.
 	Supported bool `pkl:"supported"`
+
+	// Why the tool does not support the machine. FAM shows this when it skips the bundle.
+	UnsupportedReason *string `pkl:"unsupportedReason"`
 
 	// The version of the bundle. Standard bundles have the FAM version.
 	Version *string `pkl:"version"`
