@@ -162,11 +162,14 @@ func sameSchema(dir, v string) (bool, error) {
 	return same && err == nil, err
 }
 
-// withoutDocs removes the doc comment lines (`///` and `//!`) of a Pkl file, and normalizes CRLF
-// line ends. A line inside a multi-line string (`"""`, or `#"""` … `"""#`) is content, not a
-// comment, so it stays.
+// withoutDocs removes the doc comment lines (`///` and `//!`) of a Pkl file, and normalizes the
+// line ends (CRLF and CR become LF). A line inside a multi-line string (`"""`, or `#"""` …
+// `"""#`) is content, not a comment, so it stays.
 func withoutDocs(b []byte) []byte {
+	// Pkl ends a line at LF, CR, or CRLF. Split the same way, so that a CR can never hide code
+	// in what looks like one comment line.
 	b = bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
+	b = bytes.ReplaceAll(b, []byte("\r"), []byte("\n"))
 	var out [][]byte
 	closing := "" // the end of the multi-line string that the current line is in, or ""
 	for _, line := range bytes.Split(b, []byte("\n")) {
