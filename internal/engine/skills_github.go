@@ -272,9 +272,15 @@ func doRetry(ctx context.Context, c *http.Client, req *http.Request) (*http.Resp
 		if err == nil {
 			return resp, nil
 		}
-		// Only a network failure (DNS, connect, reset, timeout) is worth another try.
+		// Only a network failure (DNS, connect, reset, timeout) is worth another try. Client.Do
+		// wraps every error in *url.Error, which is itself a net.Error, so look at the cause.
+		cause := err
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			cause = ue.Err
+		}
 		var ne net.Error
-		if ctx.Err() != nil || !errors.As(err, &ne) {
+		if ctx.Err() != nil || !errors.As(cause, &ne) {
 			return nil, err
 		}
 	}
