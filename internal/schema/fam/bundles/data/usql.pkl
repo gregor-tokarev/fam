@@ -1,48 +1,24 @@
 /// usql: Query many database systems through a common CLI (https://github.com/xo/usql).
 ///
 /// FAM downloads the latest release binary. Linux uses the static build, including on musl.
-/// Installation needs curl, tar, and bzip2. The vendor supplies no checksum file.
-/// FAM uses an install script because its GitHub release task cannot extract tar.bz2 archives.
+/// The vendor supplies no checksum file.
 /// Some database drivers need native libraries. Connection credentials depend on the database.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
 
-local installUsql = #"""
-  set -eu
-  mkdir -p "$HOME/.local/bin"
-  work=$(mktemp -d "$HOME/.local/bin/.usql.XXXXXX")
-  trap 'rm -rf "$work"' EXIT HUP INT TERM
-  case "$(uname -s)" in
-    Linux) os=linux; binary=usql_static ;;
-    Darwin) os=darwin; binary=usql ;;
-    *) echo 'Unsupported operating system' >&2; exit 1 ;;
-  esac
-  case "$(uname -m)" in
-    x86_64) arch=amd64 ;;
-    aarch64|arm64) arch=arm64 ;;
-    *) echo 'Unsupported architecture' >&2; exit 1 ;;
-  esac
-  release=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/xo/usql/releases/latest)
-  tag=${release##*/}
-  version=${tag#v}
-  printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
-  curl -fsSL "https://github.com/xo/usql/releases/download/$tag/$binary-$version-$os-$arch.tar.bz2" -o "$work/usql.tar.bz2"
-  tar -xjf "$work/usql.tar.bz2" -C "$work" "$binary"
-  chmod 755 "$work/$binary"
-  mv -f "$work/$binary" "$HOME/.local/bin/usql"
-  """#
-
 name = "usql"
 description = "Query many database systems through a common CLI"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    binary = "~/.local/bin/usql"
-    install = installUsql
-    update = installUsql
-    uninstall = "rm -f ~/.local/bin/usql"
-    versionCommand = "usql --version"
+  new fam.GitHubRelease {
+    repo = "xo/usql"
+    binary = "usql"
+    assets {
+      ["linux-amd64"] { name = "usql_static-{version}-linux-amd64.tar.bz2"; format = "tar.bz2"; file = "usql_static" }
+      ["linux-arm64"] { name = "usql_static-{version}-linux-arm64.tar.bz2"; format = "tar.bz2"; file = "usql_static" }
+      ["darwin-arm64"] { name = "usql-{version}-darwin-arm64.tar.bz2"; format = "tar.bz2"; file = "usql" }
+    }
   }
 }
 

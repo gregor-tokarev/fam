@@ -3,6 +3,7 @@ package engine
 import (
 	"archive/tar"
 	"archive/zip"
+	"compress/bzip2"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -78,7 +79,7 @@ func (t *GitHubReleaseTask) target(ctx context.Context, env *Env) (string, tasks
 }
 
 func expandReleaseName(name, tag string) string {
-	return strings.NewReplacer("{tag}", tag, "{version}", strings.TrimPrefix(tag, "v")).Replace(name)
+	return strings.NewReplacer("{tag}", tag, "{version}", releaseVersion(tag)).Replace(name)
 }
 
 // releaseRecord identifies a binary that FAM installed. Its digest also detects drift
@@ -423,16 +424,19 @@ func releaseBinary(data *os.File, a tasks.ReleaseAsset) ([]byte, error) {
 	}
 	wanted := path.Clean(*a.File)
 	switch a.Format {
-	case "tar.gz", "tar.xz":
+	case "tar.gz", "tar.xz", "tar.bz2":
 		var decoded io.Reader
-		if a.Format == "tar.gz" {
+		switch a.Format {
+		case "tar.gz":
 			gz, err := gzip.NewReader(data)
 			if err != nil {
 				return nil, err
 			}
 			defer gz.Close()
 			decoded = gz
-		} else {
+		case "tar.bz2":
+			decoded = bzip2.NewReader(data)
+		case "tar.xz":
 			xr, err := xz.NewReader(data)
 			if err != nil {
 				return nil, err

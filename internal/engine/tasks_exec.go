@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -289,11 +290,22 @@ func (t *PackageTask) Update(ctx context.Context, env *Env) (bool, string, error
 	return true, fmt.Sprintf("updated %s -> %s", before, after), nil
 }
 
-// versionIs reports whether the version output contains the version as a whole word:
-// "2.1.325 (Claude Code)" is 2.1.325, not 2.1.32.
+// releaseVersion removes a tag's path prefix and leading v.
+func releaseVersion(tag string) string {
+	return strings.TrimPrefix(tag[strings.LastIndexByte(tag, '/')+1:], "v")
+}
+
+// Allow build metadata and common release suffixes, but keep prereleases distinct.
+var releaseBuildSuffix = regexp.MustCompile(`^(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*|-(release|stable|final|build)([.-][0-9A-Za-z-]+)*)$`)
+
+// versionIs matches a whole version, including after a slash, without matching a longer version.
 func versionIs(out, version string) bool {
-	for _, f := range strings.FieldsFunc(out, func(r rune) bool { return unicode.IsSpace(r) || r == '(' || r == ')' || r == ',' }) {
-		if strings.TrimPrefix(f, "v") == strings.TrimPrefix(version, "v") {
+	version = releaseVersion(version)
+	for _, f := range strings.FieldsFunc(out, func(r rune) bool {
+		return unicode.IsSpace(r) || r == '(' || r == ')' || r == ',' || r == '/'
+	}) {
+		f = strings.TrimPrefix(f, "v")
+		if f == version || strings.HasPrefix(f, version) && releaseBuildSuffix.MatchString(strings.TrimPrefix(f, version)) {
 			return true
 		}
 	}

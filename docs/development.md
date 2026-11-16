@@ -97,7 +97,7 @@ new fam.Package {
 }
 ```
 
-`GitHubRelease` installs one binary without sudo. Assets can be bare binaries, tar.gz, tar.xz, or zip archives. An archive needs the file path of its binary. Asset names and archive paths can use `{tag}` or `{version}`. The latter removes the leading `v`.
+`GitHubRelease` installs one binary without sudo. Assets can be bare binaries, tar.gz, tar.xz, tar.bz2, or zip archives. An archive needs the file path of its binary. Asset names and archive paths can use `{tag}` or `{version}`. `{version}` uses the part after the last `/`, without a leading `v`.
 
 FAM accepts at most 512 MiB for a binary and 1 GiB for an asset or uncompressed tar archive. The version command can print its version to stdout or stderr.
 

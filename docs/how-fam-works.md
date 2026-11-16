@@ -50,7 +50,7 @@ bundles/tool.pkl      # amends "@fam/Bundle.pkl"
 
 One interface (`internal/transport`) with an SSH and a local implementation. Its operations: run a command, read a file, write a file atomically (a temporary file in the same directory, then a rename), and get file information. Both implementations run the same POSIX shell scripts. FAM selects OS-specific commands from the facts, for example `sha256sum` or `shasum -a 256`, and `stat -c` or `stat -f`.
 
-SSH uses the system `ssh` with `ControlMaster=auto`, `ControlPersist=120`, `BatchMode=yes`, and `ServerAliveInterval=5` (`ServerAliveCountMax=3`). The control sockets are in `$TMPDIR/fam-<uid>/`. `--ssh-config <file>` (or `FAM_SSH_CONFIG`) gives a config file to `ssh -F`. Without it, `ssh` reads `~/.ssh/config`.
+SSH uses the system `ssh` with `ControlMaster=auto`, `ControlPersist=120`, `BatchMode=yes`, and `ServerAliveInterval=5` (`ServerAliveCountMax=3`). The control sockets are in `/tmp/fam-<uid>/`, independent of `TMPDIR`. FAM requires a directory owned by the current user, with mode `0700`, and rejects symlinks. `--ssh-config <file>` (or `FAM_SSH_CONFIG`) gives a config file to `ssh -F`. Without it, `ssh` reads `~/.ssh/config`.
 
 `sudo`:
 
@@ -168,7 +168,7 @@ FAM asks the package manager, not `PATH`, whether the package is installed. When
 
 Cargo uses `--root ~/.local`. Go uses `GOBIN=~/.local/bin`. A `PackageRef` can give `names` for each manager, for example `names { ["apt"] = "fd-find" }`. FAM uses the generic `package` name when no name matches the selected manager.
 
-A `GitHubRelease` task installs a release binary into `~/.local/bin`, without sudo. It supports bare binaries, tar.gz, tar.xz, and zip. Plan compares the installed version with the latest tag, or a pinned `tag`. FAM checks SHA-256 checksum files when present. See [Package tasks](development.md#package-tasks) for the schema and an example.
+A `GitHubRelease` task installs a release binary into `~/.local/bin`, without sudo. It supports bare binaries, tar.gz, tar.xz, tar.bz2, and zip. Plan compares the installed version with the latest tag, or a pinned `tag`. FAM checks SHA-256 checksum files when present. See [Package tasks](development.md#package-tasks) for the schema and an example.
 
 On Linux, FAM detects glibc or musl from the machine. On musl, `assets` uses `linux-amd64-musl` or `linux-arm64-musl` when present. Otherwise, FAM uses the plain Linux key. Prefer static or musl builds for the plain Linux keys when available, because they run everywhere.
 
