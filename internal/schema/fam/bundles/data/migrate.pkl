@@ -1,0 +1,28 @@
+/// migrate: Run versioned database migrations (https://github.com/golang-migrate/migrate).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// Database operations need a connection URL and migration files. Credentials depend on the database.
+/// Migrate prints its version to stderr. The release check redirects stderr to stdout.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "migrate"
+description = "Run versioned database migrations"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "golang-migrate/migrate"
+    binary = "migrate"
+    versionCommand = "migrate -version 2>&1"
+    assets {
+      ["linux-amd64"] { name = "migrate.linux-amd64.tar.gz"; format = "tar.gz"; file = "migrate" }
+      ["darwin-arm64"] { name = "migrate.darwin-arm64.tar.gz"; format = "tar.gz"; file = "migrate" }
+      ["linux-arm64"] { name = "migrate.linux-arm64.tar.gz"; format = "tar.gz"; file = "migrate" }
+    }
+  }
+}
+
+verify {
+  new { name = "migrate -version"; script = "migrate -version" }
+}

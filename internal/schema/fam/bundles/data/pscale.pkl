@@ -1,0 +1,29 @@
+/// pscale: Manage PlanetScale databases, branches, and schema changes (https://github.com/planetscale/cli).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// Cloud operations need PLANETSCALE_SERVICE_TOKEN_ID and PLANETSCALE_SERVICE_TOKEN, or a login.
+/// Some database commands also need an external MySQL client.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "pscale"
+description = "Manage PlanetScale databases, branches, and schema changes"
+version = "@FAM_VERSION@"
+requiredSecrets { "PLANETSCALE_SERVICE_TOKEN_ID"; "PLANETSCALE_SERVICE_TOKEN" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "planetscale/cli"
+    binary = "pscale"
+    versionCommand = "pscale --version"
+    assets {
+      ["linux-amd64"] { name = "pscale_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "pscale" }
+      ["darwin-arm64"] { name = "pscale_{version}_macOS_arm64.tar.gz"; format = "tar.gz"; file = "pscale" }
+      ["linux-arm64"] { name = "pscale_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "pscale" }
+    }
+  }
+}
+
+verify {
+  new { name = "pscale --version"; script = "pscale --version" }
+}

@@ -1,0 +1,60 @@
+/// docker: Build images and control local or remote Docker engines (https://github.com/docker/cli).
+///
+/// FAM downloads the latest official binary and checks the vendor SHA-256 file.
+/// It installs only the CLI atomically into ~/.local/bin, without sudo.
+/// Installation needs curl, tar, and sha256sum on Linux or shasum on macOS.
+/// Container operations need a separately configured local or remote Docker engine. FAM installs only the CLI.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+local installDocker = #"""
+  set -eu
+  mkdir -p "$HOME/.local/bin"
+  work=$(mktemp -d "$HOME/.local/bin/.docker.XXXXXX")
+  trap 'rm -rf "$work"' EXIT HUP INT TERM
+  case "$(uname -s)" in
+    Linux) os=linux ;;
+    Darwin) os=darwin ;;
+    *) echo 'Unsupported operating system' >&2; exit 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *) echo 'Unsupported architecture' >&2; exit 1 ;;
+  esac
+  case "$os" in linux) platform=linux ;; darwin) platform=mac ;; esac
+  case "$arch" in amd64) machine=x86_64 ;; arm64) machine=aarch64 ;; esac
+  base="https://download.docker.com/$platform/static/stable/$machine"
+  curl -fsSL "$base/" -o "$work/index"
+  version=$(sed -n 's/.*href="docker-\([0-9][0-9.]*\)\.tgz".*/\1/p' "$work/index" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+  printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+  archive="docker-$version.tgz"
+  curl -fsSL "$base/$archive" -o "$work/docker.tgz"
+  expected=$(curl -fsSL "$base/$archive.sha256" | awk '{print $1}')
+  case "$os" in
+    darwin) actual=$(shasum -a 256 "$work/docker.tgz" | awk '{print $1}') ;;
+    linux) actual=$(sha256sum "$work/docker.tgz" | awk '{print $1}') ;;
+  esac
+  [ "${#expected}" -eq 64 ] && [ "$actual" = "$expected" ] || { echo 'SHA-256 mismatch' >&2; exit 1; }
+  tar -xzf "$work/docker.tgz" -C "$work" docker/docker
+  chmod 755 "$work/docker/docker"
+  mv -f "$work/docker/docker" "$HOME/.local/bin/docker"
+  """#
+
+name = "docker"
+description = "Build images and control local or remote Docker engines"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    binary = "~/.local/bin/docker"
+    install = installDocker
+    update = installDocker
+    uninstall = "rm -f ~/.local/bin/docker"
+    versionCommand = "docker --version"
+  }
+}
+
+verify {
+  new { name = "docker --version"; script = "docker --version" }
+}

@@ -1,0 +1,30 @@
+/// duckdb: Query local files and analytical datasets with SQL (https://github.com/duckdb/duckdb).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// Linux needs libstdc++ and libgcc. The bundle selects musl builds on musl Linux.
+/// Remote data sources can need separate credentials.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "duckdb"
+description = "Query local files and analytical datasets with SQL"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "duckdb/duckdb"
+    binary = "duckdb"
+    versionCommand = "duckdb --version"
+    assets {
+      ["linux-amd64"] { name = "duckdb-cli-linux-amd64.tar.gz"; format = "tar.gz"; file = "duckdb" }
+      ["darwin-arm64"] { name = "duckdb-cli-osx-arm64.tar.gz"; format = "tar.gz"; file = "duckdb" }
+      ["linux-arm64"] { name = "duckdb-cli-linux-arm64.tar.gz"; format = "tar.gz"; file = "duckdb" }
+      ["linux-amd64-musl"] { name = "duckdb-cli-linux-amd64-musl.tar.gz"; format = "tar.gz"; file = "duckdb" }
+      ["linux-arm64-musl"] { name = "duckdb-cli-linux-arm64-musl.tar.gz"; format = "tar.gz"; file = "duckdb" }
+    }
+  }
+}
+
+verify {
+  new { name = "duckdb --version"; script = "duckdb --version" }
+}

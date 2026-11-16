@@ -1,0 +1,28 @@
+/// render: Deploy and manage Render services (https://github.com/render-oss/cli).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// Cloud operations need RENDER_API_KEY or a login. Use --output json --confirm for automation.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "render"
+description = "Deploy and manage Render services"
+version = "@FAM_VERSION@"
+requiredSecrets { "RENDER_API_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "render-oss/cli"
+    binary = "render"
+    versionCommand = "render --version"
+    assets {
+      ["linux-amd64"] { name = "cli_{version}_linux_amd64.zip"; format = "zip"; file = "cli_{tag}" }
+      ["darwin-arm64"] { name = "cli_{version}_darwin_arm64.zip"; format = "zip"; file = "cli_{tag}" }
+      ["linux-arm64"] { name = "cli_{version}_linux_arm64.zip"; format = "zip"; file = "cli_{tag}" }
+    }
+  }
+}
+
+verify {
+  new { name = "render --version"; script = "render --version" }
+}

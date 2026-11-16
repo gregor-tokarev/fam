@@ -1,0 +1,59 @@
+/// terraform: Plan and apply infrastructure changes with Terraform (https://github.com/hashicorp/terraform).
+///
+/// FAM downloads the latest official binary and checks the vendor SHA-256 file.
+/// It installs only the CLI atomically into ~/.local/bin, without sudo.
+/// Installation needs curl, unzip, and sha256sum on Linux or shasum on macOS.
+/// Provider credentials depend on the project. Use -input=false for automation.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+local installTerraform = #"""
+  set -eu
+  mkdir -p "$HOME/.local/bin"
+  work=$(mktemp -d "$HOME/.local/bin/.terraform.XXXXXX")
+  trap 'rm -rf "$work"' EXIT HUP INT TERM
+  case "$(uname -s)" in
+    Linux) os=linux ;;
+    Darwin) os=darwin ;;
+    *) echo 'Unsupported operating system' >&2; exit 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *) echo 'Unsupported architecture' >&2; exit 1 ;;
+  esac
+  curl -fsSL https://releases.hashicorp.com/terraform/ -o "$work/index"
+  version=$(sed -n 's|.*href="/terraform/\([0-9][0-9.]*\)/".*|\1|p' "$work/index" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+  printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+  base="https://releases.hashicorp.com/terraform/$version"
+  archive="terraform_${version}_${os}_${arch}.zip"
+  curl -fsSL "$base/$archive" -o "$work/terraform.zip"
+  curl -fsSL "$base/terraform_${version}_SHA256SUMS" -o "$work/sums"
+  expected=$(awk -v file="$archive" '$2 == file {print $1}' "$work/sums")
+  case "$os" in
+    darwin) actual=$(shasum -a 256 "$work/terraform.zip" | awk '{print $1}') ;;
+    linux) actual=$(sha256sum "$work/terraform.zip" | awk '{print $1}') ;;
+  esac
+  [ "${#expected}" -eq 64 ] && [ "$actual" = "$expected" ] || { echo 'SHA-256 mismatch' >&2; exit 1; }
+  unzip -q "$work/terraform.zip" terraform -d "$work"
+  chmod 755 "$work/terraform"
+  mv -f "$work/terraform" "$HOME/.local/bin/terraform"
+  """#
+
+name = "terraform"
+description = "Plan and apply infrastructure changes with Terraform"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    binary = "~/.local/bin/terraform"
+    install = installTerraform
+    update = installTerraform
+    uninstall = "rm -f ~/.local/bin/terraform"
+    versionCommand = "CHECKPOINT_DISABLE=1 terraform version"
+  }
+}
+
+verify {
+  new { name = "CHECKPOINT_DISABLE=1 terraform version"; script = "CHECKPOINT_DISABLE=1 terraform version" }
+}

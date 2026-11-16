@@ -1,0 +1,27 @@
+/// rclone: Copy and synchronize files across cloud storage services (https://github.com/rclone/rclone).
+///
+/// FAM installs the standalone CLI from the latest GitHub release.
+/// Storage operations need a configured remote. Credentials and environment variables depend on the backend.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "rclone"
+description = "Copy and synchronize files across cloud storage services"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "rclone/rclone"
+    binary = "rclone"
+    versionCommand = "rclone version"
+    assets {
+      ["linux-amd64"] { name = "rclone-{tag}-linux-amd64.zip"; format = "zip"; file = "rclone-{tag}-linux-amd64/rclone" }
+      ["linux-arm64"] { name = "rclone-{tag}-linux-arm64.zip"; format = "zip"; file = "rclone-{tag}-linux-arm64/rclone" }
+      ["darwin-arm64"] { name = "rclone-{tag}-osx-arm64.zip"; format = "zip"; file = "rclone-{tag}-osx-arm64/rclone" }
+    }
+  }
+}
+
+verify {
+  new { name = "rclone version"; script = "rclone version" }
+}

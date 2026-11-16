@@ -1,0 +1,27 @@
+/// vercel: Deploy and manage Vercel projects (https://github.com/vercel/vercel).
+///
+/// FAM installs the CLI with npm. It copies the core skills from the latest GitHub release.
+/// It needs Node.js 20 or later. Cloud operations need VERCEL_TOKEN or a login.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "vercel"
+description = "Deploy and manage Vercel projects"
+version = "@FAM_VERSION@"
+requiredSecrets { "VERCEL_TOKEN" }
+tasks {
+  new fam.Package {
+    package = "vercel"
+    binary = "vercel"
+    versionCommand = "vercel --version"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel/vercel"
+    path = "skills/vercel-cli"
+  }
+}
+
+verify {
+  new { name = "vercel --version"; script = "vercel --version" }
+}

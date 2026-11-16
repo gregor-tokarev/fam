@@ -1,0 +1,22 @@
+/// sqlite-utils: Import, transform, and query SQLite databases from the CLI (https://github.com/simonw/sqlite-utils).
+///
+/// FAM installs the CLI with uv.
+/// It needs uv and Python 3.10 or later with sqlite3 support. Local databases need no login.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "sqlite-utils"
+description = "Import, transform, and query SQLite databases from the CLI"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef { package = "sqlite-utils"; manager = "uv" }
+    binary = "sqlite-utils"
+    versionCommand = "sqlite-utils --version"
+  }
+}
+
+verify {
+  new { name = "sqlite-utils --version"; script = "sqlite-utils --version" }
+}

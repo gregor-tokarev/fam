@@ -1,0 +1,29 @@
+/// kustomize: Customize Kubernetes manifests without templates (https://github.com/kubernetes-sigs/kustomize).
+///
+/// FAM installs the standalone CLI from GitHub and checks the vendor SHA-256 file.
+/// The bundle pins kustomize/v5.8.3 because FAM cannot expand its prefixed tag in asset names.
+/// Local manifest builds need no cluster or login.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "kustomize"
+description = "Customize Kubernetes manifests without templates"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "kubernetes-sigs/kustomize"
+    binary = "kustomize"
+    versionCommand = "printf 'kustomize/'; kustomize version"
+    tag = "kustomize/v5.8.3"
+    assets {
+      ["linux-amd64"] { name = "kustomize_v5.8.3_linux_amd64.tar.gz"; format = "tar.gz"; file = "kustomize"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "kustomize_v5.8.3_linux_arm64.tar.gz"; format = "tar.gz"; file = "kustomize"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "kustomize_v5.8.3_darwin_arm64.tar.gz"; format = "tar.gz"; file = "kustomize"; checksum = "checksums.txt" }
+    }
+  }
+}
+
+verify {
+  new { name = "kustomize version"; script = "kustomize version" }
+}

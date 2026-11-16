@@ -5,3 +5,9 @@ import "../Bundle.pkl"
 
 /// portless: named local URLs instead of port numbers, with its skill.
 portless: Bundle = import("../bundles/networking/portless.pkl")
+
+/// cloudflared: expose local services through Cloudflare Tunnel.
+cloudflared: Bundle = import("../bundles/networking/cloudflared.pkl")
+
+/// tailscale: connect worker machines through the Tailscale private network.
+tailscale: Bundle = import("../bundles/networking/tailscale.pkl")
