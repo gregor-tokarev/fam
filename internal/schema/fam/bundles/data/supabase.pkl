@@ -2,7 +2,8 @@
 ///
 /// FAM installs the CLI with the official release installer into ~/.local/bin.
 /// The release binary exceeds FAM's 128 MiB binary limit. The npm package does not support global installation.
-/// The installer needs Bash, curl, tar, and standard shell tools. Linux also needs libstdc++ and libgcc.
+/// The installer needs Bash, curl, tar, and standard shell tools.
+/// On musl Linux, Supabase also needs libstdc++ and libgcc.
 /// The installer selects APK builds on musl and leaves shell configuration unchanged.
 /// Cloud operations need SUPABASE_ACCESS_TOKEN or a login. Local stack commands need Docker.
 amends "../../Bundle.pkl"

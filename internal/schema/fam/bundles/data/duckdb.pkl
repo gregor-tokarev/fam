@@ -1,7 +1,8 @@
 /// duckdb: Query local files and analytical datasets with SQL (https://github.com/duckdb/duckdb).
 ///
 /// FAM installs the standalone CLI from the latest GitHub release.
-/// The bundle selects musl builds on musl Linux. Remote data sources can need separate credentials.
+/// Linux needs libstdc++ and libgcc. The bundle selects musl builds on musl Linux.
+/// Remote data sources can need separate credentials.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
