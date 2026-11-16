@@ -45,7 +45,7 @@ secrets {
 }
 
 roles {
-  ["worker"] { bundles { import("setup/worker.pkl") } }
+  ["worker"] { bundles { import("bundles/worker.pkl") } }
 }
 `, secretsFile),
 		"agents.pkl": `amends ".fam/Agents.pkl"
@@ -74,14 +74,14 @@ machines {
 		"config-fail.pkl": `amends "config.pkl"
 
 roles {
-  ["worker"] { bundles { import("setup/failing.pkl") } }
+  ["worker"] { bundles { import("bundles/failing.pkl") } }
 }
 `,
 		// Scenario 9: a slow script, so that the harness can stop the network during the run.
 		"config-slow.pkl": `amends "config.pkl"
 
 roles {
-  ["worker"] { bundles { import("setup/slow.pkl") } }
+  ["worker"] { bundles { import("bundles/slow.pkl") } }
 }
 `,
 		// Scenario 12: Claude Code and Codex. The "old" entrypoint pins older versions, so that
@@ -104,7 +104,7 @@ agents {
 		"config-systemd.pkl": `amends "config.pkl"
 
 roles {
-  ["worker"] { bundles { import("setup/systemd.pkl") } }
+  ["worker"] { bundles { import("bundles/systemd.pkl") } }
 }
 `,
 		// The standard bundle agentBrowser, with Node.js from its upstream binaries.
@@ -231,7 +231,7 @@ bundles {
   [2] = new base.BundleRef { bundle = import("bundles/pkgtest.pkl"); state = "absent" }
 }
 `,
-		"setup/worker.pkl": `amends "../.fam/Bundle.pkl"
+		"bundles/worker.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 import "../.fam/facts.pkl"
 
@@ -289,9 +289,9 @@ tasks {
   }
 }
 `,
-		"setup/files/gate.sh":          "#!/bin/sh\necho gate\n",
-		"setup/files/fam-demo.service": "[Unit]\nDescription=FAM acceptance demo\n\n[Service]\nEnvironmentFile=-%h/.config/fam-demo/env\nExecStart=/bin/sh -c 'while true; do sleep 3600; done'\n\n[Install]\nWantedBy=default.target\n",
-		"setup/files/dev.fam.demo.plist": `<?xml version="1.0" encoding="UTF-8"?>
+		"bundles/files/gate.sh":          "#!/bin/sh\necho gate\n",
+		"bundles/files/fam-demo.service": "[Unit]\nDescription=FAM acceptance demo\n\n[Service]\nEnvironmentFile=-%h/.config/fam-demo/env\nExecStart=/bin/sh -c 'while true; do sleep 3600; done'\n\n[Install]\nWantedBy=default.target\n",
+		"bundles/files/dev.fam.demo.plist": `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -300,7 +300,7 @@ tasks {
 </dict>
 </plist>
 `,
-		"setup/failing.pkl": `amends "../.fam/Bundle.pkl"
+		"bundles/failing.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 
 name = "failing"
@@ -313,7 +313,7 @@ tasks {
   }
 }
 `,
-		"setup/failing2.pkl": `amends "../.fam/Bundle.pkl"
+		"bundles/failing2.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 
 name = "failing2"
@@ -330,10 +330,10 @@ tasks {
 		"config-fail2.pkl": `amends "config.pkl"
 
 roles {
-  ["worker"] { bundles { import("setup/failing2.pkl") } }
+  ["worker"] { bundles { import("bundles/failing2.pkl") } }
 }
 `,
-		"setup/slow.pkl": `amends "../.fam/Bundle.pkl"
+		"bundles/slow.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 
 name = "slow"
@@ -346,7 +346,7 @@ tasks {
   }
 }
 `,
-		"setup/systemd.pkl": `amends "../.fam/Bundle.pkl"
+		"bundles/systemd.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 
 name = "systemd"
