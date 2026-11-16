@@ -48,7 +48,7 @@ After a change to the schema, run:
 make pklgen
 ```
 
-The script runs the `pkl-go` code generator (`package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.14.0#/gen.pkl`) with the pinned `pkl` binary. Each schema module maps to its own Go package under `internal/pklgen` (`config`, `base`, `bundle`, `playbook`, `tasks`, `machines`, `agents`), because the generator writes a `Load` function for each module. The modules import each other without a cycle: `tasks` ← `Bundle` ← `base` ← `Playbook`, `Config`. The schema has no `@go.Package` annotations, so projects do not need the `pkl-go` package at evaluation time.
+The script runs the `pkl-go` code generator (`package://pkg.pkl-lang.org/pkl-go/pkl.golang@0.14.0#/gen.pkl`) with the pinned `pkl` binary. Each schema module maps to its own Go package under `internal/pklgen` (`config`, `base`, `bundle`, `tasks`, `machines`, `agents`), because the generator writes a `Load` function for each module. The modules import each other without a cycle: `tasks` ← `Bundle` ← `base` ← `Config`. The schema has no `@go.Package` annotations, so projects do not need the `pkl-go` package at evaluation time.
 
 ## Pinned pkl
 

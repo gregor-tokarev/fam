@@ -9,7 +9,7 @@ import (
 
 // The task types of FAM.
 //
-// Bundles and playbooks use the same task types.
+// The task types of bundles.
 // Import this module with a different name, because `tasks` is also a property name:
 //
 // ```

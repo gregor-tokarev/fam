@@ -425,7 +425,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 					reconnect = true
 				}
 				// A Service task that restarted its unit satisfies the restart requests before it.
-				// Requests after it still restart the unit at the end of the playbook.
+				// Requests after it still restart the unit at the end of the bundle.
 				if len(env.restarted) > 0 {
 					kept := units[:0]
 					for _, u := range units {
@@ -441,7 +441,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 				}
 			}
 		}
-		// Restart each changed unit once, at the end of the playbook. No restart after a failure.
+		// Restart each changed unit once, at the end of the bundle. No restart after a failure.
 		if s.RestartUnits && !failedInSection && !stopped {
 			seen := map[Unit]bool{}
 			for _, u := range units {

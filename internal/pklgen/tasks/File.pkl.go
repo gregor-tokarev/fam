@@ -46,10 +46,12 @@ type FileImpl struct {
 	// On a worker, FAM runs `sudo -n`. On the cockpit, FAM asks for the password once.
 	Sudo bool `pkl:"sudo"`
 
-	// Units that FAM restarts once, at the end of the playbook, when this task made a change.
+	// Units that FAM restarts once, at the end of the bundle, when this task made a change.
 	//
 	// FAM does not restart units after a failed task.
-	// A unit managed by a [Service] task in the same playbook uses the scope of that task.
+	// FAM does not restart units for a bundle with the state `"absent"`.
+	// A unit managed by a [Service] task in the same bundle uses the scope of that task (when the
+	// bundle has a user and a system Service task with this name, the rule below applies).
 	// Other units use the system scope when [sudo] is `true`, and the user scope when it is `false`.
 	Restarts []string `pkl:"restarts"`
 }
@@ -83,10 +85,12 @@ func (rcv FileImpl) GetSudo() bool {
 	return rcv.Sudo
 }
 
-// Units that FAM restarts once, at the end of the playbook, when this task made a change.
+// Units that FAM restarts once, at the end of the bundle, when this task made a change.
 //
 // FAM does not restart units after a failed task.
-// A unit managed by a [Service] task in the same playbook uses the scope of that task.
+// FAM does not restart units for a bundle with the state `"absent"`.
+// A unit managed by a [Service] task in the same bundle uses the scope of that task (when the
+// bundle has a user and a system Service task with this name, the rule below applies).
 // Other units use the system scope when [sudo] is `true`, and the user scope when it is `false`.
 func (rcv FileImpl) GetRestarts() []string {
 	return rcv.Restarts

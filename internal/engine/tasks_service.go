@@ -291,7 +291,11 @@ type LingerTask struct {
 	base
 	User   string
 	Absent bool
+	units  []Unit
 }
+
+// Restarts implements Restarter.
+func (t *LingerTask) Restarts() []Unit { return t.units }
 
 // Kind implements Task.
 func (t *LingerTask) Kind() string { return "linger" }

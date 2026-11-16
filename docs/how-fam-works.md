@@ -6,20 +6,19 @@
 
 1. **Validate.** FAM checks that `.fam/VERSION` is the version of the binary and that the project has the directories that the config needs. It evaluates only the `machines` mapping and `secrets` (Pkl is lazy, so nothing that depends on the facts of a machine), checks that at most one machine is the cockpit, and reads the secrets file.
 2. **Collect facts.** FAM runs one shell script on each machine: over SSH for workers, locally for the cockpit. Machines run in parallel. `--serial` runs them one at a time. FAM stops on a Windows machine.
-3. **Evaluate.** FAM evaluates the full config for each machine, with the facts of that machine as the Pkl properties `fam.<name>`, and checks the rules that Pkl cannot check: bundle names, playbook machine names, and scripts with a check.
+3. **Evaluate.** FAM evaluates the full config for each machine, with the facts of that machine as the Pkl properties `fam.<name>`, and checks the rules that Pkl cannot check: bundle names and scripts with a check.
 4. **Plan.** FAM runs the check of every task. A check changes nothing.
 5. **Apply** (`fam apply` only). FAM stops on a machine with a conflict before it changes anything. Then for each task: check, apply when the check finds a difference, and check again. A task that fails stops the tasks after it on that machine. FAM never runs apply after a check error.
-6. **Restart.** At the end of each playbook, FAM restarts each changed unit once. FAM does not restart units after a failure.
+6. **Restart.** At the end of each present bundle, FAM restarts each unit that a changed task names in `restarts` once. FAM does not restart units after a failure, and not for a bundle with `state = "absent"`.
 7. **Verify.** FAM runs the verify scripts of the bundles and the agent checks in new shells.
 
 ## Task order on a machine
 
 1. Environment: `~/.config/fam/secrets.env`, `~/.config/fam/env.sh`, and the loader blocks.
 2. Agents: the CLI package, then the settings merge, for each agent. They come after the environment, so that the installers see its variables (for example a proxy).
-3. Bundles, in the order of `config.pkl`. A machine entry replaces the global entry with the same name at its position. Machine-only bundles come after the global bundles.
+3. Bundles: first the `bundles` of `config.pkl` (every machine), then the bundles of the machine's role (`roles` in `config.pkl`), then the `bundles` of the machine entry, each in list order. An entry with the name of an earlier bundle replaces it at its position, so a role or a machine can change or remove (`state = "absent"`) a bundle of every machine.
 4. Skills.
 5. Instructions.
-6. Playbooks, in the order of `config.pkl`.
 
 ## Check exit codes
 

@@ -53,7 +53,7 @@ func (e *Evaluator) Eval(ctx context.Context, props map[string]string) (*config.
 }
 
 // MachineList evaluates only the machines mapping: name, role, address, and user of each machine.
-// Pkl is lazy, so this does not evaluate bundles or playbooks that depend on the machine facts.
+// Pkl is lazy, so this does not evaluate bundles that depend on the machine facts.
 func (e *Evaluator) MachineList(ctx context.Context, props map[string]string) ([]Machine, error) {
 	ev, err := e.manager.NewEvaluator(ctx, pkl.WithDefaultAllowedModules, pkl.WithDefaultAllowedResources, pkl.WithDefaultCacheDir,
 		func(o *pkl.EvaluatorOptions) {
@@ -102,7 +102,12 @@ type EvalError struct {
 }
 
 func (e *EvalError) Error() string {
-	return fmt.Sprintf("evaluate %s:\n%s", e.Path, strings.TrimSpace(e.Err.Error()))
+	msg := fmt.Sprintf("evaluate %s:\n%s", e.Path, strings.TrimSpace(e.Err.Error()))
+	if strings.Contains(msg, "playbooks") || strings.Contains(msg, "Playbook.pkl") {
+		msg += "\n\nFAM 0.2.0 has no playbooks. Make each playbook a bundle (amends \".fam/Bundle.pkl\" with a `name`), " +
+			"and list it in `roles { [\"worker\"] { bundles { … } } }` of config.pkl, or in the `bundles` of a machine"
+	}
+	return msg
 }
 
 // FileFromURI converts a `file:` URI from `reflect.Module(module).uri` to a path.
@@ -112,7 +117,7 @@ func FileFromURI(uri string) (string, error) {
 		return "", err
 	}
 	if u.Scheme != "file" {
-		return "", fmt.Errorf("module %s is not a local file. FAM supports only file modules for bundles and playbooks", uri)
+		return "", fmt.Errorf("module %s is not a local file. FAM supports only file modules for bundles", uri)
 	}
 	return u.Path, nil
 }

@@ -29,7 +29,7 @@
     "name": "drift is found and repaired",
     "result": "pass",
     "detail": "drift in 5 tasks found and repaired, copy of the hand-edited AGENTS.md saved",
-    "duration": "24s"
+    "duration": "32s"
   },
   {
     "target": "alpine-3.24",
@@ -53,7 +53,7 @@
     "name": "secrets in shells, never in output or logs",
     "result": "pass",
     "detail": "6 shells export both secrets; values absent from 12 outputs and 6 run logs",
-    "duration": "33s"
+    "duration": "34s"
   },
   {
     "target": "alpine-3.24",
@@ -61,7 +61,7 @@
     "name": "check exit 1 never applies, failed task stops the rest",
     "result": "pass",
     "detail": "check exit 1: no apply; apply exit 7: next task skipped",
-    "duration": "22s"
+    "duration": "30s"
   },
   {
     "target": "alpine-3.24",
@@ -69,7 +69,7 @@
     "name": "network stop gives a connection error (255)",
     "result": "pass",
     "detail": "error: connection error to vm (fam@fam-alpine-3-24): ssh exit code 255: no message from ssh",
-    "duration": "45s"
+    "duration": "37s"
   },
   {
     "target": "alpine-3.24",
@@ -85,7 +85,7 @@
     "name": "unknown template variable stops FAM",
     "result": "pass",
     "detail": "error: instruction template /home/gregor/.cache/fam-acceptance/run/projects/alpine-3.24-s11/instructions-bad/AGENTS.md: template: AGENTS.md:1:10: executing \"AGENTS.md\" at \u003c.Agent\u003e: map has no entry for key \"Agent\"",
-    "duration": "28s"
+    "duration": "20s"
   },
   {
     "target": "alpine-3.24",
@@ -93,7 +93,7 @@
     "name": "Claude Code and Codex: install, update, settings, paths",
     "result": "pass",
     "detail": "pinned 27 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
-    "duration": "1m33s"
+    "duration": "1m22s"
   },
   {
     "target": "alpine-3.24",
@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "1m0s"
+    "duration": "1m1s"
   },
   {
     "target": "alpine-3.24",
@@ -109,7 +109,7 @@
     "name": "systemd tasks fail with a clear error without systemd",
     "result": "pass",
     "detail": "error: the Service task fam-demo.service needs systemd or launchd, but vm (alpine 3.24.4) has no supported service manager (init: none)",
-    "duration": "29s"
+    "duration": "21s"
   },
   {
     "target": "alpine-3.24",
@@ -117,6 +117,6 @@
     "name": "package from the OS package manager, chosen in config.pkl, then removed",
     "result": "pass",
     "detail": "tree (apk): changed, then removed",
-    "duration": "33s"
+    "duration": "25s"
   }
 ]

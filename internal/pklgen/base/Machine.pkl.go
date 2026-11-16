@@ -25,8 +25,8 @@ type Machine struct {
 
 	// Bundles for this machine only.
 	//
-	// An entry here wins over the bundle with the same `name` in `config.pkl`.
-	// Use `new { bundle = …; state = "absent" }` to remove a global bundle from this machine.
+	// An entry here wins over the bundle with the same `name` in `bundles` or `roles` of `config.pkl`.
+	// Use `new { bundle = …; state = "absent" }` to remove such a bundle from this machine.
 	Bundles []any `pkl:"bundles"`
 
 	// The package manager for a package name on this machine, for example

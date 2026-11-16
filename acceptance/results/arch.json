@@ -5,7 +5,7 @@
     "name": "plan shows the changes and changes nothing",
     "result": "pass",
     "detail": "27 changes, 2 satisfied",
-    "duration": "16s"
+    "duration": "21s"
   },
   {
     "target": "arch",
@@ -13,7 +13,7 @@
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
     "detail": "first apply 27 changed, second plan 29 satisfied, second apply 0 changed",
-    "duration": "25s"
+    "duration": "19s"
   },
   {
     "target": "arch",
@@ -29,7 +29,7 @@
     "name": "drift is found and repaired",
     "result": "pass",
     "detail": "drift in 5 tasks found and repaired, copy of the hand-edited AGENTS.md saved",
-    "duration": "20s"
+    "duration": "21s"
   },
   {
     "target": "arch",

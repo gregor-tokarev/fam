@@ -42,7 +42,7 @@ func New(opts NewOptions) ([]string, error) {
 		"skills/.gitkeep":            "",
 		"bundles/hello.pkl":          helloBundle,
 		"bundles/files/fam-hello.sh": helloScript,
-		"setup/worker.pkl":           workerPlaybook,
+		"setup/worker.pkl":           workerSetup,
 		".gitignore":                 "",
 	}
 	names := make([]string, 0, len(files))
@@ -140,8 +140,9 @@ agents = import("agents.pkl").agents
 //   file = "~/.config/fam/secrets.env"
 // }
 
-playbooks {
-  import("setup/worker.pkl")
+// Bundles for every machine with a role, after the bundles of every machine.
+roles {
+  ["worker"] { bundles { import("setup/worker.pkl") } }
 }
 `
 
@@ -190,13 +191,12 @@ const helloScript = `#!/bin/sh
 echo "${FAM_HELLO_GREETING:-Hello} ($(hostname))"
 `
 
-const workerPlaybook = `amends "../.fam/Playbook.pkl"
+const workerSetup = `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 import "../.fam/facts.pkl"
 
-description = "An example playbook for workers"
-
-roles { "worker" }
+name = "worker-setup"
+description = "An example setup for the worker machines"
 
 tasks {
   when (facts.os == "linux") {

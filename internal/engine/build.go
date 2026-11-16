@@ -7,12 +7,12 @@ import (
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
 )
 
-// Step is one task in a playbook section, with the units that it restarts.
+// Section is the tasks of one group, in run order.
 type Section struct {
-	// Name is the group name, for example "playbook worker".
+	// Name is the group name, for example "bundle worker-setup".
 	Name  string
 	Tasks []Task
-	// RestartUnits marks the sections that restart units at their end (playbooks).
+	// RestartUnits marks the sections that restart units at their end (present bundles).
 	RestartUnits bool
 }
 
@@ -52,7 +52,7 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string) (Tas
 	case tasks.Service:
 		return &ServiceTask{base: b, Unit: x.GetName(), Scope: x.GetScope(), Content: x.GetContent(), Enabled: x.GetEnabled(), Running: x.GetRunning(), Absent: isAbsent(string(x.GetState())), units: units}, nil
 	case tasks.Linger:
-		lt := &LingerTask{base: b, Absent: isAbsent(string(x.GetState()))}
+		lt := &LingerTask{base: b, Absent: isAbsent(string(x.GetState())), units: units}
 		if u := x.GetUser(); u != nil {
 			lt.User = *u
 		}
@@ -113,7 +113,9 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string) (Tas
 }
 
 // BundleSection returns the tasks of one bundle. An absent bundle undoes its typed tasks
-// in reverse order, then runs its uninstall tasks.
+// in reverse order, then runs its uninstall tasks. A present bundle restarts the units of its
+// changed tasks once, at its end. A restart of a unit that a Service task of the same bundle
+// manages uses the scope of that task.
 func BundleSection(u config.BundleUse, pm map[string]string) (Section, error) {
 	group := "bundle " + u.Bundle.Name
 	sec := Section{Name: group}
@@ -136,35 +138,30 @@ func BundleSection(u config.BundleUse, pm map[string]string) (Section, error) {
 		}
 		return sec, nil
 	}
+	sec.RestartUnits = true
+	// The scope of each unit that a Service task of this bundle manages. A name with a user and
+	// a system Service task is ambiguous: its restarts keep the scope from the `sudo` of the task.
+	scopes := map[string]string{}
+	ambiguous := map[string]bool{}
+	for _, t := range u.Bundle.Tasks {
+		if s, ok := t.(tasks.Service); ok {
+			if prev, ok := scopes[s.GetName()]; ok && prev != s.GetScope() {
+				ambiguous[s.GetName()] = true
+			}
+			scopes[s.GetName()] = s.GetScope()
+		}
+	}
+	for n := range ambiguous {
+		delete(scopes, n)
+	}
 	for _, bt := range u.Bundle.Tasks {
 		t, err := convert(bt, group, false, pm)
 		if err != nil {
 			return sec, err
 		}
-		sec.Tasks = append(sec.Tasks, t)
-	}
-	return sec, nil
-}
-
-// PlaybookSection returns the tasks of one playbook. A restart of a unit that a Service task
-// of the same playbook manages uses the scope of that task.
-func PlaybookSection(name string, ts []tasks.Task, pm map[string]string) (Section, error) {
-	group := "playbook " + name
-	sec := Section{Name: group, RestartUnits: true}
-	scopes := map[string]string{}
-	for _, t := range ts {
-		if s, ok := t.(tasks.Service); ok {
-			scopes[s.GetName()] = s.GetScope()
-		}
-	}
-	for _, pt := range ts {
-		t, err := convert(pt, group, false, pm)
-		if err != nil {
-			return sec, err
-		}
 		if r, ok := t.(Restarter); ok {
-			for i, u := range r.Restarts() {
-				if s, ok := scopes[u.Name]; ok {
+			for i, unit := range r.Restarts() {
+				if s, ok := scopes[unit.Name]; ok {
 					r.Restarts()[i].Scope = s
 				}
 			}

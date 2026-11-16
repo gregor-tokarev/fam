@@ -8,7 +8,11 @@ import (
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
 )
 
-// A bundle: one tool with its install tasks, environment, skill, instructions, and checks.
+// A bundle: a reusable part of the config. Usually one tool or one piece of machine setup, with
+// its tasks, environment, skill, instructions, and checks.
+//
+// `config.pkl` selects the machines: `bundles` (every machine), `roles` (every machine with a
+// role), or the `bundles` of one machine. A bundle itself does not know the machines.
 //
 // A bundle file amends this module:
 //

@@ -61,7 +61,7 @@
     "name": "check exit 1 never applies, failed task stops the rest",
     "result": "pass",
     "detail": "check exit 1: no apply; apply exit 7: next task skipped",
-    "duration": "16s"
+    "duration": "15s"
   },
   {
     "target": "ubuntu-26.04",
@@ -69,7 +69,7 @@
     "name": "network stop gives a connection error (255)",
     "result": "pass",
     "detail": "error: connection error to vm (fam@fam-ubuntu-26-04): ssh exit code 255: mux_client_request_session: read from master failed: Broken pipe\r",
-    "duration": "34s"
+    "duration": "35s"
   },
   {
     "target": "ubuntu-26.04",
@@ -93,7 +93,7 @@
     "name": "Claude Code and Codex: install, update, settings, paths",
     "result": "pass",
     "detail": "pinned 28 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
-    "duration": "1m1s"
+    "duration": "1m0s"
   },
   {
     "target": "ubuntu-26.04",
@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "1m5s"
+    "duration": "1m1s"
   },
   {
     "target": "ubuntu-26.04",
@@ -117,6 +117,6 @@
     "name": "package from the OS package manager, chosen in config.pkl, then removed",
     "result": "pass",
     "detail": "tree (apt): changed, then removed",
-    "duration": "25s"
+    "duration": "27s"
   }
 ]

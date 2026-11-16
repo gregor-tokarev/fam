@@ -7,7 +7,7 @@ import (
 	"github.com/apple/pkl-go/pkl"
 	"github.com/gregor-tokarev/fam/internal/pklgen/base"
 	"github.com/gregor-tokarev/fam/internal/pklgen/base/agentname"
-	"github.com/gregor-tokarev/fam/internal/pklgen/playbook"
+	"github.com/gregor-tokarev/fam/internal/pklgen/base/role"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks/manager"
 )
 
@@ -20,10 +20,13 @@ import (
 // import ".fam/std.pkl"
 //
 // bundles { std.agentBrowser }
+// roles { ["worker"] { bundles { import("setup/worker.pkl") } } }
 // machines = import("machines.pkl").machines
 // agents = import("agents.pkl").agents
-// playbooks { import("setup/worker.pkl") }
 // ```
+//
+// A machine gets the bundles of `bundles`, then the bundles of its role in `roles`, then its own
+// `bundles` (in `machines`). FAM runs them in this order.
 //
 // FAM evaluates this module once for each machine, with the facts of that machine.
 type Config struct {
@@ -44,8 +47,16 @@ type Config struct {
 	// How FAM gives secrets to the machines. When it is `null`, FAM does not manage secrets.
 	Secrets *base.Secrets `pkl:"secrets"`
 
-	// All playbooks of the project.
-	Playbooks []playbook.Playbook `pkl:"playbooks"`
+	// Bundles for every machine with a role, after the bundles of every machine.
+	//
+	// ```
+	// roles {
+	//   ["worker"] { bundles { import("setup/worker.pkl") } }
+	// }
+	// ```
+	//
+	// An entry here wins over the bundle with the same `name` in [bundles].
+	Roles map[role.Role]base.RoleBundles `pkl:"roles"`
 
 	// The package manager for a package name, for every machine.
 	//
