@@ -1,0 +1,32 @@
+// curl jq rg rsync tar unzip, Python, Git, GitHub CLI, a C/C++ compiler, make, pkg-config, socat.
+// Uses the OS package manager.
+amends "../.fam/Bundle.pkl"
+import "../.fam/tasks.pkl" as fam
+import "../.fam/facts.pkl"
+
+name = "base-packages"
+description = "Common command line tools from the OS package manager"
+
+local apt = "curl jq ripgrep rsync tar unzip python3 git gh build-essential pkg-config socat"
+local dnf = "curl jq ripgrep rsync tar unzip python3 git gh gcc gcc-c++ make pkgconf-pkg-config socat"
+local pacman = "curl jq ripgrep rsync tar unzip python git github-cli base-devel pkgconf socat"
+local brew = "jq ripgrep rsync gh pkg-config socat"
+
+local checkAll = #"for b in curl jq rg rsync tar unzip python3 git gh cc c++ make pkg-config socat; do command -v "$b" >/dev/null 2>&1 || { echo "missing $b"; exit 100; }; done"#
+
+tasks {
+  new fam.Script {
+    name = "OS packages"
+    sudo = facts.os == "linux"
+    check = checkAll
+    apply =
+      if (facts.os == "darwin") "brew install \(brew)"
+      else if (facts.distro == "fedora") "dnf install -y \(dnf)"
+      else if (facts.distro == "arch") "pacman -Sy --needed --noconfirm \(pacman)"
+      else "DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \(apt)"
+  }
+}
+
+verify {
+  new { name = "base tools"; event = "fresh_shell"; script = checkAll.replaceAll("exit 100", "exit 1") }
+}

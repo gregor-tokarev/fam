@@ -1,0 +1,18 @@
+amends ".fam/Machines.pkl"
+
+// The laptop runs FAM. The workers need only SSH: FAM connects as `user`.
+machines {
+  ["laptop"] {
+    role = "cockpit"
+  }
+  ["worker1"] {
+    role = "worker"
+    address = "worker1.example.com"
+    user = "dev"
+  }
+  ["worker2"] {
+    role = "worker"
+    address = "worker2.example.com"
+    user = "dev"
+  }
+}

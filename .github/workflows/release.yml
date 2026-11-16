@@ -1,0 +1,30 @@
+name: release
+
+# Push a tag v<version> on main to publish a release:
+#   git tag v0.2.0 && git push origin v0.2.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: scripts/build-release.sh "${GITHUB_REF_NAME#v}" dist
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # A tag with a suffix (v0.3.0-rc.1) is a prerelease: install.sh and `fam update` skip it
+        # unless the user asks for that version.
+        run: |
+          pre=
+          case "$GITHUB_REF_NAME" in *-*) pre=--prerelease ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes $pre --title "fam ${GITHUB_REF_NAME#v}"

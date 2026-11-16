@@ -1,0 +1,17 @@
+amends "../.fam/Bundle.pkl"
+import "../.fam/tasks.pkl" as fam
+
+name = "typescript"
+description = "The TypeScript compiler, a global JavaScript package"
+
+tasks {
+  // `package` alone uses npm. config.pkl selects Vite+ for it with `packageManagers`.
+  new fam.Package {
+    package = "typescript"
+    binary = "tsc"
+  }
+}
+
+verify {
+  new { event = "fresh_shell"; script = "tsc --version" }
+}

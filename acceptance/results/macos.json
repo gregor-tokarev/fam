@@ -1,0 +1,130 @@
+[
+  {
+    "target": "macos",
+    "n": 1,
+    "name": "plan shows the changes and changes nothing",
+    "result": "pass",
+    "detail": "23 changes, 3 satisfied",
+    "duration": "56s"
+  },
+  {
+    "target": "macos",
+    "n": 2,
+    "name": "apply, then plan is satisfied and apply changes nothing",
+    "result": "pass",
+    "detail": "first apply 23 changed, second plan 26 satisfied, second apply 0 changed",
+    "duration": "1m11s"
+  },
+  {
+    "target": "macos",
+    "n": 3,
+    "name": "verify: fresh_shell and reconnect",
+    "result": "pass",
+    "detail": "5 checks passed",
+    "duration": "1m6s"
+  },
+  {
+    "target": "macos",
+    "n": 4,
+    "name": "drift is found and repaired",
+    "result": "pass",
+    "detail": "drift in 5 tasks found and repaired, copy of the hand-edited AGENTS.md saved",
+    "duration": "1m13s"
+  },
+  {
+    "target": "macos",
+    "n": 5,
+    "name": "absent bundle removes skill, links, files, instruction lines",
+    "result": "pass",
+    "detail": "file, link, merged keys, skill, Claude link, instruction lines, variables removed",
+    "duration": "1m8s"
+  },
+  {
+    "target": "macos",
+    "n": 6,
+    "name": "global bundle removed on one machine",
+    "result": "pass",
+    "detail": "global bundle removed by the machine entry, other bundles kept",
+    "duration": "1m5s"
+  },
+  {
+    "target": "macos",
+    "n": 7,
+    "name": "secrets in shells, never in output or logs",
+    "result": "pass",
+    "detail": "6 shells export both secrets; values absent from 12 outputs and 6 run logs",
+    "duration": "1m9s"
+  },
+  {
+    "target": "macos",
+    "n": 8,
+    "name": "check exit 1 never applies, failed task stops the rest",
+    "result": "pass",
+    "detail": "check exit 1: no apply; apply exit 7: next task skipped",
+    "duration": "1m4s"
+  },
+  {
+    "target": "macos",
+    "n": 9,
+    "name": "network stop gives a connection error (255)",
+    "result": "pass",
+    "detail": "error: connection error to vm (fam@fam-macos): ssh exit code 255: no message from ssh",
+    "duration": "1m23s"
+  },
+  {
+    "target": "macos",
+    "n": 10,
+    "name": "foreign skill folder makes the plan stop with a conflict",
+    "result": "pass",
+    "detail": "conflict: the skill folder /Users/fam/.agents/skills/tool-skill exists and FAM did not make it. Remove or rename it, or rename the skill",
+    "duration": "56s"
+  },
+  {
+    "target": "macos",
+    "n": 11,
+    "name": "unknown template variable stops FAM",
+    "result": "pass",
+    "detail": "error: instruction template /home/gregor/.cache/fam-acceptance/run/projects/macos-s11/instructions-bad/AGENTS.md: template: AGENTS.md:1:10: executing \"AGENTS.md\" at \u003c.Agent\u003e: map has no entry for key \"Agent\"",
+    "duration": "51s"
+  },
+  {
+    "target": "macos",
+    "n": 12,
+    "name": "Claude Code and Codex: install, update, settings, paths",
+    "result": "pass",
+    "detail": "pinned 26 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
+    "duration": "2m21s"
+  },
+  {
+    "target": "macos",
+    "n": 14,
+    "name": "standard bundle agentBrowser",
+    "result": "pass",
+    "detail": "27 changed; agent-browser 0.43.0",
+    "duration": "1m33s"
+  },
+  {
+    "target": "macos",
+    "n": 15,
+    "name": "systemd tasks fail with a clear error without systemd",
+    "result": "skip",
+    "detail": "the target has launchd",
+    "duration": ""
+  },
+  {
+    "target": "macos",
+    "n": 16,
+    "name": "FAM as the cockpit inside the macOS VM (local execution)",
+    "result": "blocked",
+    "detail": "fam plan inside the Mac (role cockpit) stops: pkl 0.33.0 has no native binary for darwin/amd64. The VM is Intel (KVM on x86-64); the pinned pkl has only macos-aarch64.",
+    "duration": ""
+  },
+  {
+    "target": "macos",
+    "n": 17,
+    "name": "package from the OS package manager, chosen in config.pkl, then removed",
+    "result": "skip",
+    "detail": "macOS has no OS package manager in the base image",
+    "duration": ""
+  }
+]

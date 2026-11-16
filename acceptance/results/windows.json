@@ -1,0 +1,10 @@
+[
+  {
+    "target": "windows",
+    "n": 1,
+    "name": "Windows: FAM stops with a clear error",
+    "result": "pass",
+    "detail": "Windows Server 2025 (10.0.26100.1742) in dockur/windows, OpenSSH with cmd.exe: fam plan exit 1, machine status error, errorKind unsupported: Windows is not supported. FAM manages Linux and macOS machines only",
+    "duration": ""
+  }
+]

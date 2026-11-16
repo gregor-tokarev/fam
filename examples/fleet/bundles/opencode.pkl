@@ -1,0 +1,19 @@
+amends "../.fam/Bundle.pkl"
+import "../.fam/tasks.pkl" as fam
+
+name = "opencode"
+description = "OpenCode"
+path { "~/.opencode/bin" }
+
+tasks {
+  new fam.Package {
+    binary = "opencode"
+    install = "curl -fsSL https://opencode.ai/install | bash"
+    update = "opencode upgrade"
+    versionCommand = "opencode --version"
+  }
+}
+
+verify {
+  new { event = "fresh_shell"; script = "opencode --version" }
+}

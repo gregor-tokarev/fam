@@ -1,0 +1,10 @@
+[
+  {
+    "target": "pair",
+    "n": 13,
+    "name": "two VMs in parallel, then --serial (ubuntu-26.04 + debian-13)",
+    "result": "pass",
+    "detail": "parallel apply 3s; serial plan 1s; serial apply 2s; output grouped by machine",
+    "duration": "7s"
+  }
+]

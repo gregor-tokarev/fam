@@ -1,0 +1,122 @@
+[
+  {
+    "target": "arch",
+    "n": 1,
+    "name": "plan shows the changes and changes nothing",
+    "result": "pass",
+    "detail": "27 changes, 2 satisfied",
+    "duration": "16s"
+  },
+  {
+    "target": "arch",
+    "n": 2,
+    "name": "apply, then plan is satisfied and apply changes nothing",
+    "result": "pass",
+    "detail": "first apply 27 changed, second plan 29 satisfied, second apply 0 changed",
+    "duration": "25s"
+  },
+  {
+    "target": "arch",
+    "n": 3,
+    "name": "verify: fresh_shell and reconnect",
+    "result": "pass",
+    "detail": "5 checks passed",
+    "duration": "18s"
+  },
+  {
+    "target": "arch",
+    "n": 4,
+    "name": "drift is found and repaired",
+    "result": "pass",
+    "detail": "drift in 5 tasks found and repaired, copy of the hand-edited AGENTS.md saved",
+    "duration": "20s"
+  },
+  {
+    "target": "arch",
+    "n": 5,
+    "name": "absent bundle removes skill, links, files, instruction lines",
+    "result": "pass",
+    "detail": "file, link, merged keys, skill, Claude link, instruction lines, variables removed",
+    "duration": "19s"
+  },
+  {
+    "target": "arch",
+    "n": 6,
+    "name": "global bundle removed on one machine",
+    "result": "pass",
+    "detail": "global bundle removed by the machine entry, other bundles kept",
+    "duration": "19s"
+  },
+  {
+    "target": "arch",
+    "n": 7,
+    "name": "secrets in shells, never in output or logs",
+    "result": "pass",
+    "detail": "6 shells export both secrets; values absent from 12 outputs and 6 run logs",
+    "duration": "22s"
+  },
+  {
+    "target": "arch",
+    "n": 8,
+    "name": "check exit 1 never applies, failed task stops the rest",
+    "result": "pass",
+    "detail": "check exit 1: no apply; apply exit 7: next task skipped",
+    "duration": "18s"
+  },
+  {
+    "target": "arch",
+    "n": 9,
+    "name": "network stop gives a connection error (255)",
+    "result": "pass",
+    "detail": "error: connection error to vm (fam@fam-arch): ssh exit code 255: mux_client_request_session: read from master failed: Broken pipe\r",
+    "duration": "37s"
+  },
+  {
+    "target": "arch",
+    "n": 10,
+    "name": "foreign skill folder makes the plan stop with a conflict",
+    "result": "pass",
+    "detail": "conflict: the skill folder /home/fam/.agents/skills/tool-skill exists and FAM did not make it. Remove or rename it, or rename the skill",
+    "duration": "21s"
+  },
+  {
+    "target": "arch",
+    "n": 11,
+    "name": "unknown template variable stops FAM",
+    "result": "pass",
+    "detail": "error: instruction template /home/gregor/.cache/fam-acceptance/run/projects/arch-s11/instructions-bad/AGENTS.md: template: AGENTS.md:1:10: executing \"AGENTS.md\" at \u003c.Agent\u003e: map has no entry for key \"Agent\"",
+    "duration": "20s"
+  },
+  {
+    "target": "arch",
+    "n": 12,
+    "name": "Claude Code and Codex: install, update, settings, paths",
+    "result": "pass",
+    "detail": "pinned 31 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
+    "duration": "1m3s"
+  },
+  {
+    "target": "arch",
+    "n": 14,
+    "name": "standard bundle agentBrowser",
+    "result": "pass",
+    "detail": "33 changed; agent-browser 0.43.0",
+    "duration": "1m7s"
+  },
+  {
+    "target": "arch",
+    "n": 15,
+    "name": "systemd tasks fail with a clear error without systemd",
+    "result": "skip",
+    "detail": "the target has systemd",
+    "duration": ""
+  },
+  {
+    "target": "arch",
+    "n": 17,
+    "name": "package from the OS package manager, chosen in config.pkl, then removed",
+    "result": "pass",
+    "detail": "tree (pacman): changed, then removed",
+    "duration": "21s"
+  }
+]

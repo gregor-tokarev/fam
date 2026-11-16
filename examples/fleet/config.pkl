@@ -1,0 +1,35 @@
+// An example fleet: one laptop that runs FAM and two worker machines for coding agents.
+amends ".fam/Config.pkl"
+import ".fam/std.pkl"
+
+// Tools for every machine.
+bundles {
+  import("bundles/base-packages.pkl")
+  import("bundles/rust.pkl")
+  import("bundles/go.pkl")
+  import("bundles/vite-plus.pkl")
+  import("bundles/bun.pkl")
+  import("bundles/opencode.pkl")
+  import("bundles/typescript.pkl")
+  std.agentBrowser
+}
+
+machines = import("machines.pkl").machines
+agents = import("agents.pkl").agents
+
+// One secrets file on the laptop, outside this repository.
+// secrets.env.example lists the names. FAM never shows the values.
+secrets {
+  delivery = "copy-file"
+  file = "~/.config/fam/fleet-secrets.env"
+}
+
+playbooks {
+  import("setup/worker.pkl")
+}
+
+// Node.js comes from Vite+, so the JavaScript CLIs use the global packages of Vite+ instead of npm.
+packageManagers {
+  ["agent-browser"] = "vite"
+  ["typescript"] = "vite"
+}

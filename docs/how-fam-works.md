@@ -1,0 +1,146 @@
+# How FAM works
+
+## Run order
+
+`fam plan`, `fam apply`, and `fam verify` do these steps:
+
+1. **Validate.** FAM checks that `.fam/VERSION` is the version of the binary and that the project has the directories that the config needs. It evaluates only the `machines` mapping and `secrets` (Pkl is lazy, so nothing that depends on the facts of a machine), checks that at most one machine is the cockpit, and reads the secrets file.
+2. **Collect facts.** FAM runs one shell script on each machine: over SSH for workers, locally for the cockpit. Machines run in parallel. `--serial` runs them one at a time. FAM stops on a Windows machine.
+3. **Evaluate.** FAM evaluates the full config for each machine, with the facts of that machine as the Pkl properties `fam.<name>`, and checks the rules that Pkl cannot check: bundle names, playbook machine names, and scripts with a check.
+4. **Plan.** FAM runs the check of every task. A check changes nothing.
+5. **Apply** (`fam apply` only). FAM stops on a machine with a conflict before it changes anything. Then for each task: check, apply when the check finds a difference, and check again. A task that fails stops the tasks after it on that machine. FAM never runs apply after a check error.
+6. **Restart.** At the end of each playbook, FAM restarts each changed unit once. FAM does not restart units after a failure.
+7. **Verify.** FAM runs the verify scripts of the bundles and the agent checks in new shells.
+
+## Task order on a machine
+
+1. Environment: `~/.config/fam/secrets.env`, `~/.config/fam/env.sh`, and the loader blocks.
+2. Agents: the CLI package, then the settings merge, for each agent. They come after the environment, so that the installers see its variables (for example a proxy).
+3. Bundles, in the order of `config.pkl`. A machine entry replaces the global entry with the same name at its position. Machine-only bundles come after the global bundles.
+4. Skills.
+5. Instructions.
+6. Playbooks, in the order of `config.pkl`.
+
+## Check exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Satisfied |
+| `100` | Changes required |
+| Any other | Error. FAM never runs apply after an error. |
+| `255` from SSH | Connection error. FAM classifies it before the script result. |
+
+## Transport
+
+One interface (`internal/transport`) with an SSH and a local implementation. Its operations: run a command, read a file, write a file atomically (a temporary file in the same directory, then a rename), and get file information. Both implementations run the same POSIX shell scripts. FAM selects OS-specific commands from the facts, for example `sha256sum` or `shasum -a 256`, and `stat -c` or `stat -f`.
+
+SSH uses the system `ssh` with `ControlMaster=auto`, `ControlPersist=120`, `BatchMode=yes`, and `ServerAliveInterval=5` (`ServerAliveCountMax=3`). The control sockets are in `$TMPDIR/fam-<uid>/`. `--ssh-config <file>` (or `FAM_SSH_CONFIG`) gives a config file to `ssh -F`. Without it, `ssh` reads `~/.ssh/config`.
+
+`sudo`:
+
+- On workers, FAM runs `sudo -n`. The SSH user needs passwordless sudo for tasks with `sudo = true`.
+- On the cockpit, FAM first tries `sudo -n true`. When sudo needs a password, FAM asks once in the terminal with hidden input and tests it with `sudo -v`. Without a terminal, FAM reads `--sudo-password-file`. FAM keeps the password in memory and gives it to `sudo -k -S` (`-k` makes sudo read the password every time, so the password never reaches the command). It never writes the password.
+- A command with `sudo` never reads data from stdin. To write a file with `sudo`, FAM writes a temporary file as the user first.
+
+User scripts (`Script`, `Package`) run in Bash when the machine has Bash, else in `sh`. Before the script, FAM loads `~/.config/fam/env.sh` and puts `~/.local/bin` in `PATH`.
+
+## Paths on each machine
+
+| Path | Content |
+|---|---|
+| `~/.config/fam/env.sh` | Bundle variables, `~/.local/bin` in `PATH`, and a line that loads the secrets. |
+| `~/.config/fam/secrets.env` | `export NAME='value'` lines, mode `0600`. |
+| `~/.zshenv`, `~/.bashrc`, `~/.profile` | A marked block (`# >>> fam >>>`) that loads `env.sh`. In `~/.bashrc` the block is the first lines, before any line that stops noninteractive shells. FAM also writes the block into `~/.profile` (login shells), and into `~/.bash_profile` and `~/.bash_login` when they exist, because Bash then does not read `~/.profile`. In the other files the block is the last lines. An installer in the same apply (for example the Vite+ installer) can add lines after it, so FAM checks the blocks again at the end of the apply and moves them back. |
+| `~/.ssh/environment` and `/etc/ssh/sshd_config.d/50-fam-bash-env.conf` | Only on Linux machines where the login shell is Bash and Bash does not read `~/.bashrc` for noninteractive SSH commands (Bash built without `SSH_SOURCE_BASHRC`, for example on Arch Linux and Alpine). A marked block in `~/.ssh/environment` sets `BASH_ENV` to `~/.config/fam/env.sh`, and the sshd drop-in allows only that variable (`PermitUserEnvironment BASH_ENV`). FAM tests the sshd configuration before the reload, and opens a new connection before verify. FAM finds such a Bash from the facts: a Bash with this feature contains the string `SSH2_CLIENT`. |
+| `~/.agents/AGENTS.md` | The rendered `instructions/AGENTS.md` and the instruction lines of the bundles. |
+| `~/.agents/CLAUDE.md` | The same content, then the rendered `instructions/CLAUDE.md`. |
+| `~/.codex/AGENTS.md` | A link to `~/.agents/AGENTS.md`. |
+| `~/.claude/CLAUDE.md` | A link to `~/.agents/CLAUDE.md`. |
+| `~/.agents/skills/<name>/` | A copy of each skill, with a `.fam-managed` marker file. |
+| `~/.claude/skills/<name>` | A link to `~/.agents/skills/<name>`. |
+
+FAM stores no state. It finds what it manages from the content:
+
+- Instruction files start with a marker line that holds the SHA-256 of the rest of the file. A file without the marker, or with a different digest, was not written by FAM (or was changed by hand). FAM saves a copy (`<file>.fam-backup-<time>`) before it replaces such a file.
+- A skill folder with `.fam-managed` belongs to FAM. A skill folder or a Claude skill link that FAM did not make is a conflict: the plan stops, and `fam apply` changes nothing on that machine. FAM removes managed skills that the config no longer lists.
+
+## Instruction templates
+
+`instructions/AGENTS.md` and `instructions/CLAUDE.md` are Go `text/template` files with `missingkey=error`. An unknown variable stops FAM. The data:
+
+| Variable | Content |
+|---|---|
+| `.Machine.Name`, `.Machine.Role`, `.Machine.Address`, `.Machine.User` | The machine entry. |
+| `.Facts.OS`, `.Facts.Distro`, `.Facts.DistroVersion`, `.Facts.Arch`, `.Facts.CPUs`, `.Facts.Home`, `.Facts.User`, `.Facts.Hostname`, `.Facts.Init`, `.Facts.Shell`, `.Facts.Machine`, `.Facts.Role` | The facts. |
+
+There is no `.Agent` variable. Bundle instruction lines go into a `## Tools on this machine` section, with one `### <bundle>` heading for each bundle.
+
+## Skills
+
+FAM copies each folder of `skills/` (resolved relative to `--base`, or set with `--skills`) and the skill of each present bundle. The skill name is the folder name. A bundle skill folder with the name `skill` gets the bundle name. Two skills with the same name are an error.
+
+## Secrets
+
+The secrets file on the cockpit has `NAME=value` lines. Empty lines and lines that start with `#` are comments. `export ` before the name is allowed. A value can be in single quotes, or in double quotes with `\"`, `\\`, `\$`, and `` \` `` escapes. FAM stops on:
+
+- a file with a mode other than `0600`, or a file inside the project base,
+- a value with a new line or another control character, an open quote, or `\n`.
+
+FAM writes the values as `export NAME='value'` with `'\''` for a single quote. The plan shows the names. The run log, the text output, JSON, and TOON replace each secret value with `[secret]`. The secrets file goes to the machine through stdin, so it is never in a command line or a log. FAM also hides the old values that it finds in the secrets file of a machine (after a rotation, scripts still load them), and the forms in which a value appears in output: without its outer spaces, and with `'\''` for a single quote.
+
+Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only when its first line is the FAM header. On the cockpit, the source file must not be `~/.config/fam/secrets.env` itself.
+
+## Bundles
+
+- A bundle entry is a bundle module or `new { bundle = …; state = … }`.
+- The `name` identifies a bundle. Two files with the same name are an error.
+- A machine entry wins over the global entry with the same name.
+- An absent bundle undoes its typed tasks in reverse order (`File`, `Symlink`, `Merge` keys, `Service`, `Linger`, `Package` with an `uninstall` command), then runs its `uninstall` tasks. FAM cannot undo a `Script`, so it skips scripts. FAM also removes the skill, the Claude link, the instruction lines, and the variables of the bundle.
+
+## Services
+
+- systemd: user units in `~/.config/systemd/user/`, system units in `/etc/systemd/system/` (system units need `sudo = true`). FAM sets `XDG_RUNTIME_DIR` for `systemctl --user`. A user unit that must run without a login session also needs a `Linger` task.
+- launchd: LaunchAgents in `~/Library/LaunchAgents/` load into the GUI domain of the user (`gui/<uid>`), which exists only while the user is logged in at the screen. Without a GUI session, FAM stops the task with a clear error. Use `scope = "system"` (a LaunchDaemon in `/Library/LaunchDaemons/`) for a service without a login.
+- A machine without systemd or launchd (for example Alpine with OpenRC) stops `Service` and `Linger` tasks with a clear error.
+
+## Packages
+
+A `Package` task names a `package`, and FAM installs, updates, and removes it with a package manager. A string is an npm package; an object selects the manager:
+
+```pkl
+new fam.Package { package = "agent-browser" }                                       // npm
+new fam.Package { package = new { package = "tree"; manager = "apt" } }
+```
+
+`packageManagers` in `config.pkl` (and in a machine entry, which wins) replaces the manager for a package name in every bundle, also in the standard bundles: `packageManagers { ["agent-browser"] = "vite" }`. A bundle cannot be amended in the config for this, because Pkl cannot give the location of an amended module object (`reflect.Module(module)` fails).
+
+| Manager | Is it installed? | Install | Update | Remove | Runs as |
+|---|---|---|---|---|---|
+| `npm` | `npm ls -g` (no global folder yet: not installed) | `npm install -g` | `npm install -g <p>@latest` | `npm uninstall -g` | user |
+| `bun` | `bun pm ls -g` | `bun add -g` | `bun add -g <p>@latest` | `bun remove -g` | user |
+| `vite` | `vp list -g` | `vp install -g` | `vp update -g` | `vp uninstall -g` | user |
+| `brew` | `brew list` | `brew install` | `brew upgrade` | `brew uninstall` | user |
+| `apt` | `dpkg-query` | `apt-get install` | `apt-get install --only-upgrade` | `apt-get remove` | sudo |
+| `dnf` | `rpm -q` | `dnf install` | `dnf upgrade` | `dnf remove` | sudo |
+| `pacman` | `pacman -Q` | `pacman -S --needed` | (none: no partial upgrades; `pacman -Syu` updates the system) | `pacman -R` | sudo |
+| `yay` | `pacman -Q` | `yay -S --needed` | (as pacman) | `yay -R` | user (yay runs sudo) |
+| `apk` | `apk info -e` | `apk add` | `apk add --upgrade` | `apk del` | sudo |
+
+FAM asks the package manager, not `PATH`, whether the package is installed. When the manager itself is missing, the plan shows a change (an earlier bundle can install it), and apply stops with a clear error if it is still missing. `binary` defaults to the package name without its npm scope. Own `install`, `update`, and `uninstall` commands win over the commands of the manager.
+
+## Agents
+
+| Agent | Install | Update | Pin | Settings |
+|---|---|---|---|---|
+| Claude Code | `curl -fsSL https://claude.ai/install.sh \| bash` | `claude update` | `bash -s <version>`, then `claude install <version>` | `~/.claude/settings.json` (JSON merge) |
+| Codex | `curl -fsSL https://chatgpt.com/codex/install.sh \| CODEX_NON_INTERACTIVE=1 sh` | the install command again | `sh -s -- --release <version>` | `~/.codex/config.toml` (TOML merge) |
+
+Sources: https://code.claude.com/docs/en/setup and https://developers.openai.com/codex/cli. Both install into `~/.local/bin`. An update that does not change the output of `--version` is "unchanged".
+
+A TOML merge writes the file again with sorted keys and without comments. A JSON merge keeps the key order.
+
+## Output and run logs
+
+Text, `--json`, and `--toon` print the same result structure (`internal/output`). Each run writes a JSON lines file to `~/.local/state/fam/runs/<run id>.jsonl` (or `$XDG_STATE_HOME/fam/runs/`): every command with its script, exit code, duration, stdout, and stderr, then the result. FAM does not log the content of files that it reads, nor stdin data.
+
+Exit code of `fam`: `0` when every machine is OK (a plan with changes is OK), `1` otherwise.

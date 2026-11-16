@@ -1,0 +1,34 @@
+// Vite+ with Node.js LTS managed by Vite+ (https://github.com/voidzero-dev/vite-plus).
+amends "../.fam/Bundle.pkl"
+import "../.fam/tasks.pkl" as fam
+
+name = "vite-plus"
+description = "Vite+ and the Node.js LTS that it manages"
+path { "~/.local/share/vite-plus/bin" }
+
+tasks {
+  new fam.Package {
+    binary = "vp"
+    install = "curl -fsSL https://vite.plus | bash"
+    update = "vp upgrade"
+    versionCommand = "vp --version"
+  }
+  // Node.js in managed mode, with the LTS line as the global default (not a system Node.js).
+  new fam.Script {
+    name = "Node.js LTS managed by Vite+"
+    check = #"""
+      cd "$HOME" || exit 1
+      command -v vp >/dev/null 2>&1 || { echo "Vite+ is not installed yet"; exit 100; }
+      cur=$(vp env current node 2>&1) || { printf '%s\n' "$cur" >&2; exit 1; }
+      def=$(vp env default 2>&1) || { printf '%s\n' "$def" >&2; exit 1; }
+      printf '%s\n' "$cur" | grep -Eq '^[[:space:]]*Mode[[:space:]]+managed$' || { echo "Node.js is not in managed mode"; exit 100; }
+      printf '%s\n' "$def" | grep -q '^Default Node.js version: lts$' || { echo "the Node.js default is not lts"; exit 100; }
+      printf '%s\n' "$cur" | grep -Eq '^[[:space:]]*Installed[[:space:]]+true$' || { echo "the Node.js LTS is not installed"; exit 100; }
+      """#
+    apply = #"cd "$HOME" && vp env on node && vp env default lts && vp env install lts"#
+  }
+}
+
+verify {
+  new { event = "fresh_shell"; script = "vp --version && node --version" }
+}

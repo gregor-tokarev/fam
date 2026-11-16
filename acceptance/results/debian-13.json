@@ -1,0 +1,122 @@
+[
+  {
+    "target": "debian-13",
+    "n": 1,
+    "name": "plan shows the changes and changes nothing",
+    "result": "pass",
+    "detail": "24 changes, 3 satisfied",
+    "duration": "13s"
+  },
+  {
+    "target": "debian-13",
+    "n": 2,
+    "name": "apply, then plan is satisfied and apply changes nothing",
+    "result": "pass",
+    "detail": "first apply 24 changed, second plan 27 satisfied, second apply 0 changed",
+    "duration": "15s"
+  },
+  {
+    "target": "debian-13",
+    "n": 3,
+    "name": "verify: fresh_shell and reconnect",
+    "result": "pass",
+    "detail": "5 checks passed",
+    "duration": "14s"
+  },
+  {
+    "target": "debian-13",
+    "n": 4,
+    "name": "drift is found and repaired",
+    "result": "pass",
+    "detail": "drift in 5 tasks found and repaired, copy of the hand-edited AGENTS.md saved",
+    "duration": "17s"
+  },
+  {
+    "target": "debian-13",
+    "n": 5,
+    "name": "absent bundle removes skill, links, files, instruction lines",
+    "result": "pass",
+    "detail": "file, link, merged keys, skill, Claude link, instruction lines, variables removed",
+    "duration": "16s"
+  },
+  {
+    "target": "debian-13",
+    "n": 6,
+    "name": "global bundle removed on one machine",
+    "result": "pass",
+    "detail": "global bundle removed by the machine entry, other bundles kept",
+    "duration": "15s"
+  },
+  {
+    "target": "debian-13",
+    "n": 7,
+    "name": "secrets in shells, never in output or logs",
+    "result": "pass",
+    "detail": "6 shells export both secrets; values absent from 12 outputs and 6 run logs",
+    "duration": "18s"
+  },
+  {
+    "target": "debian-13",
+    "n": 8,
+    "name": "check exit 1 never applies, failed task stops the rest",
+    "result": "pass",
+    "detail": "check exit 1: no apply; apply exit 7: next task skipped",
+    "duration": "15s"
+  },
+  {
+    "target": "debian-13",
+    "n": 9,
+    "name": "network stop gives a connection error (255)",
+    "result": "pass",
+    "detail": "error: connection error to vm (fam@fam-debian-13): ssh exit code 255: mux_client_request_session: read from master failed: Broken pipe\r",
+    "duration": "33s"
+  },
+  {
+    "target": "debian-13",
+    "n": 10,
+    "name": "foreign skill folder makes the plan stop with a conflict",
+    "result": "pass",
+    "detail": "conflict: the skill folder /home/fam/.agents/skills/tool-skill exists and FAM did not make it. Remove or rename it, or rename the skill",
+    "duration": "13s"
+  },
+  {
+    "target": "debian-13",
+    "n": 11,
+    "name": "unknown template variable stops FAM",
+    "result": "pass",
+    "detail": "error: instruction template /home/gregor/.cache/fam-acceptance/run/projects/debian-13-s11/instructions-bad/AGENTS.md: template: AGENTS.md:1:10: executing \"AGENTS.md\" at \u003c.Agent\u003e: map has no entry for key \"Agent\"",
+    "duration": "12s"
+  },
+  {
+    "target": "debian-13",
+    "n": 12,
+    "name": "Claude Code and Codex: install, update, settings, paths",
+    "result": "pass",
+    "detail": "pinned 28 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
+    "duration": "1m7s"
+  },
+  {
+    "target": "debian-13",
+    "n": 14,
+    "name": "standard bundle agentBrowser",
+    "result": "pass",
+    "detail": "30 changed; agent-browser 0.43.0",
+    "duration": "1m35s"
+  },
+  {
+    "target": "debian-13",
+    "n": 15,
+    "name": "systemd tasks fail with a clear error without systemd",
+    "result": "skip",
+    "detail": "the target has systemd",
+    "duration": ""
+  },
+  {
+    "target": "debian-13",
+    "n": 17,
+    "name": "package from the OS package manager, chosen in config.pkl, then removed",
+    "result": "pass",
+    "detail": "tree (apt): changed, then removed",
+    "duration": "20s"
+  }
+]

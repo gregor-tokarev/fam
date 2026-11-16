@@ -1,0 +1,19 @@
+amends "../.fam/Bundle.pkl"
+import "../.fam/tasks.pkl" as fam
+
+name = "bun"
+description = "Bun"
+path { "~/.bun/bin" }
+
+tasks {
+  new fam.Package {
+    binary = "bun"
+    install = "curl -fsSL https://bun.sh/install | bash"
+    update = "bun upgrade"
+    versionCommand = "bun --version"
+  }
+}
+
+verify {
+  new { event = "fresh_shell"; script = "bun --version" }
+}

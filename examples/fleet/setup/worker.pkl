@@ -1,0 +1,52 @@
+// Setup for the worker machines only.
+amends "../.fam/Playbook.pkl"
+import "../.fam/tasks.pkl" as fam
+import "../.fam/facts.pkl"
+
+description = "Worker setup: SSH access, background jobs, no sleep, build limits"
+
+roles { "worker" }
+
+tasks {
+  when (facts.init == "systemd") {
+    // OpenSSH server, enabled at boot.
+    new fam.Service {
+      name = if (facts.distro == "ubuntu" || facts.distro == "debian") "ssh.service" else "sshd.service"
+      scope = "system"
+      sudo = true
+    }
+
+    // Keep background jobs and user services after the SSH session ends.
+    new fam.Linger {}
+
+    // Unattended work and remote access stay available: the machine never sleeps.
+    new fam.Script {
+      name = "no sleep"
+      sudo = true
+      check = #"""
+        for t in sleep.target suspend.target hibernate.target hybrid-sleep.target; do
+          [ "$(systemctl is-enabled "$t" 2>/dev/null)" = masked ] || { echo "$t is not masked"; exit 100; }
+        done
+        """#
+      apply = "systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target"
+    }
+  }
+
+  // Passwordless sudo for the SSH user. FAM itself needs it on workers (sudo -n), so the check
+  // only reports.
+  new fam.Script {
+    name = "passwordless sudo"
+    check = #"sudo -n true 2>/dev/null && exit 0 || { echo "sudo needs a password"; exit 1; }"#
+    apply = #"echo "give the user passwordless sudo by hand" >&2; exit 1"#
+  }
+
+  // Cargo uses half of the CPUs, so that several agents can build at the same time.
+  new fam.Merge {
+    path = "~/.cargo/config.toml"
+    format = "toml"
+    values {
+      build { jobs = facts.cpus ~/ 2 }
+      profile { dev { debug = "line-tables-only" } }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+amends "../.fam/Bundle.pkl"
+import "../.fam/tasks.pkl" as fam
+
+name = "rust"
+description = "Rust and Cargo with rustup"
+path { "~/.cargo/bin" }
+
+tasks {
+  new fam.Package {
+    binary = "rustup"
+    install = #"curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path"#
+    update = "rustup self update && rustup update"
+    versionCommand = "rustc --version"
+  }
+}
+
+verify {
+  new { event = "fresh_shell"; script = "cargo --version" }
+}

@@ -1,0 +1,21 @@
+//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam upgrade` to update.
+
+/// The coding agents, in a separate file.
+///
+/// ```
+/// amends ".fam/Agents.pkl"
+///
+/// agents {
+///   ["claude"] { settings { autoMemoryEnabled = false } }
+///   ["codex"] {}
+/// }
+/// ```
+///
+/// `config.pkl` uses it with `agents = import("agents.pkl").agents`.
+/// FAM knows the paths of each agent. Write settings only.
+module fam.Agents
+
+import "base.pkl"
+
+/// The agents. Supported keys: `"claude"` (Claude Code) and `"codex"` (Codex).
+agents: Mapping<base.AgentName, base.Agent>

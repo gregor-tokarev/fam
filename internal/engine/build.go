@@ -1,0 +1,175 @@
+package engine
+
+import (
+	"fmt"
+
+	"github.com/gregor-tokarev/fam/internal/config"
+	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
+)
+
+// Step is one task in a playbook section, with the units that it restarts.
+type Section struct {
+	// Name is the group name, for example "playbook worker".
+	Name  string
+	Tasks []Task
+	// RestartUnits marks the sections that restart units at their end (playbooks).
+	RestartUnits bool
+}
+
+// convert turns a schema task into an engine task.
+func convert(t tasks.Task, group string, absent bool, pm map[string]string) (Task, error) {
+	b := base{group: group, sudo: t.GetSudo()}
+	units := make([]Unit, 0, len(t.GetRestarts()))
+	for _, u := range t.GetRestarts() {
+		scope := "user"
+		if t.GetSudo() {
+			scope = "system"
+		}
+		units = append(units, Unit{Name: u, Scope: scope})
+	}
+	isAbsent := func(s string) bool { return absent || s == "absent" }
+	switch x := t.(type) {
+	case tasks.File:
+		ft := &FileTask{base: b, Path: x.GetPath(), Mode: parseMode(x.GetMode(), 0o644), Absent: isAbsent(string(x.GetState())), units: units}
+		if c := x.GetContent(); c != nil {
+			ft.Content = []byte(*c)
+		} else if !ft.Absent {
+			return nil, fmt.Errorf("%s: file %s has no content", group, x.GetPath())
+		}
+		return ft, nil
+	case tasks.Merge:
+		v, err := fromPkl(x.GetValues())
+		if err != nil {
+			return nil, fmt.Errorf("%s: merge %s: %w", group, x.GetPath(), err)
+		}
+		m, ok := v.(*omap)
+		if !ok {
+			return nil, fmt.Errorf("%s: merge %s: values must be an object", group, x.GetPath())
+		}
+		return &MergeTask{base: b, Path: x.GetPath(), Format: x.GetFormat(), Values: m, Mode: parseMode(x.GetMode(), 0o644), Absent: isAbsent(string(x.GetState())), units: units}, nil
+	case tasks.Symlink:
+		return &SymlinkTask{base: b, Path: x.GetPath(), Target: x.GetTarget(), Absent: isAbsent(string(x.GetState())), units: units}, nil
+	case tasks.Service:
+		return &ServiceTask{base: b, Unit: x.GetName(), Scope: x.GetScope(), Content: x.GetContent(), Enabled: x.GetEnabled(), Running: x.GetRunning(), Absent: isAbsent(string(x.GetState())), units: units}, nil
+	case tasks.Linger:
+		lt := &LingerTask{base: b, Absent: isAbsent(string(x.GetState()))}
+		if u := x.GetUser(); u != nil {
+			lt.User = *u
+		}
+		return lt, nil
+	case tasks.Package:
+		pt := &PackageTask{base: b, Absent: isAbsent(string(x.GetState())), units: units}
+		if v := x.GetBinary(); v != nil {
+			pt.Binary = *v
+		}
+		if p := x.GetPackage(); p != nil && *p != nil {
+			name, mgr, err := packageSpec(*p)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", group, err)
+			}
+			if m, ok := pm[name]; ok {
+				mgr = m
+			}
+			if err := managedPackage(pt, name, mgr); err != nil {
+				return nil, fmt.Errorf("%s: %w", group, err)
+			}
+		}
+		// Own commands win over the commands of the package manager.
+		if v := x.GetInstall(); v != nil {
+			pt.Install = *v
+		}
+		if v := x.GetUpdate(); v != nil {
+			pt.UpdateSh = *v
+		}
+		if v := x.GetUninstall(); v != nil {
+			pt.Uninstall = *v
+		}
+		if pt.Install == "" {
+			return nil, fmt.Errorf("%s: a package needs `package` or an `install` command", group)
+		}
+		if pt.Binary == "" {
+			return nil, fmt.Errorf("%s: a package without `package` needs `binary`", group)
+		}
+		pt.VersionCmd = pt.Binary + " --version"
+		if v := x.GetVersionCommand(); v != nil {
+			pt.VersionCmd = *v
+		}
+		return pt, nil
+	case tasks.Script:
+		if absent {
+			return nil, nil // FAM cannot undo a script.
+		}
+		st := &ScriptTask{base: b, Title: x.GetName(), ApplySh: x.GetApply(), units: units}
+		if c := x.GetCheck(); c != nil {
+			st.CheckSh = *c
+		} else if c := x.GetCreates(); c != nil {
+			st.Creates = *c
+		} else {
+			return nil, fmt.Errorf("%s: script %q has no check. Set `check` or `creates`", group, x.GetName())
+		}
+		return st, nil
+	}
+	return nil, fmt.Errorf("%s: unknown task type %T", group, t)
+}
+
+// BundleSection returns the tasks of one bundle. An absent bundle undoes its typed tasks
+// in reverse order, then runs its uninstall tasks.
+func BundleSection(u config.BundleUse, pm map[string]string) (Section, error) {
+	group := "bundle " + u.Bundle.Name
+	sec := Section{Name: group}
+	if u.State == "absent" {
+		for i := len(u.Bundle.Tasks) - 1; i >= 0; i-- {
+			t, err := convert(u.Bundle.Tasks[i], group, true, pm)
+			if err != nil {
+				return sec, err
+			}
+			if t != nil {
+				sec.Tasks = append(sec.Tasks, t)
+			}
+		}
+		for _, ut := range u.Bundle.Uninstall {
+			t, err := convert(ut, group, false, pm)
+			if err != nil {
+				return sec, err
+			}
+			sec.Tasks = append(sec.Tasks, t)
+		}
+		return sec, nil
+	}
+	for _, bt := range u.Bundle.Tasks {
+		t, err := convert(bt, group, false, pm)
+		if err != nil {
+			return sec, err
+		}
+		sec.Tasks = append(sec.Tasks, t)
+	}
+	return sec, nil
+}
+
+// PlaybookSection returns the tasks of one playbook. A restart of a unit that a Service task
+// of the same playbook manages uses the scope of that task.
+func PlaybookSection(name string, ts []tasks.Task, pm map[string]string) (Section, error) {
+	group := "playbook " + name
+	sec := Section{Name: group, RestartUnits: true}
+	scopes := map[string]string{}
+	for _, t := range ts {
+		if s, ok := t.(tasks.Service); ok {
+			scopes[s.GetName()] = s.GetScope()
+		}
+	}
+	for _, pt := range ts {
+		t, err := convert(pt, group, false, pm)
+		if err != nil {
+			return sec, err
+		}
+		if r, ok := t.(Restarter); ok {
+			for i, u := range r.Restarts() {
+				if s, ok := scopes[u.Name]; ok {
+					r.Restarts()[i].Scope = s
+				}
+			}
+		}
+		sec.Tasks = append(sec.Tasks, t)
+	}
+	return sec, nil
+}

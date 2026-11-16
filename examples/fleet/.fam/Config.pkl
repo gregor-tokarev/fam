@@ -1,0 +1,54 @@
+//! Written by FAM 0.1.0. Do not edit. Run `fam upgrade` to update.
+
+/// The entrypoint of a FAM project.
+///
+/// `config.pkl` amends this module:
+///
+/// ```
+/// amends ".fam/Config.pkl"
+/// import ".fam/std.pkl"
+///
+/// bundles { std.agentBrowser }
+/// machines = import("machines.pkl").machines
+/// agents = import("agents.pkl").agents
+/// playbooks { import("setup/worker.pkl") }
+/// ```
+///
+/// FAM evaluates this module once for each machine, with the facts of that machine.
+module fam.Config
+
+import "base.pkl"
+import "Bundle.pkl"
+import "Playbook.pkl"
+import "tasks.pkl" as t
+
+/// Bundles for every machine.
+///
+/// An entry is a bundle module, or a [base.BundleRef] with a state.
+/// A plain module means `state = "present"`.
+bundles: Listing<Bundle|base.BundleRef> = new Listing { default = (_) -> new base.BundleRef {} }
+
+/// The machines of the fleet. FAM changes only these machines.
+///
+/// The key is the machine name.
+machines: Mapping<String(matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*"))), base.Machine>
+
+/// The coding agents that FAM installs and configures on every machine.
+agents: Mapping<base.AgentName, base.Agent>
+
+/// How FAM gives secrets to the machines. When it is `null`, FAM does not manage secrets.
+secrets: base.Secrets?
+
+/// All playbooks of the project.
+playbooks: Listing<Playbook>
+
+/// The package manager for a package name, for every machine.
+///
+/// It replaces the manager of each `Package` task with this package, also in the standard bundles:
+///
+/// ```
+/// packageManagers { ["agent-browser"] = "vite" }
+/// ```
+///
+/// A machine can set its own `packageManagers`, which win over these.
+packageManagers: Mapping<String, t.Manager>

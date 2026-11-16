@@ -1,0 +1,15 @@
+//! Written by FAM 0.1.0. Do not edit. Run `fam upgrade` to update.
+
+/// The standard bundles of FAM 0.1.0.
+///
+/// ```
+/// import ".fam/std.pkl"
+///
+/// bundles { std.agentBrowser }
+/// ```
+module fam.std
+
+import "Bundle.pkl"
+
+/// agent-browser: a browser automation CLI for agents, with its skill.
+agentBrowser: Bundle = import("bundles/agent-browser/bundle.pkl")
