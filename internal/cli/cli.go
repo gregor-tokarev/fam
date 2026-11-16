@@ -54,7 +54,7 @@ func Execute() int {
 	pf.StringVar(&opts.SudoPasswordFile, "sudo-password-file", "", "file with the sudo password of the cockpit, for runs without a terminal")
 	pf.StringVar(&opts.SSHConfig, "ssh-config", os.Getenv("FAM_SSH_CONFIG"), "ssh config file that FAM gives to `ssh -F` (default: the normal ssh configuration)")
 
-	root.AddCommand(newCmd(opts), upgradeCmd(opts), updateCmd(), versionCmd(), internalCmd())
+	root.AddCommand(newCmd(opts), migrateCmd(opts), upgradeCmd(), updateCmd(), versionCmd(), internalCmd())
 	addRunCommands(root, opts)
 
 	if err := root.ExecuteContext(context.Background()); err != nil {
@@ -116,24 +116,37 @@ func newCmd(opts *Options) *cobra.Command {
 	}
 }
 
-func upgradeCmd(opts *Options) *cobra.Command {
+func migrateCmd(opts *Options) *cobra.Command {
 	return &cobra.Command{
-		Use:   "upgrade",
-		Short: "Update .fam/ to the schema of this FAM version",
+		Use:   "migrate",
+		Short: "Migrate .fam/ of a project to the schema of this FAM version",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := opts.resolve(); err != nil {
 				return err
 			}
-			old, err := project.Upgrade(opts.Base)
+			old, err := project.Migrate(opts.Base)
 			if err != nil {
 				return err
 			}
 			if old == "" {
 				old = "none"
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Updated %s from FAM %s to FAM %s\n", filepath.Join(opts.Base, ".fam"), old, version.Version)
+			fmt.Fprintf(cmd.OutOrStdout(), "Migrated %s from FAM %s to FAM %s\n", filepath.Join(opts.Base, ".fam"), old, version.Version)
 			return nil
+		},
+	}
+}
+
+// upgradeCmd is the old name of `fam migrate`. It only tells the new name.
+func upgradeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:                "upgrade",
+		Short:              "Renamed to `fam migrate`",
+		Hidden:             true,
+		DisableFlagParsing: true,
+		RunE: func(*cobra.Command, []string) error {
+			return fmt.Errorf("`fam upgrade` is now `fam migrate`")
 		},
 	}
 }

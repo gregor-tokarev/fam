@@ -1,4 +1,4 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam upgrade` to update.
+//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
 
 /// The task types of FAM.
 ///

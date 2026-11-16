@@ -4,7 +4,7 @@
 
 `fam plan`, `fam apply`, and `fam verify` do these steps:
 
-1. **Validate.** FAM checks that `.fam/` has the schema of the binary (a `.fam/` of another FAM version fits when only its version and doc comments differ; otherwise FAM asks for `fam upgrade`) and that the project has the directories that the config needs. It evaluates only the `machines` mapping and `secrets` (Pkl is lazy, so nothing that depends on the facts of a machine), checks that at most one machine is the cockpit, and reads the secrets file.
+1. **Validate.** FAM checks that `.fam/` has the schema of the binary (a `.fam/` of another FAM version fits when only its version and doc comments differ; otherwise FAM asks for `fam migrate`) and that the project has the directories that the config needs. It evaluates only the `machines` mapping and `secrets` (Pkl is lazy, so nothing that depends on the facts of a machine), checks that at most one machine is the cockpit, and reads the secrets file.
 2. **Collect facts.** FAM runs one shell script on each machine: over SSH for workers, locally for the cockpit. Machines run in parallel. `--serial` runs them one at a time. FAM stops on a Windows machine.
 3. **Evaluate.** FAM evaluates the full config for each machine, with the facts of that machine as the Pkl properties `fam.<name>`, and checks the rules that Pkl cannot check: bundle names and scripts with a check.
 4. **Plan.** FAM runs the check of every task. A check changes nothing.

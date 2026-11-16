@@ -81,7 +81,7 @@ func ProjectVersion(base string) (string, error) {
 	b, err := os.ReadFile(filepath.Join(base, Dir, VersionFile))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("%s has no %s/%s. Run `fam new` to create a project, or `fam upgrade` to write the schema", base, Dir, VersionFile)
+			return "", fmt.Errorf("%s has no %s/%s. Run `fam new` to create a project, or `fam migrate` to write the schema", base, Dir, VersionFile)
 		}
 		return "", err
 	}
@@ -91,7 +91,7 @@ func ProjectVersion(base string) (string, error) {
 // Check stops when `.fam/` does not fit this binary. A `.fam/` of another FAM version fits when
 // it has the same schema as this binary: the same files with the same content, apart from the
 // version and the doc comments. So a release that does not change the schema needs no
-// `fam upgrade`, and a release that does (for example a fixed standard bundle) asks for it.
+// `fam migrate`, and a release that does (for example a fixed standard bundle) asks for it.
 func Check(base string) error {
 	v, err := ProjectVersion(base)
 	if err != nil {
@@ -103,7 +103,7 @@ func Check(base string) error {
 	if same, err := sameSchema(filepath.Join(base, Dir), v); err == nil && same {
 		return nil
 	}
-	return fmt.Errorf("the schema in %s was written by FAM %s and differs from the schema of this binary (FAM %s). Run `fam upgrade` to update %s, or use FAM %s",
+	return fmt.Errorf("the schema in %s was written by FAM %s and differs from the schema of this binary (FAM %s). Run `fam migrate` to update %s, or use FAM %s",
 		filepath.Join(base, Dir), v, version.Version, Dir, v)
 }
 

@@ -1,4 +1,4 @@
-// Package project creates and upgrades FAM project trees.
+// Package project creates and migrates FAM project trees.
 package project
 
 import (
@@ -27,7 +27,7 @@ func New(opts NewOptions) ([]string, error) {
 	}
 	for _, f := range []string{"config.pkl", "machines.pkl", "agents.pkl", schema.Dir} {
 		if _, err := os.Stat(filepath.Join(base, f)); err == nil {
-			return nil, fmt.Errorf("%s already exists. `fam new` does not change an existing project. Use `fam upgrade` to update %s", filepath.Join(base, f), schema.Dir)
+			return nil, fmt.Errorf("%s already exists. `fam new` does not change an existing project. Use `fam migrate` to update %s", filepath.Join(base, f), schema.Dir)
 		}
 	}
 	agents := opts.Agents
@@ -75,10 +75,10 @@ func New(opts NewOptions) ([]string, error) {
 	return written, nil
 }
 
-// Upgrade replaces `.fam/` with the schema of this FAM version.
-func Upgrade(base string) (old string, err error) {
+// Migrate replaces `.fam/` with the schema of this FAM version.
+func Migrate(base string) (old string, err error) {
 	if _, err := os.Stat(filepath.Join(base, "config.pkl")); err != nil {
-		return "", fmt.Errorf("%s has no config.pkl. Run `fam upgrade` in a FAM project, or set --base", base)
+		return "", fmt.Errorf("%s has no config.pkl. Run `fam migrate` in a FAM project, or set --base", base)
 	}
 	old, _ = schema.ProjectVersion(base)
 	return old, schema.Write(base)
