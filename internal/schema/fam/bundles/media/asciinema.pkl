@@ -1,0 +1,25 @@
+/// asciinema: Terminal recording CLI with a headless mode for scripts and CI (https://github.com/asciinema/asciinema).
+///
+/// FAM installs the CLI with Cargo.
+/// Needs Cargo, Rust 1.82 or later, and a C compiler.
+/// Local terminal recordings need no login. The registry can lag behind GitHub.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "asciinema"
+description = "Terminal recording CLI with a headless mode for scripts and CI"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "asciinema"
+      manager = "cargo"
+    }
+    binary = "asciinema"
+  }
+}
+
+verify {
+  new { name = "asciinema runs"; script = "asciinema --version" }
+}

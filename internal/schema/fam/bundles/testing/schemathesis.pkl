@@ -1,0 +1,24 @@
+/// schemathesis: CLI for property based API tests from OpenAPI and GraphQL schemas (https://github.com/schemathesis/schemathesis).
+///
+/// FAM installs the CLI with uv tool install.
+/// Needs uv and Python 3.11 or later. Local schema tests need no account.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "schemathesis"
+description = "CLI for property based API tests from OpenAPI and GraphQL schemas"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "schemathesis"
+      manager = "uv"
+    }
+    binary = "schemathesis"
+  }
+}
+
+verify {
+  new { name = "schemathesis runs"; script = "schemathesis --version" }
+}

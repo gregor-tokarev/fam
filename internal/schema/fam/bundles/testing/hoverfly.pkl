@@ -1,0 +1,27 @@
+/// hoverfly: HTTP service simulation and API mock proxy CLI (https://github.com/SpectoLabs/hoverfly).
+///
+/// FAM installs the CLI with a GitHub release.
+/// No runtime or login is required. The bundle installs hoverfly, without hoverctl.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "hoverfly"
+description = "HTTP service simulation and API mock proxy CLI"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "SpectoLabs/hoverfly"
+    binary = "hoverfly"
+    versionCommand = "hoverfly -version"
+    assets {
+      ["linux-amd64"] { name = "hoverfly_bundle_linux_amd64.zip"; format = "zip"; file = "hoverfly" }
+      ["linux-arm64"] { name = "hoverfly_bundle_linux_arm64.zip"; format = "zip"; file = "hoverfly" }
+      ["darwin-arm64"] { name = "hoverfly_bundle_OSX_arm64.zip"; format = "zip"; file = "hoverfly" }
+    }
+  }
+}
+
+verify {
+  new { name = "hoverfly runs"; script = "hoverfly -version" }
+}

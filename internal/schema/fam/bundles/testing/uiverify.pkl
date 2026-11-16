@@ -1,0 +1,75 @@
+/// uiverify: Official UI Verify CLI for visual checks and screenshot uploads (https://github.com/uiverify/uiverify).
+///
+/// FAM installs the CLI with global npm.
+/// FAM copies the core skills from GitHub main because the repository has no releases.
+/// Needs Node.js 22.12 or later and UIVERIFY_API_KEY for CI access.
+/// A browser is optional when the input consists of existing screenshots.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "uiverify"
+description = "Official UI Verify CLI for visual checks and screenshot uploads"
+version = "@FAM_VERSION@"
+requiredSecrets { "UIVERIFY_API_KEY" }
+tasks {
+  new fam.Package {
+    package = "uiverify"
+    binary = "uiverify"
+    versionCommand = "uiverify --help"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/check-visual-changes"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/economical-visual-tests"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/setup-visual-testing"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/triage-visual-changes"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/playwright-visual-testing"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/vitest-visual-testing"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/bun-visual-testing"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/storybook-visual-testing"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/implement-figma-design"
+    ref = "main"
+  }
+  new fam.GitHubSkill {
+    repo = "uiverify/uiverify"
+    path = "skills/making-ui-changes"
+    ref = "main"
+  }
+}
+
+verify {
+  new { name = "uiverify runs"; script = "uiverify --help" }
+}

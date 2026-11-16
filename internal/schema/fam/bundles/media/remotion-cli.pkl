@@ -1,0 +1,77 @@
+/// remotion-cli: Official Remotion CLI for headless video and still image rendering (https://github.com/remotion-dev/remotion).
+///
+/// FAM installs the CLI with global npm.
+/// FAM copies the core skills from GitHub.
+/// Needs Node.js and a supported headless browser, supplied separately.
+/// The router and markup skills use the exported plugin copies, which have no external links.
+/// Linux packages include glibc and musl builds. License terms apply to some uses.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "remotion-cli"
+description = "Official Remotion CLI for headless video and still image rendering"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "@remotion/cli"
+    binary = "remotion"
+    versionCommand = "remotion --help"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/codex-plugin/skills/remotion-best-practices"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-captions"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-create"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-docs"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-interactivity"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-license"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-maps"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/codex-plugin/skills/remotion-markup"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-multimedia"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-render"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-saas"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-studio"
+  }
+  new fam.GitHubSkill {
+    repo = "remotion-dev/remotion"
+    path = "packages/skills/skills/remotion-upgrade"
+  }
+}
+
+verify {
+  new { name = "remotion runs"; script = "remotion --help" }
+}

@@ -8,3 +8,15 @@ agentBrowser: Bundle = import("../bundles/computer/agent-browser.pkl")
 
 /// agent-desktop: computer use for agents through the accessibility tree, with its skills.
 agentDesktop: Bundle = import("../bundles/computer/agent-desktop.pkl")
+
+/// browse: Official Browserbase CLI for browser control and hosted browser APIs.
+browserbaseBrowse: Bundle = import("../bundles/computer/browse.pkl")
+
+/// browser-use: Browser control CLI with local and hosted browser sessions.
+browserUse: Bundle = import("../bundles/computer/browser-use.pkl")
+
+/// playwright-cli: Browser automation CLI for coding agents, from Microsoft.
+playwrightCli: Bundle = import("../bundles/computer/playwright-cli.pkl")
+
+/// steel: Official Steel CLI for browser sessions, scraping, and screenshots.
+steel: Bundle = import("../bundles/computer/steel.pkl")

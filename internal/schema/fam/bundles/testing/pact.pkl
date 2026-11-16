@@ -1,0 +1,27 @@
+/// pact: Official CLI for API contract verification and mock servers (https://github.com/pact-foundation/pact-cli).
+///
+/// FAM installs the CLI with Cargo.
+/// Needs Cargo, current Rust, a C compiler, make, CMake, and Perl.
+/// Also needs pkg-config and OpenSSL development headers.
+/// Local contract tests need no account. Broker access can need separate credentials.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "pact"
+description = "Official CLI for API contract verification and mock servers"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "pact"
+      manager = "cargo"
+    }
+    binary = "pact"
+    versionCommand = "pact --help"
+  }
+}
+
+verify {
+  new { name = "pact runs"; script = "pact --help" }
+}

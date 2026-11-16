@@ -1,0 +1,51 @@
+/// browser-use: Browser control CLI with local and hosted browser sessions (https://github.com/browser-use/browser-use).
+///
+/// FAM installs the CLI with uv tool install.
+/// FAM copies the core skills from GitHub.
+/// Needs uv and Python 3.11 or later, below 4.0, and a separate browser or Browser Use Cloud.
+/// Cloud sessions need BROWSER_USE_API_KEY. Local sessions need no key.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "browser-use"
+description = "Browser control CLI with local and hosted browser sessions"
+version = "@FAM_VERSION@"
+requiredSecrets { "BROWSER_USE_API_KEY" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "browser-use"
+      manager = "uv"
+    }
+    binary = "browser-use"
+  }
+  new fam.GitHubSkill {
+    repo = "browser-use/browser-use"
+    path = "skills/browser-use"
+  }
+  new fam.GitHubSkill {
+    repo = "browser-use/browser-use"
+    path = "skills/remote-browser"
+  }
+  new fam.GitHubSkill {
+    repo = "browser-use/browser-use"
+    path = "skills/qa"
+  }
+  new fam.GitHubSkill {
+    repo = "browser-use/browser-use"
+    path = "skills/cloud"
+  }
+  new fam.GitHubSkill {
+    repo = "browser-use/browser-use"
+    path = "skills/open-source"
+  }
+  new fam.GitHubSkill {
+    repo = "browser-use/browser-use"
+    path = "skills/x402"
+  }
+}
+
+verify {
+  new { name = "browser-use runs"; script = "browser-use --version" }
+}

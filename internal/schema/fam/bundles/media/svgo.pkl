@@ -1,0 +1,21 @@
+/// svgo: Official SVG optimizer CLI for compact vector assets (https://github.com/svg/svgo).
+///
+/// FAM installs the CLI with global npm.
+/// Needs Node.js 16 or later. No browser or login is required.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "svgo"
+description = "Official SVG optimizer CLI for compact vector assets"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "svgo"
+    binary = "svgo"
+  }
+}
+
+verify {
+  new { name = "svgo runs"; script = "svgo --version" }
+}

@@ -1,0 +1,25 @@
+/// resvg: Official standalone SVG renderer CLI with PNG output (https://github.com/linebender/resvg).
+///
+/// FAM installs the CLI with Cargo.
+/// Needs Cargo and Rust 1.85 or later. No display or login is required.
+/// Install fonts separately for text output.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "resvg"
+description = "Official standalone SVG renderer CLI with PNG output"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "resvg"
+      manager = "cargo"
+    }
+    binary = "resvg"
+  }
+}
+
+verify {
+  new { name = "resvg runs"; script = "resvg --version" }
+}

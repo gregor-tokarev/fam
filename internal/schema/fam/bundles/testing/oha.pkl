@@ -1,0 +1,25 @@
+/// oha: HTTP load generator with JSON output and a noninteractive mode (https://github.com/hatoo/oha).
+///
+/// FAM installs the CLI with Cargo.
+/// Needs Cargo, Rust 1.88 or later, a C compiler, CMake, and make.
+/// Use --no-tui or JSON output on workers. No login is required.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "oha"
+description = "HTTP load generator with JSON output and a noninteractive mode"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "oha"
+      manager = "cargo"
+    }
+    binary = "oha"
+  }
+}
+
+verify {
+  new { name = "oha runs"; script = "oha --version" }
+}

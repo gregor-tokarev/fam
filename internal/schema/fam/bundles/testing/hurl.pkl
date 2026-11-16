@@ -1,0 +1,31 @@
+/// hurl: HTTP request runner and API test CLI with plain text input (https://github.com/Orange-OpenSource/hurl).
+///
+/// FAM installs the CLI with Cargo.
+/// Needs Cargo, Rust 1.99.1 or later, a C compiler, libclang, and pkg-config.
+/// On musl, Cargo uses dynamic linking so bindgen can load libclang.
+/// Also needs libcurl, OpenSSL, libxml2, and their development headers. No login is required.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "hurl"
+description = "HTTP request runner and API test CLI with plain text input"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "hurl"
+      manager = "cargo"
+    }
+    binary = "hurl"
+    when (facts.os == "linux" && facts.libc == "musl") {
+      install = #"RUSTFLAGS='-C target-feature=-crt-static' cargo install --locked --root "$HOME/.local" hurl"#
+      update = #"RUSTFLAGS='-C target-feature=-crt-static' cargo install --locked --root "$HOME/.local" hurl"#
+    }
+  }
+}
+
+verify {
+  new { name = "hurl runs"; script = "hurl --version" }
+}

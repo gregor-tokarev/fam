@@ -1,0 +1,23 @@
+/// mermaid-cli: Official CLI that renders Mermaid diagrams to SVG, PNG, and PDF (https://github.com/mermaid-js/mermaid-cli).
+///
+/// FAM installs the CLI with global npm.
+/// Needs Node.js 22.13 or later and a compatible browser, supplied separately.
+/// PUPPETEER_SKIP_DOWNLOAD prevents browser downloads during package installation.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "mermaid-cli"
+description = "Official CLI that renders Mermaid diagrams to SVG, PNG, and PDF"
+version = "@FAM_VERSION@"
+env { ["PUPPETEER_SKIP_DOWNLOAD"] = "1" }
+tasks {
+  new fam.Package {
+    package = "@mermaid-js/mermaid-cli"
+    binary = "mmdc"
+  }
+}
+
+verify {
+  new { name = "mmdc runs"; script = "mmdc --version" }
+}

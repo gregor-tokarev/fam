@@ -1,0 +1,24 @@
+/// oxipng: Lossless PNG optimization CLI with parallel processing (https://github.com/oxipng/oxipng).
+///
+/// FAM installs the CLI with Cargo.
+/// Needs Cargo, Rust 1.88 or later, and a C compiler. No login is required.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "oxipng"
+description = "Lossless PNG optimization CLI with parallel processing"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "oxipng"
+      manager = "cargo"
+    }
+    binary = "oxipng"
+  }
+}
+
+verify {
+  new { name = "oxipng runs"; script = "oxipng --version" }
+}

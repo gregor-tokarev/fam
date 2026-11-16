@@ -1,0 +1,28 @@
+/// k6: Scriptable HTTP and browser load testing CLI from Grafana (https://github.com/grafana/k6).
+///
+/// FAM installs the CLI with a GitHub release.
+/// No runtime or login is required for local HTTP tests.
+/// Browser tests need a separate browser. Cloud tests can need credentials.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "k6"
+description = "Scriptable HTTP and browser load testing CLI from Grafana"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "grafana/k6"
+    binary = "k6"
+    versionCommand = "k6 version"
+    assets {
+      ["linux-amd64"] { name = "k6-{tag}-linux-amd64.tar.gz"; format = "tar.gz"; file = "k6-{tag}-linux-amd64/k6" }
+      ["linux-arm64"] { name = "k6-{tag}-linux-arm64.tar.gz"; format = "tar.gz"; file = "k6-{tag}-linux-arm64/k6" }
+      ["darwin-arm64"] { name = "k6-{tag}-macos-arm64.zip"; format = "zip"; file = "k6-{tag}-macos-arm64/k6" }
+    }
+  }
+}
+
+verify {
+  new { name = "k6 runs"; script = "k6 version" }
+}

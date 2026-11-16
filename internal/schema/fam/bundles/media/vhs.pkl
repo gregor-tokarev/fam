@@ -1,0 +1,25 @@
+/// vhs: Scripted terminal recording CLI that creates videos and GIFs (https://github.com/charmbracelet/vhs).
+///
+/// FAM installs the CLI with go install.
+/// Needs Go 1.26.7 or later. Recording also needs FFmpeg, ttyd, and a headless browser.
+/// Supply these programs separately. Local recordings need no login.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "vhs"
+description = "Scripted terminal recording CLI that creates videos and GIFs"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/charmbracelet/vhs"
+      manager = "go"
+    }
+    binary = "vhs"
+  }
+}
+
+verify {
+  new { name = "vhs runs"; script = "vhs --version" }
+}

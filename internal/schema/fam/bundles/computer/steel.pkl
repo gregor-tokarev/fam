@@ -1,0 +1,30 @@
+/// steel: Official Steel CLI for browser sessions, scraping, and screenshots (https://github.com/steel-dev/cli).
+///
+/// FAM installs the CLI with a GitHub release.
+/// Uses native releases because the npm launcher predates the current CLI.
+/// Needs STEEL_API_KEY for Steel Cloud. No musl build is available.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "steel"
+description = "Official Steel CLI for browser sessions, scraping, and screenshots"
+version = "@FAM_VERSION@"
+supported = facts.os != "linux" || facts.libc != "musl"
+requiredSecrets { "STEEL_API_KEY" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "steel-dev/cli"
+    binary = "steel"
+    assets {
+      ["linux-amd64"] { name = "steel-cli-x86_64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "steel-cli-x86_64-unknown-linux-gnu/steel" }
+      ["linux-arm64"] { name = "steel-cli-aarch64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "steel-cli-aarch64-unknown-linux-gnu/steel" }
+      ["darwin-arm64"] { name = "steel-cli-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "steel-cli-aarch64-apple-darwin/steel" }
+    }
+  }
+}
+
+verify {
+  new { name = "steel runs"; script = "steel --version" }
+}

@@ -1,0 +1,25 @@
+/// d2: Official text to diagram CLI for architecture and system designs (https://github.com/d2lang/d2).
+///
+/// FAM installs the CLI with go install.
+/// Needs Go 1.27 or later. SVG output needs no browser or login.
+/// Other export formats can need separate tools.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "d2"
+description = "Official text to diagram CLI for architecture and system designs"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/d2lang/d2"
+      manager = "go"
+    }
+    binary = "d2"
+  }
+}
+
+verify {
+  new { name = "d2 runs"; script = "d2 --version" }
+}
