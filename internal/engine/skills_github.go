@@ -172,8 +172,8 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 			continue
 		}
 		rel := strings.TrimPrefix(inRepo, prefix)
-		// FAM writes its own marker file into each skill folder.
-		if rel == managedMarker || strings.HasPrefix(rel, "../") {
+		// FAM writes its own marker file into each skill folder: skip that name and anything below it.
+		if rel == managedMarker || strings.HasPrefix(rel, managedMarker+"/") || strings.HasPrefix(rel, "../") {
 			continue
 		}
 		switch h.Typeflag {
@@ -201,15 +201,26 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 	}
 	// A link in the folder becomes a copy of the file that it points to (as for local skills).
 	// The target must be a file in the same folder.
+	// The copies count against the same limits as regular files.
 	for rel, target := range links {
 		i, ok := byRel[target]
 		if !ok || path.IsAbs(target) {
 			return fail("the link %s does not point to a file in the skill folder", rel)
 		}
 		f := files[i]
+		total += len(f.data)
+		if total > maxSkillBytes || len(files) >= maxSkillFiles {
+			return fail("the folder has more than %d bytes or %d files", maxSkillBytes, maxSkillFiles)
+		}
 		files = append(files, skillFile{rel: rel, data: f.data, exec: f.exec})
 	}
-	if _, ok := byRel["SKILL.md"]; !ok {
+	hasSkill := false
+	for _, f := range files {
+		if f.rel == "SKILL.md" {
+			hasSkill = true
+		}
+	}
+	if !hasSkill {
 		return fail("the folder has no SKILL.md")
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].rel < files[j].rel })
