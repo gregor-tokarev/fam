@@ -19,7 +19,8 @@ type VerifySpec struct {
 }
 
 // buildSections returns the task sections of one machine in run order:
-// environment and secrets, agents, bundles, skills, instructions, playbooks.
+// environment and secrets, agents, bundles (every machine, then the role, then the machine),
+// skills, instructions.
 func buildSections(env *Env, spec *config.Spec) ([]Section, []VerifySpec, error) {
 	var out []Section
 	envSec, err := environmentSection(env, spec, env.Secrets)
@@ -72,13 +73,6 @@ func buildSections(env *Env, spec *config.Spec) ([]Section, []VerifySpec, error)
 		return nil, nil, err
 	}
 	out = append(out, in)
-	for _, p := range spec.Playbooks {
-		s, err := PlaybookSection(p.Name, p.Tasks, spec.PackageManagers)
-		if err != nil {
-			return nil, nil, err
-		}
-		out = append(out, s)
-	}
 	for _, a := range spec.Agents {
 		verify = append(verify, agentVerify(a.Name, skillNames)...)
 	}

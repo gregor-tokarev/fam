@@ -1,8 +1,8 @@
-//! Written by FAM 0.1.0. Do not edit. Run `fam upgrade` to update.
+//! Written by FAM 0.2.0. Do not edit. Run `fam upgrade` to update.
 
 /// The task types of FAM.
 ///
-/// Bundles and playbooks use the same task types.
+/// The task types of bundles.
 /// Import this module with a different name, because `tasks` is also a property name:
 ///
 /// ```
@@ -25,10 +25,10 @@ abstract class Task {
   /// On a worker, FAM runs `sudo -n`. On the cockpit, FAM asks for the password once.
   sudo: Boolean = false
 
-  /// Units that FAM restarts once, at the end of the playbook, when this task made a change.
+  /// Units that FAM restarts once, at the end of the bundle, when this task made a change.
   ///
   /// FAM does not restart units after a failed task.
-  /// A unit managed by a [Service] task in the same playbook uses the scope of that task.
+  /// A unit managed by a [Service] task in the same bundle uses the scope of that task.
   /// Other units use the system scope when [sudo] is `true`, and the user scope when it is `false`.
   restarts: Listing<String>
 }

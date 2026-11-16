@@ -44,8 +44,8 @@ secrets {
   file = %q
 }
 
-playbooks {
-  import("setup/worker.pkl")
+roles {
+  ["worker"] { bundles { import("setup/worker.pkl") } }
 }
 `, secretsFile),
 		"agents.pkl": `amends ".fam/Agents.pkl"
@@ -73,15 +73,15 @@ machines {
 		// Scenario 8: a failing check and a failing apply.
 		"config-fail.pkl": `amends "config.pkl"
 
-playbooks {
-  import("setup/failing.pkl")
+roles {
+  ["worker"] { bundles { import("setup/failing.pkl") } }
 }
 `,
 		// Scenario 9: a slow script, so that the harness can stop the network during the run.
 		"config-slow.pkl": `amends "config.pkl"
 
-playbooks {
-  import("setup/slow.pkl")
+roles {
+  ["worker"] { bundles { import("setup/slow.pkl") } }
 }
 `,
 		// Scenario 12: Claude Code and Codex. The "old" entrypoint pins older versions, so that
@@ -103,8 +103,8 @@ agents {
 		// Alpine: systemd tasks without a guard must fail with a clear error.
 		"config-systemd.pkl": `amends "config.pkl"
 
-playbooks {
-  import("setup/systemd.pkl")
+roles {
+  ["worker"] { bundles { import("setup/systemd.pkl") } }
 }
 `,
 		// The standard bundle agentBrowser, with Node.js from its upstream binaries.
@@ -231,11 +231,11 @@ bundles {
   [2] = new base.BundleRef { bundle = import("bundles/pkgtest.pkl"); state = "absent" }
 }
 `,
-		"setup/worker.pkl": `amends "../.fam/Playbook.pkl"
+		"setup/worker.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 import "../.fam/facts.pkl"
 
-roles { "worker" }
+name = "worker"
 
 tasks {
   new fam.File {
@@ -265,7 +265,7 @@ tasks {
   }
   when (facts.init == "launchd") {
     // A restart request before the Service task: the bootstrap of the new job satisfies it,
-    // so FAM must not restart the job again at the end of the playbook.
+    // so FAM must not restart the job again at the end of the bundle.
     new fam.File {
       path = "~/.config/fam-demo/env"
       content = "MODE=acceptance\n"
@@ -300,10 +300,10 @@ tasks {
 </dict>
 </plist>
 `,
-		"setup/failing.pkl": `amends "../.fam/Playbook.pkl"
+		"setup/failing.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 
-roles { "worker" }
+name = "failing"
 
 tasks {
   new fam.Script {
@@ -313,10 +313,10 @@ tasks {
   }
 }
 `,
-		"setup/failing2.pkl": `amends "../.fam/Playbook.pkl"
+		"setup/failing2.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 
-roles { "worker" }
+name = "failing2"
 
 tasks {
   new fam.Script {
@@ -329,14 +329,14 @@ tasks {
 `,
 		"config-fail2.pkl": `amends "config.pkl"
 
-playbooks {
-  import("setup/failing2.pkl")
+roles {
+  ["worker"] { bundles { import("setup/failing2.pkl") } }
 }
 `,
-		"setup/slow.pkl": `amends "../.fam/Playbook.pkl"
+		"setup/slow.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 
-roles { "worker" }
+name = "slow"
 
 tasks {
   new fam.Script {
@@ -346,10 +346,10 @@ tasks {
   }
 }
 `,
-		"setup/systemd.pkl": `amends "../.fam/Playbook.pkl"
+		"setup/systemd.pkl": `amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 
-roles { "worker" }
+name = "systemd"
 
 tasks {
   new fam.Service { name = "fam-demo.service"; content = "[Service]\nExecStart=/bin/true\n" }

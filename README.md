@@ -12,7 +12,7 @@
 
 You run coding agents on several machines. Each machine needs the same CLIs, the same secrets in every shell, the same skills, and the same instructions for Claude Code and Codex. FAM keeps all of this in one Pkl project on your control machine and puts it on every machine over SSH.
 
-- **One config.** Machines, bundles of tools, playbooks, agents, and secrets in typed Pkl files, with editor help.
+- **One config.** Machines, reusable bundles of tools and setup, agents, and secrets in typed Pkl files, with editor help.
 - **Nothing on the machines.** Workers need only SSH. FAM checks the real state on each run, so a plan always shows the truth.
 - **Proof, not hope.** Each bundle has checks that FAM runs in new shells after each apply.
 - **Safe changes.** `fam plan` changes nothing. FAM never shows secret values, stops on files that it did not make, and saves a copy before it replaces your own instruction files.

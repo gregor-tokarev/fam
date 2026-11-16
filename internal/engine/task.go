@@ -31,7 +31,7 @@ type Check struct {
 
 // Task is one unit of work on a machine.
 type Task interface {
-	// Group is the owner of the task, for example "bundle posthog" or "playbook worker".
+	// Group is the owner of the task, for example "bundle rust" or "environment".
 	Group() string
 	// Kind is the task type, for example "file".
 	Kind() string
@@ -49,7 +49,7 @@ type Updater interface {
 	Update(ctx context.Context, env *Env) (changed bool, detail string, err error)
 }
 
-// Restarter is a task that restarts units at the end of the playbook when it changed.
+// Restarter is a task that restarts units at the end of its bundle when it changed.
 type Restarter interface {
 	Restarts() []Unit
 }

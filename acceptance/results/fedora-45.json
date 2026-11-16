@@ -13,7 +13,7 @@
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
     "detail": "first apply 25 changed, second plan 27 satisfied, second apply 0 changed",
-    "duration": "20s"
+    "duration": "21s"
   },
   {
     "target": "fedora-45",
@@ -29,7 +29,7 @@
     "name": "drift is found and repaired",
     "result": "pass",
     "detail": "drift in 5 tasks found and repaired, copy of the hand-edited AGENTS.md saved",
-    "duration": "23s"
+    "duration": "22s"
   },
   {
     "target": "fedora-45",
@@ -45,7 +45,7 @@
     "name": "global bundle removed on one machine",
     "result": "pass",
     "detail": "global bundle removed by the machine entry, other bundles kept",
-    "duration": "19s"
+    "duration": "20s"
   },
   {
     "target": "fedora-45",
@@ -61,7 +61,7 @@
     "name": "check exit 1 never applies, failed task stops the rest",
     "result": "pass",
     "detail": "check exit 1: no apply; apply exit 7: next task skipped",
-    "duration": "19s"
+    "duration": "17s"
   },
   {
     "target": "fedora-45",
@@ -117,6 +117,6 @@
     "name": "package from the OS package manager, chosen in config.pkl, then removed",
     "result": "pass",
     "detail": "tree (dnf): changed, then removed",
-    "duration": "26s"
+    "duration": "28s"
   }
 ]

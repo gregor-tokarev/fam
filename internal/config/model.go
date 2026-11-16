@@ -8,7 +8,6 @@ import (
 	"github.com/gregor-tokarev/fam/internal/pklgen/base"
 	"github.com/gregor-tokarev/fam/internal/pklgen/bundle"
 	"github.com/gregor-tokarev/fam/internal/pklgen/config"
-	"github.com/gregor-tokarev/fam/internal/pklgen/playbook"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
 )
 
@@ -36,7 +35,8 @@ type BundleUse struct {
 	Bundle bundle.Bundle
 	// State is "present" or "absent".
 	State string
-	// Origin is "config" for a global bundle and "machine" for a machine entry.
+	// Origin is "config" for a bundle of every machine, "role" for a bundle of the role, and
+	// "machine" for a machine entry.
 	Origin string
 	// Dir is the directory of the bundle file. FAM resolves bundle paths relative to it.
 	Dir string
@@ -50,7 +50,6 @@ type Spec struct {
 	Bundles         []BundleUse
 	Agents          []AgentSpec
 	Secrets         *base.Secrets
-	Playbooks       []playbook.Playbook
 }
 
 // AgentSpec is one agent entry.
@@ -105,7 +104,7 @@ func bundleEntry(entry any, origin string) (BundleUse, error) {
 	return u, nil
 }
 
-// Validate checks the rules that Pkl cannot check: bundle identity and playbook machines.
+// Validate checks the rules that Pkl cannot check: bundle identity and the scripts.
 func Validate(cfg *config.Config) error {
 	if _, err := Machines(cfg); err != nil {
 		return err
@@ -149,19 +148,18 @@ func Validate(cfg *config.Config) error {
 			return err
 		}
 	}
-	pbNames := map[string]string{}
-	for _, p := range cfg.Playbooks {
-		if prev, ok := pbNames[p.Name]; ok {
-			return fmt.Errorf("two playbooks have the name %q: %s and %s", p.Name, prev, p.Source)
-		}
-		pbNames[p.Name] = p.Source
-		for _, m := range p.Machines {
-			if _, ok := cfg.Machines[m]; !ok {
-				return fmt.Errorf("playbook %q selects the machine %q, which is not in the machines mapping", p.Name, m)
+	roles := make([]string, 0, len(cfg.Roles))
+	for r := range cfg.Roles {
+		roles = append(roles, string(r))
+	}
+	sort.Strings(roles)
+	for _, r := range roles {
+		for k, rb := range cfg.Roles {
+			if string(k) == r {
+				if err := check(rb.Bundles, "the bundles of role "+r); err != nil {
+					return err
+				}
 			}
-		}
-		if err := validateTasks(p.Tasks, "playbook "+p.Name); err != nil {
-			return err
 		}
 	}
 	return nil
@@ -209,18 +207,32 @@ func Resolve(cfg *config.Config, name string) (*Spec, error) {
 		index[u.Bundle.Name] = len(spec.Bundles)
 		spec.Bundles = append(spec.Bundles, u)
 	}
-	// A machine entry wins over the same bundle in config.pkl.
-	for _, e := range m.Bundles {
-		u, err := bundleEntry(e, "machine")
-		if err != nil {
-			return nil, err
+	// The bundles of the role come after the bundles of every machine, and the machine entries
+	// last. An entry wins over the same bundle earlier in this order, at its earlier position.
+	add := func(entries []any, origin string) error {
+		for _, e := range entries {
+			u, err := bundleEntry(e, origin)
+			if err != nil {
+				return err
+			}
+			if i, ok := index[u.Bundle.Name]; ok {
+				spec.Bundles[i] = u
+				continue
+			}
+			index[u.Bundle.Name] = len(spec.Bundles)
+			spec.Bundles = append(spec.Bundles, u)
 		}
-		if i, ok := index[u.Bundle.Name]; ok {
-			spec.Bundles[i] = u
-			continue
+		return nil
+	}
+	for k, rb := range cfg.Roles {
+		if string(k) == string(m.Role) {
+			if err := add(rb.Bundles, "role"); err != nil {
+				return nil, err
+			}
 		}
-		index[u.Bundle.Name] = len(spec.Bundles)
-		spec.Bundles = append(spec.Bundles, u)
+	}
+	if err := add(m.Bundles, "machine"); err != nil {
+		return nil, err
 	}
 	agentNames := make([]string, 0, len(cfg.Agents))
 	for n := range cfg.Agents {
@@ -234,24 +246,5 @@ func Resolve(cfg *config.Config, name string) (*Spec, error) {
 			}
 		}
 	}
-	for _, p := range cfg.Playbooks {
-		if selects(p, name, string(m.Role)) {
-			spec.Playbooks = append(spec.Playbooks, p)
-		}
-	}
 	return spec, nil
-}
-
-func selects(p playbook.Playbook, machine, role string) bool {
-	for _, r := range p.Roles {
-		if string(r) == role {
-			return true
-		}
-	}
-	for _, m := range p.Machines {
-		if m == machine {
-			return true
-		}
-	}
-	return false
 }

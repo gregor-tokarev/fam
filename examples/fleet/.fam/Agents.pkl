@@ -1,4 +1,4 @@
-//! Written by FAM 0.1.0. Do not edit. Run `fam upgrade` to update.
+//! Written by FAM 0.2.0. Do not edit. Run `fam upgrade` to update.
 
 /// The coding agents, in a separate file.
 ///

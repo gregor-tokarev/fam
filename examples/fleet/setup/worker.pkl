@@ -1,11 +1,10 @@
-// Setup for the worker machines only.
-amends "../.fam/Playbook.pkl"
+// Setup for the worker machines. config.pkl lists it in `roles`.
+amends "../.fam/Bundle.pkl"
 import "../.fam/tasks.pkl" as fam
 import "../.fam/facts.pkl"
 
+name = "worker-setup"
 description = "Worker setup: SSH access, background jobs, no sleep, build limits"
-
-roles { "worker" }
 
 tasks {
   when (facts.init == "systemd") {
