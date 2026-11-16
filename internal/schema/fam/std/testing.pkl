@@ -5,3 +5,36 @@ import "../Bundle.pkl"
 
 /// emulate: local API emulation for CI and sandboxes, with its skill.
 emulate: Bundle = import("../bundles/testing/emulate.pkl")
+
+/// artillery: Load testing CLI for HTTP, WebSocket, and browser workloads.
+artillery: Bundle = import("../bundles/testing/artillery.pkl")
+
+/// bruno-cli: Official Bruno CLI for API collections and test reports.
+brunoCli: Bundle = import("../bundles/testing/bruno-cli.pkl")
+
+/// hoverfly: HTTP service simulation and API mock proxy CLI.
+hoverfly: Bundle = import("../bundles/testing/hoverfly.pkl")
+
+/// hurl: HTTP request runner and API test CLI with plain text input.
+hurl: Bundle = import("../bundles/testing/hurl.pkl")
+
+/// k6: Scriptable HTTP and browser load testing CLI from Grafana.
+k6: Bundle = import("../bundles/testing/k6.pkl")
+
+/// mockoon-cli: Official Mockoon CLI for headless API mock servers.
+mockoonCli: Bundle = import("../bundles/testing/mockoon-cli.pkl")
+
+/// oha: HTTP load generator with JSON output and a noninteractive mode.
+oha: Bundle = import("../bundles/testing/oha.pkl")
+
+/// pact: Official CLI for API contract verification and mock servers.
+pact: Bundle = import("../bundles/testing/pact.pkl")
+
+/// prism: OpenAPI mock server and validation proxy CLI from Stoplight.
+prism: Bundle = import("../bundles/testing/prism.pkl")
+
+/// schemathesis: CLI for property based API tests from OpenAPI and GraphQL schemas.
+schemathesis: Bundle = import("../bundles/testing/schemathesis.pkl")
+
+/// uiverify: Official UI Verify CLI for visual checks and screenshot uploads.
+uiVerify: Bundle = import("../bundles/testing/uiverify.pkl")

@@ -1,0 +1,27 @@
+/// playwright-cli: Browser automation CLI for coding agents, from Microsoft (https://github.com/microsoft/playwright-cli).
+///
+/// FAM installs the CLI with global npm.
+/// FAM copies the core skills from GitHub.
+/// Needs Node.js 20 or later and a supported browser, supplied separately.
+/// Supply a compatible local browser, or connect to a remote browser with CDP.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "playwright-cli"
+description = "Browser automation CLI for coding agents, from Microsoft"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "@playwright/cli"
+    binary = "playwright-cli"
+  }
+  new fam.GitHubSkill {
+    repo = "microsoft/playwright-cli"
+    path = "skills/playwright-cli"
+  }
+}
+
+verify {
+  new { name = "playwright-cli runs"; script = "playwright-cli --version" }
+}

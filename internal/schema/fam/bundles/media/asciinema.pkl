@@ -1,0 +1,30 @@
+/// asciinema: Terminal recording CLI with a headless mode for scripts and CI (https://github.com/asciinema/asciinema).
+///
+/// FAM installs the CLI from the latest GitHub release.
+/// No runtime or login is required for local recordings.
+/// Linux arm64 has no musl build.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "asciinema"
+description = "Terminal recording CLI with a headless mode for scripts and CI"
+version = "@FAM_VERSION@"
+supported = facts.os != "linux" || facts.libc != "musl" || facts.arch != "arm64"
+tasks {
+  new fam.GitHubRelease {
+    repo = "asciinema/asciinema"
+    binary = "asciinema"
+    assets {
+      ["linux-amd64"] { name = "asciinema-x86_64-unknown-linux-musl" }
+      ["linux-arm64"] { name = "asciinema-aarch64-unknown-linux-gnu" }
+      ["linux-amd64-musl"] { name = "asciinema-x86_64-unknown-linux-musl" }
+      ["darwin-arm64"] { name = "asciinema-aarch64-apple-darwin" }
+    }
+  }
+}
+
+verify {
+  new { name = "asciinema runs"; script = "asciinema --version" }
+}

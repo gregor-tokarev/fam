@@ -1,0 +1,24 @@
+/// browse: Official Browserbase CLI for browser control and hosted browser APIs (https://github.com/browserbase/stagehand).
+///
+/// FAM installs the CLI with global npm.
+/// Needs Node.js 22.18 or later and a separate browser, or Browserbase Cloud.
+/// Cloud access needs BROWSERBASE_API_KEY. Local sessions need no key.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "browse"
+description = "Official Browserbase CLI for browser control and hosted browser APIs"
+version = "@FAM_VERSION@"
+requiredSecrets { "BROWSERBASE_API_KEY" }
+tasks {
+  new fam.Package {
+    package = "browse"
+    binary = "browse"
+    versionCommand = "BROWSE_DISABLE_UPDATE_CHECK=1 DO_NOT_TRACK=1 browse --version"
+  }
+}
+
+verify {
+  new { name = "browse runs"; script = "BROWSE_DISABLE_UPDATE_CHECK=1 DO_NOT_TRACK=1 browse --version" }
+}

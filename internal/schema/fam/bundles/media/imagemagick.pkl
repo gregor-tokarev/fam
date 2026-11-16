@@ -1,0 +1,29 @@
+/// imagemagick: Official CLI for image conversion, resizing, comparison, and composition (https://github.com/ImageMagick/ImageMagick).
+///
+/// FAM installs the CLI with the system package manager.
+/// Needs the system package manager. No display or login is required.
+/// Ubuntu and Debian use the compatible convert command. Other targets use magick.
+/// Some formats need separate delegate programs.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "imagemagick"
+description = "Official CLI for image conversion, resizing, comparison, and composition"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "imagemagick"
+      manager = "system"
+      names { ["dnf"] = "ImageMagick" }
+    }
+    binary = if (facts.distro == "ubuntu" || facts.distro == "debian") "convert" else "magick"
+    versionCommand = if (facts.distro == "ubuntu" || facts.distro == "debian") "convert -version" else "magick -version"
+  }
+}
+
+verify {
+  new { name = "ImageMagick version"; script = if (facts.distro == "ubuntu" || facts.distro == "debian") "convert -version" else "magick -version" }
+}

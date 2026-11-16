@@ -1,0 +1,29 @@
+/// oha: HTTP load generator with JSON output and a noninteractive mode (https://github.com/hatoo/oha).
+///
+/// FAM installs the CLI from the latest GitHub release.
+/// Uses static musl binaries on Linux. No runtime or login is required.
+/// Use --no-tui or JSON output on workers.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "oha"
+description = "HTTP load generator with JSON output and a noninteractive mode"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "hatoo/oha"
+    binary = "oha"
+    assets {
+      ["linux-amd64"] { name = "oha-linux-amd64" }
+      ["linux-arm64"] { name = "oha-linux-arm64" }
+      ["linux-amd64-musl"] { name = "oha-linux-amd64" }
+      ["linux-arm64-musl"] { name = "oha-linux-arm64" }
+      ["darwin-arm64"] { name = "oha-macos-arm64" }
+    }
+  }
+}
+
+verify {
+  new { name = "oha runs"; script = "oha --version" }
+}

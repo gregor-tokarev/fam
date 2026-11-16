@@ -60,6 +60,10 @@ A bundle lists secret names. The config supplies their values.
 |---|---|---|---|---|
 | `std.computer.agentBrowser` | Browser automation CLI for AI agents | npm: `agent-browser` | agent-browser | — |
 | `std.computer.agentDesktop` | Computer use CLI for AI agents | npm: `agent-desktop` | agent-desktop, agent-desktop-linux | — |
+| `std.computer.browserUse` | Browser control CLI with local and hosted browser sessions | uv: `browser-use` | browser-use, remote-browser, qa, cloud, open-source, x402 | BROWSER_USE_API_KEY |
+| `std.computer.browserbaseBrowse` | Official Browserbase CLI for browser control and hosted browser APIs | npm: `browse` | — | BROWSERBASE_API_KEY |
+| `std.computer.playwrightCli` | Browser automation CLI for coding agents, from Microsoft | npm: `@playwright/cli` | playwright-cli | — |
+| `std.computer.steel` | Official Steel CLI for browser sessions, scraping, and screenshots | GitHub release: `steel-dev/cli` (latest) | — | STEEL_API_KEY |
 
 ## context
 
@@ -142,9 +146,24 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.media.agg` | Official renderer that converts asciinema recordings to GIF files | GitHub release: `asciinema/agg` (latest) | — | — |
 | `std.media.aiCli` | Generate anything from the terminal | npm: `ai-cli` | ai-cli | — |
+| `std.media.asciinema` | Terminal recording CLI with a headless mode for scripts and CI | GitHub release: `asciinema/asciinema` (latest) | — | — |
+| `std.media.d2` | Official text to diagram CLI for architecture and system designs | GitHub release: `d2lang/d2` (latest) | — | — |
+| `std.media.elevenlabs` | Official ElevenLabs CLI for speech, audio, media generation, and API access | npm: `@elevenlabs/cli` | elevenlabs-custom-commands | ELEVENLABS_API_KEY |
+| `std.media.fal` | Official fal CLI for model API calls, generation queues, and deployments | uv: `fal` | — | FAL_KEY |
+| `std.media.ffmpeg` | Official command line tools for video, audio, and media conversion | apt: `ffmpeg` | — | — |
 | `std.media.hyperframes` | HTML to video for agents | npm: `hyperframes` | hyperframes, hyperframes-cli, hyperframes-registry, media-use, reverse-any-video, style-sampling | — |
+| `std.media.imageMagick` | Official CLI for image conversion, resizing, comparison, and composition | apt: `imagemagick` | — | — |
+| `std.media.mermaidCli` | Official CLI that renders Mermaid diagrams to SVG, PNG, and PDF | npm: `@mermaid-js/mermaid-cli` | — | — |
+| `std.media.oxipng` | Lossless PNG optimization CLI with parallel processing | GitHub release: `oxipng/oxipng` (latest) | — | — |
+| `std.media.remotionCli` | Official Remotion CLI for headless video and still image rendering | npm: `@remotion/cli` | remotion-best-practices, remotion-captions, remotion-create, remotion-docs, remotion-interactivity, remotion-license, remotion-maps, remotion-markup, remotion-multimedia, remotion-render, remotion-saas, remotion-studio, remotion-upgrade | — |
+| `std.media.resvg` | Official standalone SVG renderer CLI with PNG output | GitHub release: `linebender/resvg` (latest) | — | — |
+| `std.media.svgo` | Official SVG optimizer CLI for compact vector assets | npm: `svgo` | — | — |
+| `std.media.vhs` | Scripted terminal recording CLI that creates videos and GIFs | GitHub release: `charmbracelet/vhs` (latest) | — | — |
+| `std.media.vips` | Official image processing CLI for large images and batch operations | apt: `libvips-tools` | — | — |
 | `std.media.webreel` | Scripted browser demos as video | npm: `webreel` | webreel | — |
+| `std.media.ytDlp` | Command line downloader for video, audio, subtitles, and metadata | uv: `yt-dlp` | — | — |
 
 ## networking
 
@@ -183,7 +202,18 @@ A bundle lists secret names. The config supplies their values.
 
 | Bundle | Description | Install | Skills | Secrets |
 |---|---|---|---|---|
+| `std.testing.artillery` | Load testing CLI for HTTP, WebSocket, and browser workloads | npm: `artillery` | — | — |
+| `std.testing.brunoCli` | Official Bruno CLI for API collections and test reports | npm: `@usebruno/cli` | — | — |
 | `std.testing.emulate` | Local API emulation | npm: `emulate` | emulate | — |
+| `std.testing.hoverfly` | HTTP service simulation and API mock proxy CLI | GitHub release: `SpectoLabs/hoverfly` (latest) | — | — |
+| `std.testing.hurl` | HTTP request runner and API test CLI with plain text input | GitHub release: `Orange-OpenSource/hurl` (latest) | — | — |
+| `std.testing.k6` | Scriptable HTTP and browser load testing CLI from Grafana | GitHub release: `grafana/k6` (latest) | — | — |
+| `std.testing.mockoonCli` | Official Mockoon CLI for headless API mock servers | npm: `@mockoon/cli` | — | — |
+| `std.testing.oha` | HTTP load generator with JSON output and a noninteractive mode | GitHub release: `hatoo/oha` (latest) | — | — |
+| `std.testing.pact` | Official CLI for API contract verification and mock servers | GitHub release: `pact-foundation/pact-cli` (latest) | — | — |
+| `std.testing.prism` | OpenAPI mock server and validation proxy CLI from Stoplight | npm: `@stoplight/prism-cli` | — | — |
+| `std.testing.schemathesis` | CLI for property based API tests from OpenAPI and GraphQL schemas | uv: `schemathesis` | — | — |
+| `std.testing.uiVerify` | Official UI Verify CLI for visual checks and screenshot uploads | npm: `uiverify` | check-visual-changes, economical-visual-tests, setup-visual-testing, triage-visual-changes, playwright-visual-testing, vitest-visual-testing, bun-visual-testing, storybook-visual-testing, implement-figma-design, making-ui-changes | UIVERIFY_API_KEY |
 
 ## work
 

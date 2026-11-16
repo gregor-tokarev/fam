@@ -1,0 +1,30 @@
+/// elevenlabs: Official ElevenLabs CLI for speech, audio, media generation, and API access (https://github.com/elevenlabs/cli).
+///
+/// FAM installs the CLI with global npm.
+/// FAM copies the core skills from GitHub.
+/// The npm launcher installs the native binary. Needs Node.js and ELEVENLABS_API_KEY.
+/// The say skill links outside its folder, so FAM cannot copy it.
+/// Use an output file for speech on machines without audio playback.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "elevenlabs"
+description = "Official ElevenLabs CLI for speech, audio, media generation, and API access"
+version = "@FAM_VERSION@"
+requiredSecrets { "ELEVENLABS_API_KEY" }
+tasks {
+  new fam.Package {
+    package = "@elevenlabs/cli"
+    binary = "elevenlabs"
+  }
+  new fam.GitHubSkill {
+    repo = "elevenlabs/cli"
+    path = ".agents/skills/custom-commands"
+    name = "elevenlabs-custom-commands"
+  }
+}
+
+verify {
+  new { name = "elevenlabs runs"; script = "elevenlabs --version" }
+}

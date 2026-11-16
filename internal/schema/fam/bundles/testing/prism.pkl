@@ -1,0 +1,21 @@
+/// prism: OpenAPI mock server and validation proxy CLI from Stoplight (https://github.com/stoplightio/prism).
+///
+/// FAM installs the CLI with global npm.
+/// Needs Node.js 24.18 or later. Local API mocks need no login.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "prism"
+description = "OpenAPI mock server and validation proxy CLI from Stoplight"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = "@stoplight/prism-cli"
+    binary = "prism"
+  }
+}
+
+verify {
+  new { name = "prism runs"; script = "prism --version" }
+}

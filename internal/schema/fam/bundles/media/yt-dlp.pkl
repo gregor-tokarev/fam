@@ -1,0 +1,25 @@
+/// yt-dlp: Command line downloader for video, audio, subtitles, and metadata (https://github.com/yt-dlp/yt-dlp).
+///
+/// FAM installs the CLI with uv tool install.
+/// Needs uv and Python 3.11 or later. No account is required for public media.
+/// Some sites need cookies or a JavaScript runtime. Merging media needs FFmpeg.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "yt-dlp"
+description = "Command line downloader for video, audio, subtitles, and metadata"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "yt-dlp"
+      manager = "uv"
+    }
+    binary = "yt-dlp"
+  }
+}
+
+verify {
+  new { name = "yt-dlp runs"; script = "yt-dlp --version" }
+}

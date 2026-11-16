@@ -127,7 +127,7 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 
 ## Standard bundles
 
-`@fam/std.pkl` has ready bundles for agent tools, in groups: `bundles { std.networking.portless; std.media.hyperframes }`. Each one installs its tool with a package manager, an install script, or a GitHub release and copies its skills from the latest GitHub release. None installs a browser, a runtime, or system packages. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
+`@fam/std.pkl` has ready bundles for agent tools, in groups: `bundles { std.networking.portless; std.media.hyperframes }`. Each one installs its tool with a package manager, an install script, or a GitHub release and copies its skills from the latest GitHub release. A bundle can use the OS package manager for its CLI. Bundles do not install browsers, runtimes, or system configuration. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
 
 See the [standard bundle catalogue](std.md) for descriptions, install methods, skills, and required secrets.
 

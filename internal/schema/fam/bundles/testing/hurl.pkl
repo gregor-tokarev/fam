@@ -1,0 +1,31 @@
+/// hurl: HTTP request runner and API test CLI with plain text input (https://github.com/Orange-OpenSource/hurl).
+///
+/// FAM installs the CLI from the latest GitHub release.
+/// Linux needs glibc, libcurl.so.4, and libxml2.so.2. No musl build is available.
+/// Ubuntu 26 and later lack libxml2.so.2, so this bundle excludes them.
+/// No compiler or login is required.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+name = "hurl"
+description = "HTTP request runner and API test CLI with plain text input"
+version = "@FAM_VERSION@"
+supported = (facts.os != "linux" || facts.libc != "musl")
+  && (facts.distro != "ubuntu" || facts.distroVersion.split(".")[0].toInt() < 26)
+tasks {
+  new fam.GitHubRelease {
+    repo = "Orange-OpenSource/hurl"
+    binary = "hurl"
+    assets {
+      ["linux-amd64"] { name = "hurl-{version}-x86_64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "hurl-{version}-x86_64-unknown-linux-gnu/bin/hurl"; checksum = "hurl-{version}-x86_64-unknown-linux-gnu.tar.gz.sha256" }
+      ["linux-arm64"] { name = "hurl-{version}-aarch64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "hurl-{version}-aarch64-unknown-linux-gnu/bin/hurl"; checksum = "hurl-{version}-aarch64-unknown-linux-gnu.tar.gz.sha256" }
+      ["darwin-arm64"] { name = "hurl-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "hurl-{version}-aarch64-apple-darwin/bin/hurl"; checksum = "hurl-{version}-aarch64-apple-darwin.tar.gz.sha256" }
+    }
+  }
+}
+
+verify {
+  new { name = "hurl runs"; script = "hurl --version" }
+}
