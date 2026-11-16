@@ -142,6 +142,7 @@ func migrateCmd(opts *Options) *cobra.Command {
 func upgradeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:                "upgrade",
+		Short:              "Renamed to `fam migrate`",
 		Hidden:             true,
 		DisableFlagParsing: true,
 		RunE: func(*cobra.Command, []string) error {
