@@ -685,9 +685,18 @@ func s14Std(c *Ctx) error {
 		return err
 	}
 	m, _ := machineOf(r)
-	out, err := c.mustSSH(`bash -lc 'agent-browser --version'; test -r ~/.agents/skills/agent-browser/SKILL.md && echo skill; test -L ~/.claude/skills/agent-browser && echo link; grep -c agent-browser ~/.agents/AGENTS.md`)
+	out, err := c.mustSSH(`bash -lc 'agent-browser --version'; grep -q '^name: agent-browser' ~/.agents/skills/agent-browser/SKILL.md && echo skill; test -L ~/.claude/skills/agent-browser && echo link; grep -c agent-browser ~/.agents/AGENTS.md`)
 	if err != nil || !strings.Contains(out, "skill") || !strings.Contains(out, "link") {
 		return fmt.Errorf("agentBrowser: %v %s", err, out)
+	}
+	// The bundle installs only the CLI and its skill: no browser, no system packages, no variables.
+	for _, t := range m.Tasks {
+		if t.Group == "bundle agent-browser" && t.Kind != "package" {
+			return fmt.Errorf("agentBrowser has a task other than the CLI: %s %s", t.Kind, t.Name)
+		}
+	}
+	if extra, _ := c.ssh(`test -d ~/.agent-browser/browsers && echo browser; bash -lc 'env' | grep '^AGENT_BROWSER_'`); strings.TrimSpace(extra) != "" {
+		return fmt.Errorf("agentBrowser changed more than the CLI: %s", extra)
 	}
 	c.notes = append(c.notes, fmt.Sprintf("%d changed; %s", m.Counts.Changed, firstLineS(out)))
 	return nil

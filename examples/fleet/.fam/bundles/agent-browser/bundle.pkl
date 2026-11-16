@@ -1,60 +1,28 @@
-//! Written by FAM 0.2.1. Do not edit. Run `fam upgrade` to update.
+//! Written by FAM 0.3.0. Do not edit. Run `fam upgrade` to update.
 
 /// agent-browser: a browser automation CLI for AI agents (https://github.com/vercel-labs/agent-browser).
 ///
-/// FAM installs the package with the global npm of the machine (Node.js 22 or later), and copies
-/// the upstream skill. To use another package manager, set it in `config.pkl` (or for one machine):
+/// FAM installs the CLI with the global npm of the machine (Node.js 22 or later), and copies the
+/// skill of its latest release from GitHub. To use another package manager, set it in
+/// `config.pkl` (or for one machine):
 ///
 /// ```
 /// packageManagers { ["agent-browser"] = "vite" }
 /// ```
 ///
-/// The browser:
-/// - macOS: Chrome for Testing (`agent-browser install`).
-/// - Ubuntu and Debian on x86-64: Chrome for Testing with its system libraries
-///   (`agent-browser install --with-deps`, which uses `sudo`).
-/// - Other Linux distributions (Fedora, Arch Linux, Alpine) and Linux on ARM64: Chromium from the OS
-///   package manager. Chrome for Testing has no build for musl or Linux ARM64, and `--with-deps`
-///   does not find the package manager of these distributions.
+/// FAM does not install a browser and does not change the system. Install the browser that
+/// agent-browser uses yourself, for example with `agent-browser install`, or in a bundle of your own.
 amends "../../Bundle.pkl"
 
+import "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
-import "../../facts.pkl"
 
 name = "agent-browser"
 description = "Browser automation CLI for AI agents"
-version = "0.2.1"
-skill = "skill"
-
-local systemChromium = facts.os == "linux" &&
-  ((facts.distro != "ubuntu" && facts.distro != "debian") || facts.arch == "arm64")
-
-// The Chromium binary has a different name and path on each distribution (and is a snap on
-// Ubuntu). FAM links the one that it finds to a fixed path.
-local chromiumLink = "\(facts.home)/.local/bin/agent-browser-chromium"
-
-local chromiumInstall =
-  if (facts.distro == "alpine") "apk add --no-cache chromium"
-  else if (facts.distro == "arch") "pacman -S --needed --noconfirm chromium"
-  else if (facts.distro == "fedora") "dnf install -y chromium"
-  else "DEBIAN_FRONTEND=noninteractive apt-get install -y chromium"
-
-local findChromium = #"for c in chromium chromium-browser /snap/bin/chromium; do p=$(command -v "$c" 2>/dev/null) && [ -n "$p" ] && break; p=; done"#
-
-// The Chrome for Testing binary in the home folder of the user.
-local findChrome = #"""
-  c=$(find "$HOME/.agent-browser/browsers" -type f -perm -u+x \( -name chrome -o -name "Google Chrome for Testing" \) 2>/dev/null | head -n 1)
-  """#
-
-env {
-  when (systemChromium) {
-    ["AGENT_BROWSER_EXECUTABLE_PATH"] = chromiumLink
-  }
-  // Ubuntu 23.10 and later block unprivileged user namespaces with AppArmor, so the Chrome
-  // sandbox cannot start. The browser runs without its sandbox there.
-  when (facts.distro == "ubuntu") {
-    ["AGENT_BROWSER_ARGS"] = "--no-sandbox"
-  }
+version = "0.3.0"
+skill = new Bundle.GitHubSkill {
+  repo = "vercel-labs/agent-browser"
+  path = "skills/agent-browser"
 }
 
 instructions {
@@ -66,73 +34,8 @@ tasks {
   new fam.Package {
     package = "agent-browser"
   }
-  when (systemChromium) {
-    new fam.Script {
-      name = "system Chromium"
-      sudo = true
-      check = "\(findChromium); [ -n \"$p\" ] && exit 0 || exit 100"
-      apply = chromiumInstall
-    }
-    new fam.Script {
-      name = "Chromium link for agent-browser"
-      // Without Chromium the task before installs it, so the link is a change, not an error.
-      check = "\(findChromium); [ -n \"$p\" ] || exit 100; [ \"$(readlink '\(chromiumLink)')\" = \"$p\" ] && exit 0 || exit 100"
-      apply = "\(findChromium); mkdir -p '\(facts.home)/.local/bin' && ln -sfn \"$p\" '\(chromiumLink)'"
-    }
-  } else {
-    new fam.Script {
-      name = "agent-browser browser"
-      check = findChrome + "\n" + #"[ -n "$c" ] && exit 0 || exit 100"#
-      apply = "agent-browser install"
-    }
-    when (facts.os == "linux") {
-      // The system libraries of Chrome. FAM runs this with its own sudo, so it also works on a
-      // cockpit with a sudo password. The download of the root run goes to a temporary folder.
-      new fam.Script {
-        name = "browser system libraries"
-        sudo = true
-        check = #"""
-          c=$(find "\#(facts.home)/.agent-browser/browsers" -type f -perm -u+x -name chrome 2>/dev/null | head -n 1)
-          # Without Chrome the task before downloads it: a change, not an error.
-          [ -n "$c" ] || exit 100
-          "$c" --version >/dev/null 2>&1 && exit 0 || exit 100
-          """#
-        // Root has another PATH: take the PATH of the user's login shell, so that agent-browser
-        // and its Node.js resolve as for the user (any npm prefix).
-        apply = #"""
-          up=$(su -l '\#(facts.user)' -c 'printf %s "$PATH"' 2>/dev/null)
-          [ -n "$up" ] && PATH="$up:$PATH" && export PATH
-          ab=$(command -v agent-browser) || { echo "agent-browser is not in the PATH of \#(facts.user)" >&2; exit 1; }
-          # A Vite+ shim links to <VP_HOME>/current/bin/vp and finds its packages through HOME.
-          # The temporary HOME below hides them, so give the shim its VP_HOME.
-          case "$(readlink "$ab" 2>/dev/null)" in
-            */current/bin/vp) VP_HOME=$(readlink "$ab"); VP_HOME=${VP_HOME%/current/bin/vp}; export VP_HOME ;;
-          esac
-          t=$(mktemp -d); HOME="$t" agent-browser install --with-deps; rc=$?; rm -rf "$t"; exit $rc
-          """#
-      }
-    }
-  }
-}
-
-uninstall {
-  new fam.Script {
-    name = "agent-browser browser removal"
-    check = #"[ -d "$HOME/.agent-browser" ] && exit 100 || exit 0"#
-    apply = #"rm -rf "$HOME/.agent-browser""#
-  }
-  new fam.Symlink {
-    path = "~/.local/bin/agent-browser-chromium"
-    target = "/usr/bin/chromium"
-    state = "absent"
-  }
 }
 
 verify {
   new { name = "agent-browser --version"; event = "fresh_shell"; script = "agent-browser --version" }
-  new {
-    name = "agent-browser opens a page"
-    event = "fresh_shell"
-    script = #"agent-browser open about:blank >/dev/null && agent-browser close >/dev/null"#
-  }
 }

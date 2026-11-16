@@ -51,10 +51,17 @@ type Bundle struct {
 	// for example `"~/.cargo/bin"`. `~/` is the home directory.
 	Path []string `pkl:"path"`
 
-	// A skill folder, relative to this file. The folder must contain `SKILL.md`.
+	// The skill of the bundle: a folder relative to this file, or a folder in a GitHub repository.
+	// The folder must contain `SKILL.md`.
 	//
-	// FAM copies it to `~/.agents/skills/<folder name>`.
-	Skill *string `pkl:"skill"`
+	// ```
+	// skill = "skill"
+	// skill = new Bundle.GitHubSkill { repo = "vercel-labs/agent-browser"; path = "skills/agent-browser" }
+	// ```
+	//
+	// FAM copies it to `~/.agents/skills/<folder name>` (a local folder named `skill` uses the
+	// bundle name).
+	Skill *any `pkl:"skill"`
 
 	// Lines that FAM adds to the agent instructions of the machine.
 	Instructions []string `pkl:"instructions"`

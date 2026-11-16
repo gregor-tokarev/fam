@@ -298,7 +298,7 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 		return
 	}
 	mr.spec = spec
-	sects, verify, err := buildSections(mr.env, spec)
+	sects, verify, err := buildSections(ctx, mr.env, spec)
 	if err != nil {
 		mr.res.ErrorKind = "config"
 		setError(mr.res, err)

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/gregor-tokarev/fam/internal/config"
+	"github.com/gregor-tokarev/fam/internal/pklgen/bundle"
 	"github.com/gregor-tokarev/fam/internal/transport"
 )
 
@@ -347,7 +348,7 @@ func (t *SkillPruneTask) Apply(ctx context.Context, env *Env) (string, error) {
 
 // skillsSection copies the project skills and the skills of present bundles,
 // and removes the skills of absent bundles and old skills.
-func skillsSection(env *Env, spec *config.Spec) (Section, error) {
+func skillsSection(ctx context.Context, env *Env, spec *config.Spec) (Section, error) {
 	g := base{group: "skills"}
 	sec := Section{Name: "skills"}
 	var list []*SkillSource
@@ -386,14 +387,31 @@ func skillsSection(env *Env, spec *config.Spec) (Section, error) {
 		if u.State != "present" || u.Bundle.Skill == nil {
 			continue
 		}
-		dir := filepath.Join(u.Dir, *u.Bundle.Skill)
-		name := filepath.Base(filepath.Clean(dir))
-		if name == "skill" || name == "." {
-			name = u.Bundle.Name
-		}
-		s, err := loadSkill(name, dir, "bundle "+u.Bundle.Name)
-		if err != nil {
-			return sec, err
+		var s *SkillSource
+		switch sk := (*u.Bundle.Skill).(type) {
+		case string:
+			dir := filepath.Join(u.Dir, sk)
+			name := filepath.Base(filepath.Clean(dir))
+			if name == "skill" || name == "." {
+				name = u.Bundle.Name
+			}
+			ls, err := loadSkill(name, dir, "bundle "+u.Bundle.Name)
+			if err != nil {
+				return sec, err
+			}
+			s = ls
+		case bundle.GitHubSkill, *bundle.GitHubSkill:
+			gs, _ := sk.(bundle.GitHubSkill)
+			if p, ok := sk.(*bundle.GitHubSkill); ok {
+				gs = *p
+			}
+			gsrc, err := loadGitHubSkill(ctx, gs, "bundle "+u.Bundle.Name)
+			if err != nil {
+				return sec, err
+			}
+			s = gsrc
+		default:
+			return sec, fmt.Errorf("bundle %s: skill has the type %T. Use a folder name or new Bundle.GitHubSkill { … }", u.Bundle.Name, sk)
 		}
 		if err := add(s); err != nil {
 			return sec, err
