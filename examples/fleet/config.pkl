@@ -11,7 +11,7 @@ bundles {
   import("bundles/bun.pkl")
   import("bundles/opencode.pkl")
   import("bundles/typescript.pkl")
-  std.agentBrowser
+  std.computer.agentBrowser
 }
 
 machines = import("machines.pkl").machines

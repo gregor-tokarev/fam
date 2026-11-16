@@ -1,46 +1,88 @@
-/// The standard bundles of FAM @FAM_VERSION@.
+/// The standard bundles of FAM @FAM_VERSION@, in groups.
 ///
 /// ```
 /// import "@fam/std.pkl"
 ///
-/// bundles { std.agentBrowser; std.portless }
+/// bundles { std.computer.agentBrowser; std.networking.portless }
 /// ```
 module fam.std
 
 import "Bundle.pkl"
 
-/// agent-browser: a browser automation CLI for agents, with its skill.
-agentBrowser: Bundle = import("bundles/agent-browser.pkl")
+/// Tools that let agents use a computer: browsers and desktop apps.
+computer: Computer
 
-/// agent-desktop: computer use for agents through the accessibility tree, with its skills.
-agentDesktop: Bundle = import("bundles/agent-desktop.pkl")
+/// Tools that give agents context: source code of packages, a knowledge graph of a codebase, related issues.
+context: Context
 
-/// ai-cli: generate text, images, and more from the terminal, with its skill.
-aiCli: Bundle = import("bundles/ai-cli.pkl")
+/// Tools that make media: video, images, and text.
+media: Media
 
-/// emulate: local API emulation for CI and sandboxes, with its skill.
-emulate: Bundle = import("bundles/emulate.pkl")
+/// Tools for local networking.
+networking: Networking
 
-/// HyperFrames: HTML to video, with the core skills.
-hyperframes: Bundle = import("bundles/hyperframes.pkl")
+/// Tools for tests.
+testing: Testing
 
-/// issue-graph: related issues and changes before work starts, with its skill.
-issueGraph: Bundle = import("bundles/issue-graph.pkl")
+/// Tools for the agents themselves.
+agents: Agents
 
-/// lat.md: a Markdown knowledge graph of a codebase, with its skill.
-latMd: Bundle = import("bundles/lat-md.pkl")
+/// Programming languages for agents.
+languages: Languages
 
-/// opensrc: the source code of npm packages for agents, with its skill.
-opensrc: Bundle = import("bundles/opensrc.pkl")
+/// Tools that let agents use a computer: browsers and desktop apps.
+class Computer {
+  /// agent-browser: a browser automation CLI for agents, with its skill.
+  agentBrowser: Bundle = import("bundles/computer/agent-browser.pkl")
 
-/// portless: named local URLs instead of port numbers, with its skill.
-portless: Bundle = import("bundles/portless.pkl")
+  /// agent-desktop: computer use for agents through the accessibility tree, with its skills.
+  agentDesktop: Bundle = import("bundles/computer/agent-desktop.pkl")
+}
 
-/// skills: the agent skills tool, with the find-skills skill.
-skills: Bundle = import("bundles/skills.pkl")
+/// Tools that give agents context: source code of packages, a knowledge graph of a codebase, related issues.
+class Context {
+  /// issue-graph: related issues and changes before work starts, with its skill.
+  issueGraph: Bundle = import("bundles/context/issue-graph.pkl")
 
-/// webreel: scripted browser demos as video, with its skill.
-webreel: Bundle = import("bundles/webreel.pkl")
+  /// lat.md: a Markdown knowledge graph of a codebase, with its skill.
+  latMd: Bundle = import("bundles/context/lat-md.pkl")
 
-/// Zero: the programming language for agents, with its skill.
-zero: Bundle = import("bundles/zero.pkl")
+  /// opensrc: the source code of npm packages for agents, with its skill.
+  opensrc: Bundle = import("bundles/context/opensrc.pkl")
+}
+
+/// Tools that make media: video, images, and text.
+class Media {
+  /// ai-cli: generate text, images, and more from the terminal, with its skill.
+  aiCli: Bundle = import("bundles/media/ai-cli.pkl")
+
+  /// HyperFrames: HTML to video, with the core skills.
+  hyperframes: Bundle = import("bundles/media/hyperframes.pkl")
+
+  /// webreel: scripted browser demos as video, with its skill.
+  webreel: Bundle = import("bundles/media/webreel.pkl")
+}
+
+/// Tools for local networking.
+class Networking {
+  /// portless: named local URLs instead of port numbers, with its skill.
+  portless: Bundle = import("bundles/networking/portless.pkl")
+}
+
+/// Tools for tests.
+class Testing {
+  /// emulate: local API emulation for CI and sandboxes, with its skill.
+  emulate: Bundle = import("bundles/testing/emulate.pkl")
+}
+
+/// Tools for the agents themselves.
+class Agents {
+  /// skills: the agent skills tool, with the find-skills skill.
+  skills: Bundle = import("bundles/agents/skills.pkl")
+}
+
+/// Programming languages for agents.
+class Languages {
+  /// Zero: the programming language for agents, with its skill.
+  zero: Bundle = import("bundles/languages/zero.pkl")
+}

@@ -10,9 +10,9 @@
 ///
 /// FAM does not install a browser and does not change the system. Install the browser that
 /// agent-browser uses yourself, for example with `agent-browser install`, or in a bundle of your own.
-amends "../Bundle.pkl"
+amends "../../Bundle.pkl"
 
-import "../tasks.pkl" as fam
+import "../../tasks.pkl" as fam
 
 name = "agent-browser"
 description = "Browser automation CLI for AI agents"

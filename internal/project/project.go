@@ -142,7 +142,7 @@ import "@fam/std.pkl"
 // Bundles for every machine.
 bundles {
   import("bundles/hello.pkl")
-  // std.agentBrowser
+  // std.computer.agentBrowser
 }
 
 machines = import("machines.pkl").machines
