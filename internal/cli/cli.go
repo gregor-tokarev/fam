@@ -176,7 +176,53 @@ func internalCmd() *cobra.Command {
 			return nil
 		},
 	})
+	c.AddCommand(&cobra.Command{
+		Use:   "install-pkl <dir>",
+		Short: "Copy the pinned pkl binary to <dir>/pkl, for editors with the Pkl plugin",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			src, err := pklbin.Path(cmd.Context(), os.Stderr)
+			if err != nil {
+				return err
+			}
+			dest, err := installPkl(src, args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Installed pkl %s to %s\n", version.PklVersion, dest)
+			return nil
+		},
+	})
 	return c
+}
+
+// installPkl copies the pkl binary src to dir/pkl. It writes a new file next to the target, then
+// renames it, so that a running pkl keeps working.
+func installPkl(src, dir string) (string, error) {
+	b, err := os.ReadFile(src)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	tmp, err := os.CreateTemp(dir, ".pkl.new-*")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(b); err != nil {
+		tmp.Close()
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		return "", err
+	}
+	if err := os.Chmod(tmp.Name(), 0o755); err != nil {
+		return "", err
+	}
+	dest := filepath.Join(dir, "pkl")
+	return dest, os.Rename(tmp.Name(), dest)
 }
 
 func joinNames(names []string) string { return strings.Join(names, ", ") }

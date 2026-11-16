@@ -26,7 +26,7 @@ On Linux (x86-64 or arm64) or a Mac with Apple Silicon:
 curl -fsSL https://raw.githubusercontent.com/gregor-tokarev/fam/main/install.sh | sh
 ```
 
-FAM goes to `~/.local/bin`. Install it only on the machine that you work from: the other machines need only SSH.
+FAM goes to `~/.local/bin`, with `pkl` when you do not have it yet (for the Pkl plugin of your editor). Install it only on the machine that you work from: the other machines need only SSH.
 
 To update FAM, run `fam update`.
 

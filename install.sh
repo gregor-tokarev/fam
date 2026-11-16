@@ -5,6 +5,10 @@
 #
 # FAM_VERSION=0.2.0   install this version (default: the latest release)
 # FAM_INSTALL_DIR=... install into this folder (default: ~/.local/bin)
+# FAM_PKL=0           do not install pkl
+#
+# When no pkl is in PATH, the script also installs the pkl that fam uses (the Pkl plugins of
+# editors need it).
 #
 # Run it again to update fam, or run `fam update`.
 set -eu
@@ -72,6 +76,10 @@ mv -f "$new" "$dir/fam"
 new=
 
 echo "Installed $("$dir/fam" version) to $dir/fam"
+if [ "${FAM_PKL:-1}" != 0 ] && ! command -v pkl >/dev/null 2>&1; then
+  "$dir/fam" internal install-pkl "$dir" ||
+    echo "fam install: pkl was not installed. Editors with the Pkl plugin need pkl in PATH: https://pkl-lang.org" >&2
+fi
 case ":$PATH:" in
   *":$dir:"*) ;;
   *) echo "Add $dir to PATH, for example: echo 'export PATH=\"$dir:\$PATH\"' >> ~/.profile" ;;
