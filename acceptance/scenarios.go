@@ -704,9 +704,7 @@ func s14Std(c *Ctx) error {
 // lat.md, which depend on the target.
 var stdSkills = []string{
 	"agent-browser",
-	"vercel-composition-patterns", "deploy-to-vercel", "vercel-react-best-practices", "vercel-react-native-skills",
-	"vercel-react-view-transitions", "vercel-cli-with-tokens", "vercel-optimize", "web-design-guidelines", "writing-guidelines",
-	"ai-cli", "d3k", "emulate",
+	"ai-cli", "emulate",
 	"hyperframes", "hyperframes-cli", "hyperframes-registry", "media-use", "reverse-any-video", "style-sampling",
 	"issue-graph", "opensrc", "portless", "find-skills", "webreel", "zero",
 }

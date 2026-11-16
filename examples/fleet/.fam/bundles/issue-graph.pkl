@@ -1,4 +1,4 @@
-//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+//! Written by FAM 0.8.0. Do not edit. Run `fam migrate` to update.
 
 /// issue-graph: finds related issues, competing changes, and open follow-ups before work starts
 /// (https://github.com/vercel-labs/issue-graph).
@@ -12,7 +12,7 @@ import "../tasks.pkl" as fam
 
 name = "issue-graph"
 description = "Related issues and changes before you start work"
-version = "0.7.0"
+version = "0.8.0"
 tasks {
   new fam.Package {
     package = "issue-graph"
