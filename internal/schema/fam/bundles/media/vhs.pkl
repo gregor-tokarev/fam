@@ -1,8 +1,8 @@
 /// vhs: Scripted terminal recording CLI that creates videos and GIFs (https://github.com/charmbracelet/vhs).
 ///
-/// FAM installs the CLI with go install.
-/// Needs Go 1.26.7 or later. Recording also needs FFmpeg, ttyd, and a headless browser.
-/// Supply these programs separately. Local recordings need no login.
+/// FAM installs the CLI from the latest GitHub release.
+/// Uses static binaries on Linux. No runtime or login is required for the CLI.
+/// Recording needs separate FFmpeg, ttyd, and a headless browser.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
@@ -11,12 +11,14 @@ name = "vhs"
 description = "Scripted terminal recording CLI that creates videos and GIFs"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "github.com/charmbracelet/vhs"
-      manager = "go"
-    }
+  new fam.GitHubRelease {
+    repo = "charmbracelet/vhs"
     binary = "vhs"
+    assets {
+      ["linux-amd64"] { name = "vhs_{version}_Linux_x86_64.tar.gz"; format = "tar.gz"; file = "vhs_{version}_Linux_x86_64/vhs"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "vhs_{version}_Linux_arm64.tar.gz"; format = "tar.gz"; file = "vhs_{version}_Linux_arm64/vhs"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "vhs_{version}_Darwin_arm64.tar.gz"; format = "tar.gz"; file = "vhs_{version}_Darwin_arm64/vhs"; checksum = "checksums.txt" }
+    }
   }
 }
 

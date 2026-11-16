@@ -103,19 +103,19 @@ A bundle lists secret names. The config supplies their values.
 |---|---|---|---|---|
 | `std.media.agg` | Official renderer that converts asciinema recordings to GIF files | GitHub release: `asciinema/agg` (latest) | — | — |
 | `std.media.aiCli` | Generate anything from the terminal | npm: `ai-cli` | ai-cli | — |
-| `std.media.asciinema` | Terminal recording CLI with a headless mode for scripts and CI | cargo: `asciinema` | — | — |
-| `std.media.d2` | Official text to diagram CLI for architecture and system designs | go: `github.com/d2lang/d2` | — | — |
+| `std.media.asciinema` | Terminal recording CLI with a headless mode for scripts and CI | GitHub release: `asciinema/asciinema` (latest) | — | — |
+| `std.media.d2` | Official text to diagram CLI for architecture and system designs | GitHub release: `d2lang/d2` (latest) | — | — |
 | `std.media.elevenlabs` | Official ElevenLabs CLI for speech, audio, media generation, and API access | npm: `@elevenlabs/cli` | elevenlabs-custom-commands | ELEVENLABS_API_KEY |
 | `std.media.fal` | Official fal CLI for model API calls, generation queues, and deployments | uv: `fal` | — | FAL_KEY |
 | `std.media.ffmpeg` | Official command line tools for video, audio, and media conversion | apt: `ffmpeg` | — | — |
 | `std.media.hyperframes` | HTML to video for agents | npm: `hyperframes` | hyperframes, hyperframes-cli, hyperframes-registry, media-use, reverse-any-video, style-sampling | — |
 | `std.media.imageMagick` | Official CLI for image conversion, resizing, comparison, and composition | apt: `imagemagick` | — | — |
 | `std.media.mermaidCli` | Official CLI that renders Mermaid diagrams to SVG, PNG, and PDF | npm: `@mermaid-js/mermaid-cli` | — | — |
-| `std.media.oxipng` | Lossless PNG optimization CLI with parallel processing | cargo: `oxipng` | — | — |
+| `std.media.oxipng` | Lossless PNG optimization CLI with parallel processing | GitHub release: `oxipng/oxipng` (latest) | — | — |
 | `std.media.remotionCli` | Official Remotion CLI for headless video and still image rendering | npm: `@remotion/cli` | remotion-best-practices, remotion-captions, remotion-create, remotion-docs, remotion-interactivity, remotion-license, remotion-maps, remotion-markup, remotion-multimedia, remotion-render, remotion-saas, remotion-studio, remotion-upgrade | — |
-| `std.media.resvg` | Official standalone SVG renderer CLI with PNG output | cargo: `resvg` | — | — |
+| `std.media.resvg` | Official standalone SVG renderer CLI with PNG output | GitHub release: `linebender/resvg` (latest) | — | — |
 | `std.media.svgo` | Official SVG optimizer CLI for compact vector assets | npm: `svgo` | — | — |
-| `std.media.vhs` | Scripted terminal recording CLI that creates videos and GIFs | go: `github.com/charmbracelet/vhs` | — | — |
+| `std.media.vhs` | Scripted terminal recording CLI that creates videos and GIFs | GitHub release: `charmbracelet/vhs` (latest) | — | — |
 | `std.media.vips` | Official image processing CLI for large images and batch operations | apt: `libvips-tools` | — | — |
 | `std.media.webreel` | Scripted browser demos as video | npm: `webreel` | webreel | — |
 | `std.media.ytDlp` | Command line downloader for video, audio, subtitles, and metadata | uv: `yt-dlp` | — | — |
@@ -146,11 +146,11 @@ A bundle lists secret names. The config supplies their values.
 | `std.testing.brunoCli` | Official Bruno CLI for API collections and test reports | npm: `@usebruno/cli` | — | — |
 | `std.testing.emulate` | Local API emulation | npm: `emulate` | emulate | — |
 | `std.testing.hoverfly` | HTTP service simulation and API mock proxy CLI | GitHub release: `SpectoLabs/hoverfly` (latest) | — | — |
-| `std.testing.hurl` | HTTP request runner and API test CLI with plain text input | cargo: `hurl` | — | — |
+| `std.testing.hurl` | HTTP request runner and API test CLI with plain text input | GitHub release: `Orange-OpenSource/hurl` (latest) | — | — |
 | `std.testing.k6` | Scriptable HTTP and browser load testing CLI from Grafana | GitHub release: `grafana/k6` (latest) | — | — |
 | `std.testing.mockoonCli` | Official Mockoon CLI for headless API mock servers | npm: `@mockoon/cli` | — | — |
-| `std.testing.oha` | HTTP load generator with JSON output and a noninteractive mode | cargo: `oha` | — | — |
-| `std.testing.pact` | Official CLI for API contract verification and mock servers | cargo: `pact` | — | — |
+| `std.testing.oha` | HTTP load generator with JSON output and a noninteractive mode | GitHub release: `hatoo/oha` (latest) | — | — |
+| `std.testing.pact` | Official CLI for API contract verification and mock servers | script: `set -eu mkdir -p "$HOME/.local/bin" work=$(mktemp -d "$HOME/.local/bin/.pact-install.XXXXXXXX") trap 'rm -rf "$work"' EXIT HUP INT TERM latest=$(curl -fLsS --retry 3 -o /dev/null -w '%{url_effective}' https://github.com/pact-foundation/pact-cli/releases/latest) tag=${latest##*/} case "$tag" in v[0-9]*\|[0-9]*) ;; *) echo 'Invalid Pact release tag' >&2; exit 1 ;; esac asset='pact-x86_64-unknown-linux-musl.tar.xz' url="https://github.com/pact-foundation/pact-cli/releases/download/$tag" curl -fLsS --retry 3 "$url/$asset" -o "$work/$asset" curl -fLsS --retry 3 "$url/$asset.sha256" -o "$work/checksum" expected=$(awk 'NR == 1 { print $1 }' "$work/checksum") case "$expected" in ''\|*[!0-9a-fA-F]*) echo 'Invalid Pact SHA-256' >&2; exit 1 ;; esac [ "${#expected}" -eq 64 ] if command -v sha256sum >/dev/null 2>&1; then   actual=$(sha256sum "$work/$asset" \| awk '{ print $1 }') else   actual=$(shasum -a 256 "$work/$asset" \| awk '{ print $1 }') fi [ "$actual" = "$expected" ] \|\| { echo 'Pact SHA-256 mismatch' >&2; exit 1; } tar -xJf "$work/$asset" -C "$work" 'pact-x86_64-unknown-linux-musl/pact' chmod 0755 "$work/pact-x86_64-unknown-linux-musl/pact" mv -f "$work/pact-x86_64-unknown-linux-musl/pact" "$HOME/.local/bin/pact"` | — | — |
 | `std.testing.prism` | OpenAPI mock server and validation proxy CLI from Stoplight | npm: `@stoplight/prism-cli` | — | — |
 | `std.testing.schemathesis` | CLI for property based API tests from OpenAPI and GraphQL schemas | uv: `schemathesis` | — | — |
 | `std.testing.uiVerify` | Official UI Verify CLI for visual checks and screenshot uploads | npm: `uiverify` | check-visual-changes, economical-visual-tests, setup-visual-testing, triage-visual-changes, playwright-visual-testing, vitest-visual-testing, bun-visual-testing, storybook-visual-testing, implement-figma-design, making-ui-changes | UIVERIFY_API_KEY |

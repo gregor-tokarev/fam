@@ -1,24 +1,56 @@
 /// pact: Official CLI for API contract verification and mock servers (https://github.com/pact-foundation/pact-cli).
 ///
-/// FAM installs the CLI with Cargo.
-/// Needs Cargo, current Rust, a C compiler, make, CMake, and Perl.
-/// Also needs pkg-config and OpenSSL development headers.
-/// Local contract tests need no account. Broker access can need separate credentials.
+/// FAM downloads the latest official archive, checks its SHA-256, and installs pact atomically.
+/// Linux uses static musl binaries. No compiler, runtime, or login is required.
+/// Needs curl, tar with xz support, and sha256sum or shasum. Alpine needs the xz package.
+/// Alpine is excluded because its base tar needs an external xz decompressor.
+/// Broker access can need separate credentials.
+/// GitHubRelease does not support the vendor's tar.xz archives.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
 
 name = "pact"
 description = "Official CLI for API contract verification and mock servers"
 version = "@FAM_VERSION@"
+supported = facts.distro != "alpine"
+
+local arch = if (facts.arch == "arm64") "aarch64" else "x86_64"
+local target = if (facts.os == "darwin") "\(arch)-apple-darwin" else "\(arch)-unknown-linux-musl"
+local installPact = #"""
+  set -eu
+  mkdir -p "$HOME/.local/bin"
+  work=$(mktemp -d "$HOME/.local/bin/.pact-install.XXXXXXXX")
+  trap 'rm -rf "$work"' EXIT HUP INT TERM
+  latest=$(curl -fLsS --retry 3 -o /dev/null -w '%{url_effective}' https://github.com/pact-foundation/pact-cli/releases/latest)
+  tag=${latest##*/}
+  case "$tag" in v[0-9]*|[0-9]*) ;; *) echo 'Invalid Pact release tag' >&2; exit 1 ;; esac
+  asset='pact-\#(target).tar.xz'
+  url="https://github.com/pact-foundation/pact-cli/releases/download/$tag"
+  curl -fLsS --retry 3 "$url/$asset" -o "$work/$asset"
+  curl -fLsS --retry 3 "$url/$asset.sha256" -o "$work/checksum"
+  expected=$(awk 'NR == 1 { print $1 }' "$work/checksum")
+  case "$expected" in ''|*[!0-9a-fA-F]*) echo 'Invalid Pact SHA-256' >&2; exit 1 ;; esac
+  [ "${#expected}" -eq 64 ]
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum "$work/$asset" | awk '{ print $1 }')
+  else
+    actual=$(shasum -a 256 "$work/$asset" | awk '{ print $1 }')
+  fi
+  [ "$actual" = "$expected" ] || { echo 'Pact SHA-256 mismatch' >&2; exit 1; }
+  tar -xJf "$work/$asset" -C "$work" 'pact-\#(target)/pact'
+  chmod 0755 "$work/pact-\#(target)/pact"
+  mv -f "$work/pact-\#(target)/pact" "$HOME/.local/bin/pact"
+  """#
+
 tasks {
   new fam.Package {
-    package = new fam.PackageRef {
-      package = "pact"
-      manager = "cargo"
-    }
     binary = "pact"
     versionCommand = "pact --help"
+    install = installPact
+    update = installPact
+    uninstall = #"rm -f "$HOME/.local/bin/pact""#
   }
 }
 
