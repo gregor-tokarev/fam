@@ -19,18 +19,18 @@ type machineEntry struct {
 	Target Target
 }
 
-// writeProject writes the test project into dir. FAM writes .fam/ with `fam new`.
+// writeProject writes the test project into dir. `fam new` writes PklProject before.
 func writeProject(dir, secretsFile string, machines []machineEntry) error {
 	var m strings.Builder
-	m.WriteString("amends \".fam/Machines.pkl\"\n\nmachines {\n")
+	m.WriteString("amends \"@fam/Machines.pkl\"\n\nmachines {\n")
 	for _, e := range machines {
 		fmt.Fprintf(&m, "  [%q] { role = \"worker\"; address = %q; user = \"fam\" }\n", e.Name, alias(e.Target.Name))
 	}
 	m.WriteString("}\n")
 	files := map[string]string{
 		"machines.pkl": m.String(),
-		"config.pkl": fmt.Sprintf(`amends ".fam/Config.pkl"
-import ".fam/std.pkl"
+		"config.pkl": fmt.Sprintf(`amends "@fam/Config.pkl"
+import "@fam/std.pkl"
 
 bundles {
   import("bundles/tool/bundle.pkl")
@@ -48,12 +48,12 @@ roles {
   ["worker"] { bundles { import("bundles/worker.pkl") } }
 }
 `, secretsFile),
-		"agents.pkl": `amends ".fam/Agents.pkl"
+		"agents.pkl": `amends "@fam/Agents.pkl"
 agents {}
 `,
 		// Scenario 5: the global bundle "tool" becomes absent.
 		"config-absent.pkl": `amends "config.pkl"
-import ".fam/base.pkl"
+import "@fam/base.pkl"
 
 bundles {
   [0] = new base.BundleRef { bundle = import("bundles/tool/bundle.pkl"); state = "absent" }
@@ -109,7 +109,7 @@ roles {
 `,
 		// The standard bundle agentBrowser, with Node.js from its upstream binaries.
 		"config-std.pkl": `amends "config.pkl"
-import ".fam/std.pkl"
+import "@fam/std.pkl"
 
 bundles {
   import("bundles/node.pkl")
@@ -119,8 +119,8 @@ bundles {
 		// Scenario 16: all standard bundles.
 		// agent-desktop and lat.md have no builds for musl (Alpine).
 		"config-std-all.pkl": `amends "config.pkl"
-import ".fam/std.pkl"
-import ".fam/facts.pkl"
+import "@fam/std.pkl"
+import "@fam/facts.pkl"
 
 bundles {
   import("bundles/node.pkl")
@@ -140,8 +140,8 @@ bundles {
   std.zero
 }
 `,
-		"bundles/tool/bundle.pkl": `amends "../../.fam/Bundle.pkl"
-import "../../.fam/tasks.pkl" as fam
+		"bundles/tool/bundle.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "tool"
 description = "A test tool for the acceptance harness"
@@ -175,8 +175,8 @@ verify {
 		"bundles/tool/tool-skill/SKILL.md":       "---\nname: tool-skill\ndescription: The skill of the test tool.\n---\n\nRun `fam-tool`.\n",
 		"bundles/tool/tool-skill/scripts/run.sh": "#!/bin/sh\nfam-tool\n",
 		"bundles/tool/notes/SKILL.md":            "---\nname: tool-notes\ndescription: A second skill of the test tool.\n---\n\nNotes.\n",
-		"bundles/global.pkl": `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+		"bundles/global.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "global"
 tasks {
@@ -186,9 +186,9 @@ verify {
   new { event = "fresh_shell"; script = "test -f ~/.local/share/fam-global/marker" }
 }
 `,
-		"bundles/node.pkl": `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
-import "../.fam/facts.pkl"
+		"bundles/node.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
+import "@fam/facts.pkl"
 
 name = "node"
 description = "Node.js: upstream binaries in ~/.local, or the OS package on Alpine"
@@ -218,8 +218,8 @@ tasks {
 `,
 		// Scenario 17: a package from the OS package manager. The bundle names only the package
 		// (npm by default); the config selects the manager of the distribution.
-		"bundles/pkgtest.pkl": `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+		"bundles/pkgtest.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "pkgtest"
 tasks {
@@ -230,7 +230,7 @@ verify {
 }
 `,
 		"config-pkg.pkl": `amends "config.pkl"
-import ".fam/facts.pkl"
+import "@fam/facts.pkl"
 
 bundles {
   import("bundles/pkgtest.pkl")
@@ -245,15 +245,15 @@ packageManagers {
 }
 `,
 		"config-pkg-absent.pkl": `amends "config-pkg.pkl"
-import ".fam/base.pkl"
+import "@fam/base.pkl"
 
 bundles {
   [2] = new base.BundleRef { bundle = import("bundles/pkgtest.pkl"); state = "absent" }
 }
 `,
-		"bundles/worker.pkl": `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
-import "../.fam/facts.pkl"
+		"bundles/worker.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
+import "@fam/facts.pkl"
 
 name = "worker"
 
@@ -320,8 +320,8 @@ tasks {
 </dict>
 </plist>
 `,
-		"bundles/failing.pkl": `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+		"bundles/failing.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "failing"
 
@@ -333,8 +333,8 @@ tasks {
   }
 }
 `,
-		"bundles/failing2.pkl": `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+		"bundles/failing2.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "failing2"
 
@@ -353,8 +353,8 @@ roles {
   ["worker"] { bundles { import("bundles/failing2.pkl") } }
 }
 `,
-		"bundles/slow.pkl": `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+		"bundles/slow.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "slow"
 
@@ -366,8 +366,8 @@ tasks {
   }
 }
 `,
-		"bundles/systemd.pkl": `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+		"bundles/systemd.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "systemd"
 

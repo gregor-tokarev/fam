@@ -1,5 +1,3 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
-
 /// agent-browser: a browser automation CLI for AI agents (https://github.com/vercel-labs/agent-browser).
 ///
 /// FAM installs the CLI with the global npm of the machine (Node.js 22 or later), and copies the

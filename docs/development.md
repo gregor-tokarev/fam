@@ -5,7 +5,7 @@
 | Path | Content |
 |---|---|
 | `cmd/fam` | The `fam` command. |
-| `internal/schema/fam` | The Pkl schema and the standard bundles. FAM embeds this folder and writes it into `.fam/` of a project. `@FAM_VERSION@` becomes the FAM version. |
+| `internal/schema/fam` | The Pkl schema and the standard bundles: the files of the Pkl package `fam`. FAM embeds this folder and builds the package from it (`internal/schema`). `@FAM_VERSION@` becomes the FAM version. |
 | `internal/pklgen` | Go structs generated from the schema. Do not edit. |
 | `internal/pklbin` | Download and cache of the pinned `pkl` binary. |
 | `internal/project` | `fam new` and `fam migrate`. |
@@ -17,24 +17,28 @@ make build          # builds ./fam with the version of the Makefile
 go build ./cmd/fam  # the same, with the default version
 ```
 
-`VERSION=0.3.0 make build` sets the FAM version. A project's `.fam/` fits a binary of another version when it has the same schema: the same files with the same content, apart from the version and the doc comments (`///`, `//!`) of the Pkl files. Otherwise FAM asks for `fam migrate`. FAM compares the content only when the versions differ. So a release that changes only Go code or doc comments needs no `fam migrate`, and a release that changes a schema module or a standard bundle does.
+`VERSION=0.3.0 make build` sets the FAM version.
+
+FAM builds the `fam` package from the embedded files: a zip file with fixed dates and sorted entries, and its metadata. The same files and version give the same bytes, so the checksum in `PklProject.deps.json` of a project matches the package that the release publishes. A project accepts a binary of another patch release of its minor version, so **a patch release must not change the schema or a standard bundle**. A change to the schema or a standard bundle needs a new minor version.
+
+A development build with changed schema files has the same version but another checksum: FAM asks for `fam migrate` in the project.
 
 ## Releases
 
-Push a tag on `main` to publish a release. First update the schema of the example project to the new version, and merge that change:
+Push a tag on `main` to publish a release. First pin the new version in the example project, and merge that change:
 
 ```sh
-VERSION=0.6.0 make build && ./fam migrate --base examples/fleet
+VERSION=0.9.0 make build && ./fam migrate --base examples/fleet
 ```
 
 Then tag the merge commit:
 
 ```sh
-git tag v0.6.0
-git push origin v0.6.0
+git tag v0.9.0
+git push origin v0.9.0
 ```
 
-`.github/workflows/release.yml` runs `scripts/build-release.sh <version>`. It builds `fam_<os>_<arch>.tar.gz` for linux/amd64, linux/arm64, and darwin/arm64 (the platforms of the pinned pkl), and `checksums.txt` with the SHA-256 of each archive. Then it creates the GitHub release. The version in the tag goes into `internal/version.Version`, which is also the schema version that `fam new` and `fam migrate` write into `.fam/`.
+`.github/workflows/release.yml` runs `scripts/build-release.sh <version>`. It builds `fam_<os>_<arch>.tar.gz` for linux/amd64, linux/arm64, and darwin/arm64 (the platforms of the pinned pkl), and `checksums.txt` with the SHA-256 of each archive. It also writes the files of the `fam` Pkl package with `fam internal package`: the metadata `fam@<version>` and `fam@<version>.zip`. Then it creates the GitHub release with all these files. The version in the tag goes into `internal/version.Version`, which is also the version of the package.
 
 - `install.sh` downloads the archive for its platform from `releases/latest/download` (or `FAM_VERSION`), checks it against `checksums.txt`, and installs `fam` into `FAM_INSTALL_DIR` (default `~/.local/bin`).
 - `fam update` (`internal/selfupdate`) reads the latest tag from the redirect of `releases/latest` (no API token), downloads the archive and `checksums.txt`, checks the SHA-256, and replaces its own file with a rename. `fam update --check` only reports, and `fam update --version X` installs a given release.

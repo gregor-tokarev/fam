@@ -13,7 +13,7 @@
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
     "detail": "first apply 26 changed, second plan 29 satisfied, second apply 0 changed",
-    "duration": "17s"
+    "duration": "18s"
   },
   {
     "target": "ubuntu-26.04",
@@ -53,7 +53,7 @@
     "name": "secrets in shells, never in output or logs",
     "result": "pass",
     "detail": "6 shells export both secrets; values absent from 12 outputs and 6 run logs",
-    "duration": "20s"
+    "duration": "21s"
   },
   {
     "target": "ubuntu-26.04",
@@ -61,7 +61,7 @@
     "name": "check exit 1 never applies, failed task stops the rest",
     "result": "pass",
     "detail": "check exit 1: no apply; apply exit 7: next task skipped",
-    "duration": "15s"
+    "duration": "16s"
   },
   {
     "target": "ubuntu-26.04",
@@ -69,7 +69,7 @@
     "name": "network stop gives a connection error (255)",
     "result": "pass",
     "detail": "error: connection error to vm (fam@fam-ubuntu-26-04): ssh exit code 255: mux_client_request_session: read from master failed: Broken pipe\r",
-    "duration": "34s"
+    "duration": "35s"
   },
   {
     "target": "ubuntu-26.04",
@@ -93,7 +93,7 @@
     "name": "Claude Code and Codex: install, update, settings, paths",
     "result": "pass",
     "detail": "pinned 30 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
-    "duration": "3m10s"
+    "duration": "1m1s"
   },
   {
     "target": "ubuntu-26.04",
@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "26s"
+    "duration": "23s"
   },
   {
     "target": "ubuntu-26.04",
@@ -116,8 +116,8 @@
     "n": 16,
     "name": "all standard bundles: install, verify, satisfied, archive cache",
     "result": "pass",
-    "detail": "75 changed, 18 skills; apply 2m35s, plan 25s",
-    "duration": "3m15s"
+    "detail": "75 changed, 18 skills; apply 2m7s, plan 23s",
+    "duration": "2m46s"
   },
   {
     "target": "ubuntu-26.04",
@@ -125,6 +125,6 @@
     "name": "package from the OS package manager, chosen in config.pkl, then removed",
     "result": "pass",
     "detail": "tree (apt): changed, then removed",
-    "duration": "27s"
+    "duration": "33s"
   }
 ]

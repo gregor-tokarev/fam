@@ -1,5 +1,5 @@
-amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "rust"
 description = "Rust and Cargo with rustup"

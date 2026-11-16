@@ -1,5 +1,3 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
-
 /// A bundle: a reusable part of the config. Usually one tool or one piece of machine setup, with
 /// its tasks (also skills: [t.Skill], [t.GitHubSkill]), environment, and checks.
 ///
@@ -9,8 +7,8 @@
 /// A bundle file amends this module:
 ///
 /// ```
-/// amends "../.fam/Bundle.pkl"
-/// import "../.fam/tasks.pkl" as fam
+/// amends "@fam/Bundle.pkl"
+/// import "@fam/tasks.pkl" as fam
 ///
 /// name = "posthog"
 /// tasks {

@@ -1,5 +1,3 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
-
 /// ai-cli: generate text, images, and more from the terminal (https://github.com/vercel-labs/ai-cli).
 ///
 /// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest

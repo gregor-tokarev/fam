@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/gregor-tokarev/fam/internal/pklgen/base"
 	"github.com/gregor-tokarev/fam/internal/pklgen/bundle"
@@ -95,6 +96,10 @@ func bundleEntry(entry any, origin string) (BundleUse, error) {
 		u = BundleUse{Bundle: b.Bundle, State: string(b.State), Origin: origin}
 	default:
 		return u, fmt.Errorf("a bundles entry has the type %T. Use a bundle module or `new { bundle = …; state = … }`", entry)
+	}
+	// A bundle of a package (the standard bundles) has no folder: it cannot use local files.
+	if !strings.HasPrefix(u.Bundle.Source, "file:") {
+		return u, nil
 	}
 	p, err := FileFromURI(u.Bundle.Source)
 	if err != nil {

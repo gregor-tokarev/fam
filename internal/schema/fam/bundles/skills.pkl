@@ -1,5 +1,3 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
-
 /// skills: the open agent skills tool (`npx skills`), with its find-skills skill
 /// (https://github.com/vercel-labs/skills).
 ///

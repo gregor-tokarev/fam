@@ -1,12 +1,10 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
-
 /// The entrypoint of a FAM project.
 ///
 /// `config.pkl` amends this module:
 ///
 /// ```
-/// amends ".fam/Config.pkl"
-/// import ".fam/std.pkl"
+/// amends "@fam/Config.pkl"
+/// import "@fam/std.pkl"
 ///
 /// bundles { std.agentBrowser }
 /// roles { ["worker"] { bundles { import("bundles/worker-setup.pkl") } } }

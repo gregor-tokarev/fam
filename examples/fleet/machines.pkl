@@ -1,4 +1,4 @@
-amends ".fam/Machines.pkl"
+amends "@fam/Machines.pkl"
 
 // The laptop runs FAM. The workers need only SSH: FAM connects as `user`.
 machines {

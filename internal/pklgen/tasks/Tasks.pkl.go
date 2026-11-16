@@ -13,7 +13,7 @@ import (
 // Import this module with a different name, because `tasks` is also a property name:
 //
 // ```
-// import "../.fam/tasks.pkl" as fam
+// import "@fam/tasks.pkl" as fam
 // ```
 //
 // Paths that start with `~/` are relative to the home directory of the SSH user.

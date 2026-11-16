@@ -12,7 +12,7 @@ import (
 // The coding agents, in a separate file.
 //
 // ```
-// amends ".fam/Agents.pkl"
+// amends "@fam/Agents.pkl"
 //
 //	agents {
 //	  ["claude"] { settings { autoMemoryEnabled = false } }

@@ -124,7 +124,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Service sshd"
 	if out, err := exec.Command(fam, "new", "--base", dir).CombinedOutput(); err != nil {
 		return fmt.Errorf("fam new: %v: %s", err, out)
 	}
-	machines := fmt.Sprintf("amends \".fam/Machines.pkl\"\nmachines {\n  [\"win\"] { role = \"worker\"; address = %q; user = \"Docker\" }\n}\n", windowsAlias)
+	machines := fmt.Sprintf("amends \"@fam/Machines.pkl\"\nmachines {\n  [\"win\"] { role = \"worker\"; address = %q; user = \"Docker\" }\n}\n", windowsAlias)
 	if err := os.WriteFile(filepath.Join(dir, "machines.pkl"), []byte(machines), 0o644); err != nil {
 		return err
 	}

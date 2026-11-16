@@ -4,13 +4,30 @@
 
 `fam plan`, `fam apply`, and `fam verify` do these steps:
 
-1. **Validate.** FAM checks that `.fam/` has the schema of the binary (a `.fam/` of another FAM version fits when only its version and doc comments differ; otherwise FAM asks for `fam migrate`) and that the project has the directories that the config needs. It evaluates only the `machines` mapping and `secrets` (Pkl is lazy, so nothing that depends on the facts of a machine), checks that at most one machine is the cockpit, and reads the secrets file.
+1. **Validate.** FAM puts its `fam` package into the Pkl cache and checks the version that `PklProject.deps.json` pins (see [The fam package](#the-fam-package)), and that the project has the directories that the config needs. It evaluates only the `machines` mapping and `secrets` (Pkl is lazy, so nothing that depends on the facts of a machine), checks that at most one machine is the cockpit, and reads the secrets file.
 2. **Collect facts.** FAM runs one shell script on each machine: over SSH for workers, locally for the cockpit. Machines run in parallel. `--serial` runs them one at a time. FAM stops on a Windows machine.
 3. **Evaluate.** FAM evaluates the full config for each machine, with the facts of that machine as the Pkl properties `fam.<name>`, and checks the rules that Pkl cannot check: bundle names and scripts with a check.
 4. **Plan.** FAM runs the check of every task. A check changes nothing.
 5. **Apply** (`fam apply` only). FAM stops on a machine with a conflict before it changes anything. Then for each task: check, apply when the check finds a difference, and check again. A task that fails stops the tasks after it on that machine. FAM never runs apply after a check error.
 6. **Restart.** At the end of each present bundle, FAM restarts each unit that a changed task names in `restarts` once. FAM does not restart units after a failure, and not for a bundle with `state = "absent"`.
 7. **Verify.** FAM runs the verify scripts of the bundles and the agent checks in new shells.
+
+## The fam package
+
+The schema (`Config.pkl`, `Bundle.pkl`, `tasks.pkl`, …) and the standard bundles (`std.pkl`) are the Pkl package `fam`. A project declares it in `PklProject`, as a Go project declares its modules in `go.mod`, and imports it with `@fam/`:
+
+```
+PklProject            # dependencies { ["fam"] { uri = "package://github.com/gregor-tokarev/fam/releases/download/v<version>/fam@<version>" } }
+PklProject.deps.json  # the checksum of the package
+config.pkl            # amends "@fam/Config.pkl"
+bundles/tool.pkl      # amends "@fam/Bundle.pkl"
+```
+
+- The package is in the FAM binary. `fam new`, `fam migrate`, `fam plan`, `fam apply`, and `fam verify` put it into the Pkl cache (`~/.cache/pkl`, or `$XDG_CACHE_HOME/pkl`, and `~/.pkl/cache` for editors with an older Pkl). So FAM never downloads its own schema.
+- Editors with the Pkl plugin read `PklProject` and the same cache, so completion and go-to-definition work for `@fam/…` and `std.…`. On a machine without FAM, the editor downloads the package once from the GitHub release.
+- The project pins one FAM version. A binary of another patch release of the same minor version works with it: patch releases do not change the schema. Otherwise FAM asks for `fam migrate` (an older project) or `fam update` (a newer project).
+- `fam migrate` changes the version in `PklProject` and the checksum in `PklProject.deps.json`. It keeps the other dependencies of the project.
+- A standard bundle comes from the package, so it has no folder: it cannot use `fam.Skill` with a local folder.
 
 ## Task order on a machine
 
@@ -102,7 +119,7 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 
 ## Standard bundles
 
-`.fam/std.pkl` has ready bundles for agent tools: `bundles { std.portless; std.hyperframes }`. Each one installs the CLI (with npm, unless `packageManagers` selects another manager) and copies its skills from the latest GitHub release. None installs a browser, a runtime, or system packages. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
+`@fam/std.pkl` has ready bundles for agent tools: `bundles { std.portless; std.hyperframes }`. Each one installs the CLI (with npm, unless `packageManagers` selects another manager) and copies its skills from the latest GitHub release. None installs a browser, a runtime, or system packages. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
 
 | Bundle | Installs | Skills |
 |---|---|---|

@@ -1,9 +1,7 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
-
 /// The machines of the fleet, in a separate file.
 ///
 /// ```
-/// amends ".fam/Machines.pkl"
+/// amends "@fam/Machines.pkl"
 ///
 /// machines {
 ///   ["cockpit"] { role = "cockpit" }

@@ -1,9 +1,7 @@
-//! Written by FAM @FAM_VERSION@. Do not edit. Run `fam migrate` to update.
-
 /// The standard bundles of FAM @FAM_VERSION@.
 ///
 /// ```
-/// import ".fam/std.pkl"
+/// import "@fam/std.pkl"
 ///
 /// bundles { std.agentBrowser; std.portless }
 /// ```

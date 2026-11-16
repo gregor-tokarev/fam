@@ -25,9 +25,9 @@ func New(opts NewOptions) ([]string, error) {
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return nil, err
 	}
-	for _, f := range []string{"config.pkl", "machines.pkl", "agents.pkl", schema.Dir} {
+	for _, f := range []string{"config.pkl", "machines.pkl", "agents.pkl", schema.ProjectFile} {
 		if _, err := os.Stat(filepath.Join(base, f)); err == nil {
-			return nil, fmt.Errorf("%s already exists. `fam new` does not change an existing project. Use `fam migrate` to update %s", filepath.Join(base, f), schema.Dir)
+			return nil, fmt.Errorf("%s already exists. `fam new` does not change an existing project. Use `fam migrate` to change the FAM version of a project", filepath.Join(base, f))
 		}
 	}
 	agents := opts.Agents
@@ -68,20 +68,33 @@ func New(opts NewOptions) ([]string, error) {
 		}
 		written = append(written, name)
 	}
-	if err := schema.Write(base); err != nil {
+	if err := pinPackage(base); err != nil {
 		return written, err
 	}
-	written = append(written, schema.Dir+"/")
+	written = append(written, schema.ProjectFile, schema.DepsFile)
 	return written, nil
 }
 
-// Migrate replaces `.fam/` with the schema of this FAM version.
+// Migrate pins the fam package of this FAM version in the PklProject of a project.
 func Migrate(base string) (old string, err error) {
 	if _, err := os.Stat(filepath.Join(base, "config.pkl")); err != nil {
 		return "", fmt.Errorf("%s has no config.pkl. Run `fam migrate` in a FAM project, or set --base", base)
 	}
-	old, _ = schema.ProjectVersion(base)
-	return old, schema.Write(base)
+	old, _, _ = schema.Pinned(base)
+	return old, pinPackage(base)
+}
+
+// pinPackage writes PklProject and PklProject.deps.json for the package of this binary, and puts
+// the package into the Pkl cache, so that editors find it at once.
+func pinPackage(base string) error {
+	p, err := schema.Current()
+	if err != nil {
+		return err
+	}
+	if err := schema.SeedAll(p); err != nil {
+		return fmt.Errorf("write the fam package into the Pkl cache: %w", err)
+	}
+	return schema.WriteProject(base, p)
 }
 
 // DetectAgents returns the agents that it finds on this machine.
@@ -108,7 +121,7 @@ func DetectAgents() []string {
 
 func agentsPkl(agents []string) string {
 	var b strings.Builder
-	b.WriteString("amends \".fam/Agents.pkl\"\n\n")
+	b.WriteString("amends \"@fam/Agents.pkl\"\n\n")
 	b.WriteString("// FAM installs each agent CLI, updates it on each `fam apply`,\n")
 	b.WriteString("// and merges `settings` into the settings file of the agent.\n")
 	b.WriteString("agents {\n")
@@ -123,8 +136,8 @@ func agentsPkl(agents []string) string {
 	return b.String()
 }
 
-const configPkl = `amends ".fam/Config.pkl"
-import ".fam/std.pkl"
+const configPkl = `amends "@fam/Config.pkl"
+import "@fam/std.pkl"
 
 // Bundles for every machine.
 bundles {
@@ -146,7 +159,7 @@ roles {
 }
 `
 
-const machinesPkl = `amends ".fam/Machines.pkl"
+const machinesPkl = `amends "@fam/Machines.pkl"
 
 machines {
   ["cockpit"] {
@@ -160,8 +173,8 @@ machines {
 }
 `
 
-const helloBundle = `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
+const helloBundle = `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
 
 name = "hello"
 description = "An example bundle: one small script in ~/.local/bin"
@@ -187,9 +200,9 @@ const helloScript = `#!/bin/sh
 echo "${FAM_HELLO_GREETING:-Hello} ($(hostname))"
 `
 
-const workerSetup = `amends "../.fam/Bundle.pkl"
-import "../.fam/tasks.pkl" as fam
-import "../.fam/facts.pkl"
+const workerSetup = `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
+import "@fam/facts.pkl"
 
 name = "worker-setup"
 description = "An example setup for the worker machines"
