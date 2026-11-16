@@ -13,18 +13,18 @@
 ## Build
 
 ```sh
-make build        # copies the upstream skills of the standard bundles, then builds ./fam
-go build ./cmd/fam  # offline build with the committed skill copies
+make build          # builds ./fam with the version of the Makefile
+go build ./cmd/fam  # the same, with the default version
 ```
 
-`VERSION=0.2.0 make build` sets the FAM version. A project's `.fam/` fits a binary of another version when it has the same schema: the same files with the same content, apart from the version and the doc comments (`///`, `//!`) of the Pkl files. Otherwise FAM asks for `fam upgrade`. FAM compares the content only when the versions differ. So a release that changes only Go code or doc comments needs no `fam upgrade`, and a release that changes a schema module or a standard bundle does.
+`VERSION=0.3.0 make build` sets the FAM version. A project's `.fam/` fits a binary of another version when it has the same schema: the same files with the same content, apart from the version and the doc comments (`///`, `//!`) of the Pkl files. Otherwise FAM asks for `fam upgrade`. FAM compares the content only when the versions differ. So a release that changes only Go code or doc comments needs no `fam upgrade`, and a release that changes a schema module or a standard bundle does.
 
 ## Releases
 
 Push a tag on `main` to publish a release. First update the schema of the example project to the new version, and merge that change:
 
 ```sh
-VERSION=0.2.0 make build && ./fam upgrade --base examples/fleet
+VERSION=0.3.0 make build && ./fam upgrade --base examples/fleet
 ```
 
 Then tag the merge commit:
@@ -56,7 +56,7 @@ FAM downloads `pkl` 0.33.0 from the GitHub release on first use into `<user cach
 
 ## Standard bundles
 
-`scripts/sync-std-skills.sh` copies the upstream skill of each standard bundle at a pinned commit. FAM never gets skills from upstream at run time.
+A standard bundle installs only its tool and gets its skill from the tool's GitHub repository (`Bundle.GitHubSkill`). FAM vendors no skills. Without a `ref`, the skill comes from the latest release, so it matches the latest version of the tool.
 
 ## Acceptance harness
 

@@ -1,6 +1,6 @@
-//! Written by FAM 0.2.1. Do not edit. Run `fam upgrade` to update.
+//! Written by FAM 0.3.0. Do not edit. Run `fam upgrade` to update.
 
-/// The standard bundles of FAM 0.2.1.
+/// The standard bundles of FAM 0.3.0.
 ///
 /// ```
 /// import ".fam/std.pkl"

@@ -78,6 +78,6 @@ FAM as the cockpit inside the Mac: the Mac is an Intel (x86-64) VM, and pkl 0.33
 | 11 | An unknown template variable (`{{ .Agent }}`) stops FAM. |
 | 12 | Claude Code and Codex: pinned older versions, then an update to the latest; settings merged into existing files; skills and instructions at the agent paths. |
 | 13 | Two VMs in parallel, then `--serial`. Text output is grouped by machine. |
-| 14 | The standard bundle `agentBrowser`, with Node.js from a test bundle. |
+| 14 | The standard bundle `agentBrowser`, with Node.js from a test bundle: the CLI, and its skill from the latest GitHub release. FAM installs no browser and sets no `AGENT_BROWSER_*` variables. |
 | 15 | Machines without systemd (Alpine): systemd tasks fail with a clear error. |
 | 17 | A bundle names only a package (`tree`); `packageManagers` in the config selects the OS package manager (apt, dnf, pacman, apk). FAM installs it, the plan is satisfied, and `state = "absent"` removes it. |

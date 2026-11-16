@@ -100,8 +100,8 @@
     "n": 14,
     "name": "standard bundle agentBrowser",
     "result": "pass",
-    "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "1m1s"
+    "detail": "28 changed; agent-browser 0.43.0",
+    "duration": "23s"
   },
   {
     "target": "ubuntu-26.04",

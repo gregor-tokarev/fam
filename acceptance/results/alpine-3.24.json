@@ -13,7 +13,7 @@
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
     "detail": "first apply 23 changed, second plan 26 satisfied, second apply 0 changed",
-    "duration": "23s"
+    "duration": "26s"
   },
   {
     "target": "alpine-3.24",
@@ -100,8 +100,8 @@
     "n": 14,
     "name": "standard bundle agentBrowser",
     "result": "pass",
-    "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "1m1s"
+    "detail": "28 changed; agent-browser 0.43.0",
+    "duration": "37s"
   },
   {
     "target": "alpine-3.24",
