@@ -1,0 +1,33 @@
+/// dtctl: a CLI for Dynatrace telemetry and resources (https://github.com/Dynatrace/dtctl).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Credentials: DT_API_TOKEN.
+/// FAM copies the core skills from the upstream repository.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "dtctl"
+description = "Query Dynatrace telemetry and manage dashboards, workflows, and SLOs"
+version = "@FAM_VERSION@"
+requiredSecrets { "DT_API_TOKEN" }
+tasks {
+  new fam.GitHubRelease {
+    repo = "Dynatrace/dtctl"
+    binary = "dtctl"
+    versionCommand = "dtctl version"
+    assets {
+      ["linux-amd64"] { name = "dtctl_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "dtctl" }
+      ["linux-arm64"] { name = "dtctl_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "dtctl" }
+      ["darwin-arm64"] { name = "dtctl_{version}_darwin_arm64.tar.gz"; format = "tar.gz"; file = "dtctl" }
+    }
+  }
+  new fam.GitHubSkill {
+    repo = "Dynatrace/dtctl"
+    path = "skills/dtctl"
+  }
+}
+
+verify {
+  new { name = "version"; script = "dtctl version" }
+}

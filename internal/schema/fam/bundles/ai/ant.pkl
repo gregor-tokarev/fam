@@ -1,0 +1,26 @@
+/// ant: a CLI for the Claude Platform API (https://github.com/anthropics/anthropic-cli).
+///
+/// FAM installs github.com/anthropics/anthropic-cli/v2/cmd/ant with go.
+/// FAM needs Go 1.26.10 or later to build the CLI.
+/// Credentials: ANTHROPIC_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "ant"
+description = "Call the Claude Platform API for messages, files, batches, and platform resources"
+version = "@FAM_VERSION@"
+requiredSecrets { "ANTHROPIC_API_KEY" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/anthropics/anthropic-cli/v2/cmd/ant"
+      manager = "go"
+    }
+    binary = "ant"
+  }
+}
+
+verify {
+  new { name = "version"; script = "ant --version" }
+}

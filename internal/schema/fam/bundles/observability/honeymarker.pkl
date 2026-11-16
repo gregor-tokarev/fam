@@ -1,0 +1,27 @@
+/// honeymarker: a CLI for Honeycomb deployment markers (https://github.com/honeycombio/honeymarker).
+///
+/// FAM installs github.com/honeycombio/honeymarker with go.
+/// FAM needs Go to build the CLI.
+/// Credentials: HONEYCOMB_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "honeymarker"
+description = "Manage Honeycomb deployment markers and annotations"
+version = "@FAM_VERSION@"
+requiredSecrets { "HONEYCOMB_API_KEY" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/honeycombio/honeymarker"
+      manager = "go"
+    }
+    binary = "honeymarker"
+    versionCommand = "honeymarker version"
+  }
+}
+
+verify {
+  new { name = "version"; script = "honeymarker version" }
+}

@@ -11,3 +11,30 @@ latMd: Bundle = import("../bundles/context/lat-md.pkl")
 
 /// opensrc: the source code of npm packages for agents, with its skill.
 opensrc: Bundle = import("../bundles/context/opensrc.pkl")
+
+/// ast-grep: Search and rewrite source code with syntax-tree patterns.
+astGrep: Bundle = import("../bundles/context/ast-grep.pkl")
+
+/// context7: Retrieve current library documentation and code examples from Upstash Context7.
+context7: Bundle = import("../bundles/context/context7.pkl")
+
+/// fd: Find files and directories through a concise headless CLI.
+fd: Bundle = import("../bundles/context/fd.pkl")
+
+/// firecrawl: Search, scrape, crawl, and extract web content with the official Firecrawl CLI.
+firecrawl: Bundle = import("../bundles/context/firecrawl.pkl")
+
+/// repomix: Pack local or remote source repositories into context for coding agents.
+repomix: Bundle = import("../bundles/context/repomix.pkl")
+
+/// ripgrep: Search source trees with fast regular expressions and ignore-file support.
+ripgrep: Bundle = import("../bundles/context/ripgrep.pkl")
+
+/// scc: Count source lines and estimate code complexity with structured output.
+scc: Bundle = import("../bundles/context/scc.pkl")
+
+/// tavily: Search the web and extract content with the official Tavily CLI.
+tavily: Bundle = import("../bundles/context/tavily.pkl")
+
+/// tokei: Count source lines, comments, and language totals across a repository.
+tokei: Bundle = import("../bundles/context/tokei.pkl")

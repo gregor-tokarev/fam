@@ -1,0 +1,26 @@
+/// langsmith: a CLI for LangSmith traces, runs, and evaluations (https://github.com/langchain-ai/langsmith-cli).
+///
+/// FAM installs github.com/langchain-ai/langsmith-cli/cmd/langsmith with go.
+/// FAM needs Go to build the CLI.
+/// Credentials: LANGSMITH_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "langsmith"
+description = "Inspect LangSmith traces, runs, datasets, and evaluations"
+version = "@FAM_VERSION@"
+requiredSecrets { "LANGSMITH_API_KEY" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/langchain-ai/langsmith-cli/cmd/langsmith"
+      manager = "go"
+    }
+    binary = "langsmith"
+  }
+}
+
+verify {
+  new { name = "version"; script = "langsmith --version" }
+}

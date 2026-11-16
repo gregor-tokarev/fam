@@ -1,0 +1,25 @@
+/// e2b: a CLI for E2B cloud sandboxes and templates (https://github.com/e2b-dev/E2B).
+///
+/// FAM installs @e2b/cli with npm.
+/// The CLI needs Node.js >=22.19.0.
+/// Credentials: E2B_API_KEY.
+/// Template builds can need a container build environment.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "e2b"
+description = "Manage E2B cloud sandboxes and build sandbox templates"
+version = "@FAM_VERSION@"
+requiredSecrets { "E2B_API_KEY" }
+tasks {
+  new fam.Package {
+    package = "@e2b/cli"
+    binary = "e2b"
+    versionCommand = "NO_UPDATE_NOTIFIER=1 e2b --version"
+  }
+}
+
+verify {
+  new { name = "version"; script = "NO_UPDATE_NOTIFIER=1 e2b --version" }
+}

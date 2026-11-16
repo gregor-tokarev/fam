@@ -1,0 +1,24 @@
+/// scc: a code counter and complexity estimator (https://github.com/boyter/scc).
+///
+/// FAM installs github.com/boyter/scc/v4 with go.
+/// FAM needs Go 1.26.4 or later to build the CLI.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "scc"
+description = "Count source lines and estimate code complexity with structured output"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/boyter/scc/v4"
+      manager = "go"
+    }
+    binary = "scc"
+  }
+}
+
+verify {
+  new { name = "version"; script = "scc --version" }
+}

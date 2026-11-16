@@ -1,0 +1,43 @@
+/// axiom: a CLI for Axiom datasets, logs, and traces (https://github.com/axiomhq/cli).
+///
+/// FAM installs github.com/axiomhq/cli/cmd/axiom with go.
+/// FAM needs Go to build the CLI.
+/// Credentials: AXIOM_TOKEN.
+/// FAM copies the core skills from the upstream repository.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "axiom"
+description = "Query Axiom datasets, logs, and traces from the command line"
+version = "@FAM_VERSION@"
+requiredSecrets { "AXIOM_TOKEN" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/axiomhq/cli/cmd/axiom"
+      manager = "go"
+    }
+    binary = "axiom"
+  }
+  new fam.GitHubSkill {
+    repo = "axiomhq/cli"
+    path = "skills/axiom-apl"
+  }
+  new fam.GitHubSkill {
+    repo = "axiomhq/cli"
+    path = "skills/detect-anomalies"
+  }
+  new fam.GitHubSkill {
+    repo = "axiomhq/cli"
+    path = "skills/explore-dataset"
+  }
+  new fam.GitHubSkill {
+    repo = "axiomhq/cli"
+    path = "skills/find-traces"
+  }
+}
+
+verify {
+  new { name = "version"; script = "axiom --version" }
+}

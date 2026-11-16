@@ -1,0 +1,32 @@
+/// openai-cli: a CLI for OpenAI APIs and administration (https://github.com/openai/openai-cli).
+///
+/// FAM installs github.com/openai/openai-cli/cmd/openai with go.
+/// FAM needs Go 1.26.0 or later to build the CLI.
+/// Credentials: OPENAI_API_KEY, OPENAI_ADMIN_KEY.
+/// FAM copies the core skills from the upstream repository.
+/// OPENAI_ADMIN_KEY is for administration operations.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "openai-cli"
+description = "Call OpenAI APIs for responses, files, batches, images, audio, and administration"
+version = "@FAM_VERSION@"
+requiredSecrets { "OPENAI_API_KEY"; "OPENAI_ADMIN_KEY" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "github.com/openai/openai-cli/cmd/openai"
+      manager = "go"
+    }
+    binary = "openai"
+  }
+  new fam.GitHubSkill {
+    repo = "openai/openai-cli"
+    path = "skills/openai-cli"
+  }
+}
+
+verify {
+  new { name = "version"; script = "openai --version" }
+}

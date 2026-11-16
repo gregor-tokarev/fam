@@ -1,0 +1,23 @@
+/// tavily: a CLI for Tavily web search and extraction (https://github.com/tavily-ai/cli).
+///
+/// FAM installs @tavily/cli with npm.
+/// The CLI needs Node.js >=20.1.0.
+/// Credentials: TAVILY_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "tavily"
+description = "Search the web and extract content with the official Tavily CLI."
+version = "@FAM_VERSION@"
+requiredSecrets { "TAVILY_API_KEY" }
+tasks {
+  new fam.Package {
+    package = "@tavily/cli"
+    binary = "tvly"
+  }
+}
+
+verify {
+  new { name = "version"; script = "tvly --version" }
+}

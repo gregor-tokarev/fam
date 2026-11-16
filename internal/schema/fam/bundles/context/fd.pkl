@@ -1,0 +1,24 @@
+/// fd: a file search tool (https://github.com/sharkdp/fd).
+///
+/// FAM installs fd-find with cargo.
+/// The build needs Cargo, Rust 1.90 or later, and a C linker.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "fd"
+description = "Find files and directories through a concise headless CLI"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "fd-find"
+      manager = "cargo"
+    }
+    binary = "fd"
+  }
+}
+
+verify {
+  new { name = "version"; script = "fd --version" }
+}

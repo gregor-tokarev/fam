@@ -1,0 +1,32 @@
+/// slack-cli: a CLI for Slack APIs and application development (https://github.com/slackapi/slack-cli).
+///
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// FAM copies the core skills from the upstream repository.
+/// Authenticate with slack login or pass --token. App projects can need Node.js or Deno.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "slack-cli"
+description = "Call Slack APIs and develop, run, and deploy Slack applications"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.GitHubRelease {
+    repo = "slackapi/slack-cli"
+    binary = "slack"
+    assets {
+      ["linux-amd64"] { name = "slack_cli_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "bin/slack" }
+      ["linux-arm64"] { name = "slack_cli_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "bin/slack" }
+      ["darwin-arm64"] { name = "slack_cli_{version}_macOS_arm64.tar.gz"; format = "tar.gz"; file = "bin/slack" }
+    }
+  }
+  new fam.GitHubSkill {
+    repo = "slackapi/slack-cli"
+    path = "cmd/skill"
+    name = "slack-cli"
+  }
+}
+
+verify {
+  new { name = "version"; script = "slack --version" }
+}

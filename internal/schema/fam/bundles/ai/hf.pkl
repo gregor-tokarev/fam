@@ -1,0 +1,27 @@
+/// hf: a CLI for Hugging Face models, datasets, and repositories (https://github.com/huggingface/huggingface_hub).
+///
+/// FAM installs huggingface-hub with uv.
+/// FAM needs uv and Python >=3.10.
+/// Credentials: HF_TOKEN.
+/// Public downloads need no token. HF_TOKEN enables private and gated repositories.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "hf"
+description = "Download and publish Hugging Face models, datasets, and repository files"
+version = "@FAM_VERSION@"
+requiredSecrets { "HF_TOKEN" }
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "huggingface-hub"
+      manager = "uv"
+    }
+    binary = "hf"
+  }
+}
+
+verify {
+  new { name = "version"; script = "hf --version" }
+}

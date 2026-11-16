@@ -1,0 +1,23 @@
+/// stripe-cli: a CLI for Stripe APIs, webhooks, and payment integrations (https://github.com/stripe/stripe-cli).
+///
+/// FAM installs @stripe/cli with npm.
+/// The CLI needs Node.js >=18 for the npm shim.
+/// Credentials: STRIPE_API_KEY.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "stripe-cli"
+description = "Manage Stripe API resources, webhooks, and local payment integration workflows"
+version = "@FAM_VERSION@"
+requiredSecrets { "STRIPE_API_KEY" }
+tasks {
+  new fam.Package {
+    package = "@stripe/cli"
+    binary = "stripe"
+  }
+}
+
+verify {
+  new { name = "version"; script = "stripe --version" }
+}

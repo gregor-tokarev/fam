@@ -1,0 +1,24 @@
+/// ripgrep: a fast text search tool with ignore-file support (https://github.com/BurntSushi/ripgrep).
+///
+/// FAM installs ripgrep with cargo.
+/// The build needs Cargo, Rust 1.85 or later, and a C linker.
+amends "../../Bundle.pkl"
+
+import "../../tasks.pkl" as fam
+
+name = "ripgrep"
+description = "Search source trees with fast regular expressions and ignore-file support"
+version = "@FAM_VERSION@"
+tasks {
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "ripgrep"
+      manager = "cargo"
+    }
+    binary = "rg"
+  }
+}
+
+verify {
+  new { name = "version"; script = "rg --version" }
+}
