@@ -17,6 +17,8 @@ tasks {
     assets {
       ["linux-amd64"] { name = "uv-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-x86_64-unknown-linux-musl/uv" }
       ["linux-arm64"] { name = "uv-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-aarch64-unknown-linux-musl/uv" }
+      ["linux-amd64-musl"] { name = "uv-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-x86_64-unknown-linux-musl/uv" }
+      ["linux-arm64-musl"] { name = "uv-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-aarch64-unknown-linux-musl/uv" }
       ["darwin-arm64"] { name = "uv-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "uv-aarch64-apple-darwin/uv" }
     }
   }

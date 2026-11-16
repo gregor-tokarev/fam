@@ -1,7 +1,7 @@
 /// osv-scanner: Find vulnerable dependencies in source trees, lockfiles, and container images (https://github.com/google/osv-scanner).
 ///
-/// FAM builds the official Go module with Go into ~/.local/bin.
-/// Go 1.27.3 or later must exist.
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime or compiler.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
@@ -10,14 +10,14 @@ name = "osv-scanner"
 description = "Find vulnerable dependencies in source trees, lockfiles, and container images"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "github.com/google/osv-scanner/v2/cmd/osv-scanner"
-      manager = "go"
-    }
-    install = #"GOTOOLCHAIN=local GOBIN="$HOME/.local/bin" go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest"#
-    update = #"GOTOOLCHAIN=local GOBIN="$HOME/.local/bin" go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest"#
+  new fam.GitHubRelease {
+    repo = "google/osv-scanner"
     binary = "osv-scanner"
+    assets {
+      ["linux-amd64"] { name = "osv-scanner_linux_amd64"; checksum = "osv-scanner_SHA256SUMS" }
+      ["linux-arm64"] { name = "osv-scanner_linux_arm64"; checksum = "osv-scanner_SHA256SUMS" }
+      ["darwin-arm64"] { name = "osv-scanner_darwin_arm64"; checksum = "osv-scanner_SHA256SUMS" }
+    }
   }
 }
 

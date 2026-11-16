@@ -1,7 +1,7 @@
 /// glow: Render Markdown files and standard input in a terminal (https://github.com/charmbracelet/glow).
 ///
-/// FAM builds the official Go module with Go into ~/.local/bin.
-/// Go 1.26.5 or later must exist.
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime or compiler.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
@@ -10,14 +10,14 @@ name = "glow"
 description = "Render Markdown files and standard input in a terminal"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "charm.land/glow/v3"
-      manager = "go"
-    }
-    install = #"GOTOOLCHAIN=local GOBIN="$HOME/.local/bin" go install charm.land/glow/v3@latest"#
-    update = #"GOTOOLCHAIN=local GOBIN="$HOME/.local/bin" go install charm.land/glow/v3@latest"#
+  new fam.GitHubRelease {
+    repo = "charmbracelet/glow"
     binary = "glow"
+    assets {
+      ["linux-amd64"] { name = "glow_{version}_Linux_x86_64.tar.gz"; format = "tar.gz"; file = "glow_{version}_Linux_x86_64/glow"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "glow_{version}_Linux_arm64.tar.gz"; format = "tar.gz"; file = "glow_{version}_Linux_arm64/glow"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "glow_{version}_Darwin_arm64.tar.gz"; format = "tar.gz"; file = "glow_{version}_Darwin_arm64/glow"; checksum = "checksums.txt" }
+    }
   }
 }
 

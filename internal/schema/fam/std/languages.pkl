@@ -20,3 +20,12 @@ rustup: Bundle = import("../bundles/languages/rustup.pkl")
 
 /// uv: Manage Python interpreters, packages, environments, and command-line tools.
 uv: Bundle = import("../bundles/languages/uv.pkl")
+
+/// Bun: run JavaScript and TypeScript with the Bun toolchain.
+bun: Bundle = import("../bundles/languages/bun.pkl")
+
+/// Deno: run JavaScript and TypeScript with the Deno toolchain.
+deno: Bundle = import("../bundles/languages/deno.pkl")
+
+/// Go: build and format Go programs with the official toolchain.
+go: Bundle = import("../bundles/languages/go.pkl")

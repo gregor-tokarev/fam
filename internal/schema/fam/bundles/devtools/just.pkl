@@ -1,7 +1,7 @@
 /// just: Run project commands and recipes from a justfile (https://github.com/casey/just).
 ///
-/// FAM builds the official just crate with Cargo into ~/.local/bin.
-/// Cargo, Rust 1.89 or later, and a C compiler must exist.
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime or compiler.
 /// Recipes need their declared shell or interpreter.
 amends "../../Bundle.pkl"
 
@@ -11,10 +11,15 @@ name = "just"
 description = "Run project commands and recipes from a justfile"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "just"
-      manager = "cargo"
+  new fam.GitHubRelease {
+    repo = "casey/just"
+    binary = "just"
+    assets {
+      ["linux-amd64"] { name = "just-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
+      ["linux-arm64"] { name = "just-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
+      ["linux-amd64-musl"] { name = "just-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
+      ["linux-arm64-musl"] { name = "just-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
+      ["darwin-arm64"] { name = "just-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "just" }
     }
   }
   new fam.GitHubSkill {

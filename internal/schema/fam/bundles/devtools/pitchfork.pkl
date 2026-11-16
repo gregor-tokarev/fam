@@ -1,22 +1,27 @@
 /// pitchfork: Start, inspect, and stop project services with readiness and dependency checks (https://github.com/jdx/pitchfork).
 ///
-/// FAM builds the official pitchfork-cli crate with Cargo into ~/.local/bin.
-/// Cargo, Rust 1.95 or later, and a C compiler must exist.
+/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// The binary needs no runtime or compiler.
+/// The vendor supplies no musl build. FAM skips musl Linux.
 /// Services need their own programs. FAM does not start a daemon or install services.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
 
 name = "pitchfork"
 description = "Start, inspect, and stop project services with readiness and dependency checks"
 version = "@FAM_VERSION@"
+supported = !(facts.os == "linux" && facts.libc == "musl")
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "pitchfork-cli"
-      manager = "cargo"
-    }
+  new fam.GitHubRelease {
+    repo = "jdx/pitchfork"
     binary = "pitchfork"
+    assets {
+      ["linux-amd64"] { name = "pitchfork-x86_64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "pitchfork" }
+      ["linux-arm64"] { name = "pitchfork-aarch64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "pitchfork" }
+      ["darwin-arm64"] { name = "pitchfork-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "pitchfork" }
+    }
   }
   new fam.GitHubSkill {
     repo = "jdx/pitchfork"
