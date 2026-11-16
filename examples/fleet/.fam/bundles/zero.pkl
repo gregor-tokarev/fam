@@ -1,0 +1,30 @@
+//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+
+/// Zero: the programming language for agents (https://github.com/vercel-labs/zerolang).
+///
+/// FAM installs `zero` with its install script into `~/.zero/bin`, and copies the skill of the latest
+/// release from GitHub.
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+
+name = "zero"
+description = "The Zero programming language for agents"
+version = "0.7.0"
+path { "~/.zero/bin" }
+tasks {
+  new fam.Package {
+    binary = "~/.zero/bin/zero"
+    install = "curl -fsSL https://zerolang.ai/install.sh | sh"
+    update = "curl -fsSL https://zerolang.ai/install.sh | sh"
+    uninstall = "rm -f ~/.zero/bin/zero"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel-labs/zerolang"
+    path = "skills/zero"
+  }
+}
+
+verify {
+  new { name = "zero --version"; script = "zero --version" }
+}

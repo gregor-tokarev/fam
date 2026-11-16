@@ -1,4 +1,4 @@
-//! Written by FAM 0.6.0. Do not edit. Run `fam migrate` to update.
+//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
 
 /// The entrypoint of a FAM project.
 ///

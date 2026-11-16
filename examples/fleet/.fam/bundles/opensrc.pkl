@@ -1,0 +1,27 @@
+//! Written by FAM 0.7.0. Do not edit. Run `fam migrate` to update.
+
+/// opensrc: fetches the source code of npm packages for agents (https://github.com/vercel-labs/opensrc).
+///
+/// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
+/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+/// opensrc needs Node.js 24 or later.
+amends "../Bundle.pkl"
+
+import "../tasks.pkl" as fam
+
+name = "opensrc"
+description = "Source code of npm packages for agents"
+version = "0.7.0"
+tasks {
+  new fam.Package {
+    package = "opensrc"
+  }
+  new fam.GitHubSkill {
+    repo = "vercel-labs/opensrc"
+    path = "skills/opensrc"
+  }
+}
+
+verify {
+  new { name = "opensrc --version"; script = "opensrc --version" }
+}

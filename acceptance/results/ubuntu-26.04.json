@@ -13,7 +13,7 @@
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
     "detail": "first apply 26 changed, second plan 29 satisfied, second apply 0 changed",
-    "duration": "18s"
+    "duration": "17s"
   },
   {
     "target": "ubuntu-26.04",
@@ -37,7 +37,7 @@
     "name": "absent bundle removes skill, links, files, merged keys, variables",
     "result": "pass",
     "detail": "file, link, merged keys, skill, Claude link, variables removed",
-    "duration": "18s"
+    "duration": "17s"
   },
   {
     "target": "ubuntu-26.04",
@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "42s"
+    "duration": "23s"
   },
   {
     "target": "ubuntu-26.04",
@@ -110,6 +110,14 @@
     "result": "skip",
     "detail": "the target has systemd",
     "duration": ""
+  },
+  {
+    "target": "ubuntu-26.04",
+    "n": 16,
+    "name": "all standard bundles: install, verify, satisfied, archive cache",
+    "result": "pass",
+    "detail": "95 changed, 28 skills; apply 2m33s, plan 25s",
+    "duration": "3m15s"
   },
   {
     "target": "ubuntu-26.04",
