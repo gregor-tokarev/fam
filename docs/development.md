@@ -17,7 +17,7 @@ make build        # copies the upstream skills of the standard bundles, then bui
 go build ./cmd/fam  # offline build with the committed skill copies
 ```
 
-`VERSION=0.2.0 make build` sets the FAM version. The version of `.fam/` in a project must be the same as the version of the binary.
+`VERSION=0.2.0 make build` sets the FAM version. A project's `.fam/` fits a binary of another version when it has the same schema: the same files with the same content, apart from the version and the doc comments (`///`, `//!`) of the Pkl files. Otherwise FAM asks for `fam upgrade`. FAM compares the content only when the versions differ. So a release that changes only Go code or doc comments needs no `fam upgrade`, and a release that changes a schema module or a standard bundle does.
 
 ## Releases
 
