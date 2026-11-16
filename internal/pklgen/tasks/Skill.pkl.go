@@ -21,7 +21,8 @@ var _ Skill = SkillImpl{}
 //
 // FAM copies it to `~/.agents/skills/<name>`, marks it as managed, and links
 // `~/.claude/skills/<name>` to it. With `state = "absent"`, FAM removes the copy and the link,
-// but only when FAM made them.
+// but only when FAM made them. Skill tasks run as the SSH user: `sudo = true` is an error.
+// `restarts` restarts the units when the skill changes.
 type SkillImpl struct {
 	// The folder, relative to the bundle file.
 	Path string `pkl:"path"`

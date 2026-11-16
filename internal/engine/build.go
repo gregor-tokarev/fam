@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"regexp"
 
 	"github.com/gregor-tokarev/fam/internal/config"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
@@ -146,15 +147,29 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 	default:
 		return nil, false, nil
 	}
+	// Skills live in the home folder of the SSH user, so FAM never copies them with sudo.
+	if t.GetSudo() {
+		return nil, true, fmt.Errorf("%s: skill %s: skill tasks run as the SSH user. Remove `sudo = true`", group, name)
+	}
+	if !skillName.MatchString(name) {
+		return nil, true, fmt.Errorf("%s: the skill name %q is not valid: use letters, digits, '.', '_', and '-', and start with a letter or digit. Set `name`", group, name)
+	}
+	units := make([]Unit, 0, len(t.GetRestarts()))
+	for _, n := range t.GetRestarts() {
+		units = append(units, Unit{Name: n, Scope: "user"})
+	}
 	if absent {
-		return []Task{&SkillRemoveTask{base: g, Name_: name}}, true, nil
+		return []Task{&SkillRemoveTask{base: g, Name_: name, units: units}}, true, nil
 	}
 	src, err := load(name)
 	if err != nil {
 		return nil, true, err
 	}
-	return []Task{&SkillTask{base: g, Skill: src}, &SkillLinkTask{base: g, Name_: name}}, true, nil
+	return []Task{&SkillTask{base: g, Skill: src, units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
 }
+
+// skillName is the rule for skill names, as in tasks.pkl.
+var skillName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 // BundleSection returns the tasks of one bundle. An absent bundle undoes its typed tasks
 // in reverse order, then runs its uninstall tasks. A present bundle restarts the units of its
@@ -213,25 +228,27 @@ func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 		delete(scopes, n)
 	}
 	for _, bt := range u.Bundle.Tasks {
-		if st, ok, err := skillTasks(ctx, bt, u, group, false); ok || err != nil {
-			if err != nil {
-				return sec, err
-			}
-			sec.Tasks = append(sec.Tasks, st...)
-			continue
-		}
-		t, err := convert(bt, group, false, pm)
+		ts, ok, err := skillTasks(ctx, bt, u, group, false)
 		if err != nil {
 			return sec, err
 		}
-		if r, ok := t.(Restarter); ok {
-			for i, unit := range r.Restarts() {
-				if s, ok := scopes[unit.Name]; ok {
-					r.Restarts()[i].Scope = s
+		if !ok {
+			t, err := convert(bt, group, false, pm)
+			if err != nil {
+				return sec, err
+			}
+			ts = []Task{t}
+		}
+		for _, t := range ts {
+			if r, ok := t.(Restarter); ok {
+				for i, unit := range r.Restarts() {
+					if s, ok := scopes[unit.Name]; ok {
+						r.Restarts()[i].Scope = s
+					}
 				}
 			}
 		}
-		sec.Tasks = append(sec.Tasks, t)
+		sec.Tasks = append(sec.Tasks, ts...)
 	}
 	return sec, nil
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -271,7 +272,9 @@ func doRetry(ctx context.Context, c *http.Client, req *http.Request) (*http.Resp
 		if err == nil {
 			return resp, nil
 		}
-		if ctx.Err() != nil {
+		// Only a network failure (DNS, connect, reset, timeout) is worth another try.
+		var ne net.Error
+		if ctx.Err() != nil || !errors.As(err, &ne) {
 			return nil, err
 		}
 	}

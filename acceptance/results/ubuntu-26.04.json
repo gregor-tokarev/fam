@@ -37,7 +37,7 @@
     "name": "absent bundle removes skill, links, files, merged keys, variables",
     "result": "pass",
     "detail": "file, link, merged keys, skill, Claude link, variables removed",
-    "duration": "17s"
+    "duration": "18s"
   },
   {
     "target": "ubuntu-26.04",
@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "3m15s"
+    "duration": "23s"
   },
   {
     "target": "ubuntu-26.04",

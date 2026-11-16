@@ -13,7 +13,7 @@
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
     "detail": "first apply 25 changed, second plan 28 satisfied, second apply 0 changed",
-    "duration": "31s"
+    "duration": "32s"
   },
   {
     "target": "alpine-3.24",
@@ -37,7 +37,7 @@
     "name": "absent bundle removes skill, links, files, merged keys, variables",
     "result": "pass",
     "detail": "file, link, merged keys, skill, Claude link, variables removed",
-    "duration": "24s"
+    "duration": "23s"
   },
   {
     "target": "alpine-3.24",
@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "38s"
+    "duration": "29s"
   },
   {
     "target": "alpine-3.24",

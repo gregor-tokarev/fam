@@ -175,7 +175,11 @@ done' sh {} +`, transport.Quote(dir), managedMarker, env.T.SHA256Cmd())
 type SkillTask struct {
 	base
 	Skill *SkillSource
+	units []Unit
 }
+
+// Restarts implements Restarter.
+func (t *SkillTask) Restarts() []Unit { return t.units }
 
 // Kind implements Task.
 func (t *SkillTask) Kind() string { return "skill" }
@@ -387,7 +391,11 @@ func skillsSection(env *Env, bundleSkills map[string]string) (Section, error) {
 type SkillRemoveTask struct {
 	base
 	Name_ string
+	units []Unit
 }
+
+// Restarts implements Restarter.
+func (t *SkillRemoveTask) Restarts() []Unit { return t.units }
 
 // Kind implements Task.
 func (t *SkillRemoveTask) Kind() string { return "skill" }
