@@ -2,9 +2,9 @@
 ///
 /// FAM installs `zero` with its install script into `~/.zero/bin`, and copies the skill of the latest
 /// release from GitHub.
-amends "../Bundle.pkl"
+amends "../../Bundle.pkl"
 
-import "../tasks.pkl" as fam
+import "../../tasks.pkl" as fam
 
 name = "zero"
 description = "The Zero programming language for agents"

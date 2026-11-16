@@ -6,10 +6,10 @@
 ///
 /// On Linux, agent-desktop needs glibc (not Alpine) and a desktop session (X11 or Wayland) with
 /// AT-SPI. FAM does not change the system for this.
-amends "../Bundle.pkl"
+amends "../../Bundle.pkl"
 
-import "../tasks.pkl" as fam
-import "../facts.pkl"
+import "../../tasks.pkl" as fam
+import "../../facts.pkl"
 
 name = "agent-desktop"
 description = "Computer use CLI for AI agents"

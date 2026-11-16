@@ -113,7 +113,7 @@ import "@fam/std.pkl"
 
 bundles {
   import("bundles/node.pkl")
-  std.agentBrowser
+  std.computer.agentBrowser
 }
 `,
 		// Scenario 16: all standard bundles.
@@ -124,20 +124,20 @@ import "@fam/facts.pkl"
 
 bundles {
   import("bundles/node.pkl")
-  std.agentBrowser
+  std.computer.agentBrowser
   when (facts.distro != "alpine") {
-    std.agentDesktop
-    std.latMd
+    std.computer.agentDesktop
+    std.context.latMd
   }
-  std.aiCli
-  std.emulate
-  std.hyperframes
-  std.issueGraph
-  std.opensrc
-  std.portless
-  std.skills
-  std.webreel
-  std.zero
+  std.media.aiCli
+  std.testing.emulate
+  std.media.hyperframes
+  std.context.issueGraph
+  std.context.opensrc
+  std.networking.portless
+  std.agents.skills
+  std.media.webreel
+  std.languages.zero
 }
 `,
 		"bundles/tool/bundle.pkl": `amends "@fam/Bundle.pkl"
