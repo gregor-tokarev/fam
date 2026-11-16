@@ -1,7 +1,7 @@
 /// ripgrep: a fast text search tool with ignore-file support (https://github.com/BurntSushi/ripgrep).
 ///
-/// FAM installs ripgrep with cargo.
-/// The build needs Cargo, Rust 1.85 or later, and a C linker.
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// FAM uses static musl builds on Linux, including glibc workers.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
@@ -10,12 +10,16 @@ name = "ripgrep"
 description = "Search source trees with fast regular expressions and ignore-file support"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "ripgrep"
-      manager = "cargo"
-    }
+  new fam.GitHubRelease {
+    repo = "BurntSushi/ripgrep"
     binary = "rg"
+    assets {
+      ["linux-amd64"] { name = "ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "ripgrep-{version}-x86_64-unknown-linux-musl/rg"; checksum = "ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz.sha256" }
+      ["linux-arm64"] { name = "ripgrep-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "ripgrep-{version}-aarch64-unknown-linux-musl/rg"; checksum = "ripgrep-{version}-aarch64-unknown-linux-musl.tar.gz.sha256" }
+      ["linux-amd64-musl"] { name = "ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "ripgrep-{version}-x86_64-unknown-linux-musl/rg"; checksum = "ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz.sha256" }
+      ["linux-arm64-musl"] { name = "ripgrep-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "ripgrep-{version}-aarch64-unknown-linux-musl/rg"; checksum = "ripgrep-{version}-aarch64-unknown-linux-musl.tar.gz.sha256" }
+      ["darwin-arm64"] { name = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "ripgrep-{version}-aarch64-apple-darwin/rg"; checksum = "ripgrep-{version}-aarch64-apple-darwin.tar.gz.sha256" }
+    }
   }
 }
 

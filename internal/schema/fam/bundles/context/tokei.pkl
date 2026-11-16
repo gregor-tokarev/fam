@@ -1,7 +1,10 @@
 /// tokei: a code counter with language totals (https://github.com/XAMPPRocky/tokei).
 ///
-/// FAM installs tokei with cargo.
-/// The build needs Cargo, Rust, and a C linker.
+/// FAM installs the tokei system package (Homebrew on macOS).
+/// Upstream v15.0.0 has no release binaries.
+/// Ubuntu 26.04 supplies 13.0.0 and Alpine 3.24 supplies 14.0.0.
+/// These versions provide the code counts and language totals.
+/// FAM needs no Rust or C toolchain.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
@@ -13,7 +16,7 @@ tasks {
   new fam.Package {
     package = new fam.PackageRef {
       package = "tokei"
-      manager = "cargo"
+      manager = "system"
     }
     binary = "tokei"
   }

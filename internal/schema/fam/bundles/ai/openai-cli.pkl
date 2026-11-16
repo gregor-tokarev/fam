@@ -1,7 +1,7 @@
 /// openai-cli: a CLI for OpenAI APIs and administration (https://github.com/openai/openai-cli).
 ///
-/// FAM installs github.com/openai/openai-cli/cmd/openai with go.
-/// FAM needs Go 1.26.0 or later to build the CLI.
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Linux binaries are static and also run on musl.
 /// Credentials: OPENAI_API_KEY, OPENAI_ADMIN_KEY.
 /// FAM copies the core skills from the upstream repository.
 /// OPENAI_ADMIN_KEY is for administration operations.
@@ -14,12 +14,14 @@ description = "Call OpenAI APIs for responses, files, batches, images, audio, an
 version = "@FAM_VERSION@"
 requiredSecrets { "OPENAI_API_KEY"; "OPENAI_ADMIN_KEY" }
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "github.com/openai/openai-cli/cmd/openai"
-      manager = "go"
-    }
+  new fam.GitHubRelease {
+    repo = "openai/openai-cli"
     binary = "openai"
+    assets {
+      ["linux-amd64"] { name = "openai_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "openai"; checksum = "openai_{version}_checksums.txt" }
+      ["linux-arm64"] { name = "openai_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "openai"; checksum = "openai_{version}_checksums.txt" }
+      ["darwin-arm64"] { name = "openai_{version}_macos_arm64.zip"; format = "zip"; file = "openai"; checksum = "openai_{version}_checksums.txt" }
+    }
   }
   new fam.GitHubSkill {
     repo = "openai/openai-cli"

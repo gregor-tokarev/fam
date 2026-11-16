@@ -1,24 +1,28 @@
 /// axiom: a CLI for Axiom datasets, logs, and traces (https://github.com/axiomhq/cli).
 ///
-/// FAM installs github.com/axiomhq/cli/cmd/axiom with go.
-/// FAM needs Go to build the CLI.
+/// FAM installs the upstream release binary into ~/.local/bin.
+/// Linux binaries require glibc. Musl is not supported.
 /// Credentials: AXIOM_TOKEN.
 /// FAM copies the core skills from the upstream repository.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
 
 name = "axiom"
 description = "Query Axiom datasets, logs, and traces from the command line"
 version = "@FAM_VERSION@"
+supported = facts.libc != "musl"
 requiredSecrets { "AXIOM_TOKEN" }
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "github.com/axiomhq/cli/cmd/axiom"
-      manager = "go"
-    }
+  new fam.GitHubRelease {
+    repo = "axiomhq/cli"
     binary = "axiom"
+    assets {
+      ["linux-amd64"] { name = "axiom_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "axiom_{version}_linux_amd64/axiom"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "axiom_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "axiom_{version}_linux_arm64/axiom"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "axiom_{version}_darwin_arm64.tar.gz"; format = "tar.gz"; file = "axiom_{version}_darwin_arm64/axiom"; checksum = "checksums.txt" }
+    }
   }
   new fam.GitHubSkill {
     repo = "axiomhq/cli"
