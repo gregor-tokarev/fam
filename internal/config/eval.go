@@ -115,7 +115,7 @@ func (e *EvalError) Error() string {
 		msg += "\n\nFAM 0.4.0 bundles have no `instructions`. Put the lines into instructions/AGENTS.md of the project, " +
 			"or rely on the skill of the bundle"
 	}
-	if strings.Contains(msg, "Cannot find property `agentSkills`") || strings.Contains(msg, "Cannot find property `d3k`") {
+	if strings.Contains(msg, "Cannot find property `agentSkills` in module `fam.std`") || strings.Contains(msg, "Cannot find property `d3k` in module `fam.std`") {
 		msg += "\n\nFAM 0.8.0 has no std.agentSkills and no std.d3k: a standard bundle installs a tool, not only skills. " +
 			"Add the skills to a bundle of your own, for example " +
 			"`new fam.GitHubSkill { repo = \"vercel-labs/dev3000\"; path = \"skills/d3k\" }` or " +
