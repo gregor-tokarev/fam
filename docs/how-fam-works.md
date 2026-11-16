@@ -78,7 +78,7 @@ There is no `.Agent` variable. Bundle instruction lines go into a `## Tools on t
 
 FAM copies each folder of `skills/` (resolved relative to `--base`, or set with `--skills`) and the skill of each present bundle. The skill name is the folder name. A bundle skill folder with the name `skill` gets the bundle name. Two skills with the same name are an error.
 
-A bundle skill can also be a folder in a public GitHub repository (`new Bundle.GitHubSkill { repo; path; ref }`). The cockpit downloads the repository archive from `codeload.github.com` once for each run, also for `fam plan`, and copies the folder like a local one. Without a `ref`, FAM uses the tag of the latest release (the redirect of `github.com/<repo>/releases/latest`, no API token). A link in the folder becomes a copy of the file that it points to.
+A bundle skill can also be a folder in a public GitHub repository (`new Bundle.GitHubSkill { repo; path; ref }`). The cockpit downloads the repository archive from `codeload.github.com` once for each run, also for `fam plan`, and copies the folder like a local one. Without a `ref`, FAM uses the tag of the latest release (the redirect of `github.com/<repo>/releases/latest`, no API token). A link in the folder becomes a copy of the file that it points to, which must be in the same folder. FAM reads at most 1 GiB of the archive and keeps only the folder (at most 16 MiB for each file, 64 MiB and 5000 files in total).
 
 ## Secrets
 

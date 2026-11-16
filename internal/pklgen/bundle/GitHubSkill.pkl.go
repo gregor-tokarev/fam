@@ -10,7 +10,7 @@ type GitHubSkill struct {
 	// The skill folder in the repository, for example `"skills/agent-browser"`.
 	Path string `pkl:"path"`
 
-	// A tag, branch, or commit. When it is `null`, FAM uses the tag of the latest release, so that
-	// the skill matches the latest version of the tool.
+	// A tag, branch, or commit. When it is `null`, FAM uses the tag of the latest GitHub release,
+	// which is usually the latest version of the tool.
 	Ref *string `pkl:"ref"`
 }

@@ -24,14 +24,14 @@ go build ./cmd/fam  # the same, with the default version
 Push a tag on `main` to publish a release. First update the schema of the example project to the new version, and merge that change:
 
 ```sh
-VERSION=0.3.0 make build && ./fam upgrade --base examples/fleet
+VERSION=0.4.0 make build && ./fam upgrade --base examples/fleet
 ```
 
 Then tag the merge commit:
 
 ```sh
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 `.github/workflows/release.yml` runs `scripts/build-release.sh <version>`. It builds `fam_<os>_<arch>.tar.gz` for linux/amd64, linux/arm64, and darwin/arm64 (the platforms of the pinned pkl), and `checksums.txt` with the SHA-256 of each archive. Then it creates the GitHub release. The version in the tag goes into `internal/version.Version`, which is also the schema version that `fam new` and `fam upgrade` write into `.fam/`.
@@ -56,7 +56,7 @@ FAM downloads `pkl` 0.33.0 from the GitHub release on first use into `<user cach
 
 ## Standard bundles
 
-A standard bundle installs only its tool and gets its skill from the tool's GitHub repository (`Bundle.GitHubSkill`). FAM vendors no skills. Without a `ref`, the skill comes from the latest release, so it matches the latest version of the tool.
+A standard bundle installs only its tool and gets its skill from the tool's GitHub repository (`Bundle.GitHubSkill`). FAM vendors no skills. Without a `ref`, the skill comes from the latest GitHub release. That is usually the version that the package manager installs, but a registry can be ahead of or behind GitHub.
 
 ## Acceptance harness
 

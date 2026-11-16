@@ -99,7 +99,7 @@ class GitHubSkill {
   /// The skill folder in the repository, for example `"skills/agent-browser"`.
   path: String(!isEmpty && !startsWith("/") && !split("/").contains(".."))
 
-  /// A tag, branch, or commit. When it is `null`, FAM uses the tag of the latest release, so that
-  /// the skill matches the latest version of the tool.
+  /// A tag, branch, or commit. When it is `null`, FAM uses the tag of the latest GitHub release,
+  /// which is usually the latest version of the tool.
   ref: String?
 }

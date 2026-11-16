@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path"
 	"sort"
 	"strings"
@@ -61,6 +62,14 @@ func loadGitHubSkill(ctx context.Context, gs bundle.GitHubSkill, origin string) 
 		}
 		r.files, r.err = downloadSkill(ctx, gs.Repo, gs.Path, r.ref)
 	})
+	if r.err != nil && ctx.Err() != nil {
+		// Do not keep a canceled download: a later call tries again.
+		githubSkills.Lock()
+		if githubSkills.done[key] == r {
+			delete(githubSkills.done, key)
+		}
+		githubSkills.Unlock()
+	}
 	name := path.Base(gs.Path)
 	src := fmt.Sprintf("github.com/%s/%s@%s", gs.Repo, gs.Path, r.ref)
 	if r.err != nil {
@@ -87,15 +96,33 @@ func latestRelease(ctx context.Context, repo string) (string, error) {
 	}
 	resp.Body.Close()
 	loc := resp.Header.Get("Location")
-	if resp.StatusCode < 300 || resp.StatusCode >= 400 || path.Base(path.Dir(loc)) != "tag" {
+	// The tag is everything after /releases/tag/. A tag can contain slashes (skills/v1).
+	_, tag, ok := strings.Cut(loc, "/releases/tag/")
+	if resp.StatusCode < 300 || resp.StatusCode >= 400 || !ok || tag == "" {
 		return "", fmt.Errorf("%s has no release (HTTP %d from %s). Set `ref` of the skill to a tag, branch, or commit", repo, resp.StatusCode, u)
 	}
-	return path.Base(loc), nil
+	if t, err := url.PathUnescape(tag); err == nil {
+		tag = t
+	}
+	return tag, nil
 }
+
+// Limits of a skill download. The archive is the whole repository, so FAM reads at most
+// maxArchive uncompressed bytes, and keeps only the files of the skill folder.
+const (
+	maxArchive    = 1 << 30
+	maxSkillFile  = 16 << 20
+	maxSkillBytes = 64 << 20
+	maxSkillFiles = 5000
+)
 
 // downloadSkill reads the files of one folder from the archive of a repository at a ref.
 func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, error) {
-	u := CodeloadBase + "/" + repo + "/tar.gz/" + ref
+	segs := strings.Split(ref, "/")
+	for i, sg := range segs {
+		segs[i] = url.PathEscape(sg)
+	}
+	u := CodeloadBase + "/" + repo + "/tar.gz/" + strings.Join(segs, "/")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -108,15 +135,20 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download %s: HTTP %d", u, resp.StatusCode)
 	}
-	gz, err := gzip.NewReader(io.LimitReader(resp.Body, 512<<20))
+	gz, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("download %s: %w", u, err)
 	}
+	fail := func(format string, a ...any) ([]skillFile, error) {
+		return nil, fmt.Errorf("skill %s of %s@%s: %s", folder, repo, ref, fmt.Sprintf(format, a...))
+	}
 	prefix := strings.Trim(folder, "/") + "/"
 	var files []skillFile
+	byRel := map[string]int{}
 	links := map[string]string{} // rel path in the folder -> link target in the repository
-	all := map[string]skillFile{}
-	tr := tar.NewReader(gz)
+	total := 0
+	root := ""
+	tr := tar.NewReader(&capReader{r: gz, left: maxArchive})
 	for {
 		h, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -125,52 +157,79 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 		if err != nil {
 			return nil, fmt.Errorf("download %s: %w", u, err)
 		}
-		// The archive has one top folder (<name>-<ref>/).
-		_, inRepo, ok := strings.Cut(h.Name, "/")
-		if !ok || inRepo == "" {
+		if h.Typeflag == tar.TypeXGlobalHeader {
 			continue
 		}
+		// The archive has one top folder (<name>-<ref>/).
+		top, inRepo, _ := strings.Cut(h.Name, "/")
+		if root == "" {
+			root = top
+		} else if top != root {
+			return fail("the archive has more than one top folder")
+		}
 		inRepo = path.Clean(inRepo)
+		if !strings.HasPrefix(inRepo, prefix) {
+			continue
+		}
+		rel := strings.TrimPrefix(inRepo, prefix)
+		// FAM writes its own marker file into each skill folder.
+		if rel == managedMarker || strings.HasPrefix(rel, "../") {
+			continue
+		}
 		switch h.Typeflag {
 		case tar.TypeReg:
-			if !strings.HasPrefix(inRepo, prefix) {
-				// Keep small files outside the folder for links that point out of it.
-				if h.Size > 1<<20 {
-					continue
-				}
+			if h.Size > maxSkillFile {
+				return fail("the file %s has %d bytes, more than the limit of %d", rel, h.Size, maxSkillFile)
 			}
-			data, err := io.ReadAll(io.LimitReader(tr, 64<<20))
+			total += int(h.Size)
+			if total > maxSkillBytes || len(files) >= maxSkillFiles {
+				return fail("the folder has more than %d bytes or %d files", maxSkillBytes, maxSkillFiles)
+			}
+			data, err := io.ReadAll(tr)
 			if err != nil {
 				return nil, fmt.Errorf("download %s: %w", u, err)
 			}
-			f := skillFile{rel: strings.TrimPrefix(inRepo, prefix), data: data, exec: h.Mode&0o100 != 0}
-			all[inRepo] = f
-			if strings.HasPrefix(inRepo, prefix) && f.rel != managedMarker {
-				files = append(files, f)
-			}
+			byRel[rel] = len(files)
+			files = append(files, skillFile{rel: rel, data: data, exec: h.Mode&0o100 != 0})
 		case tar.TypeSymlink:
-			if strings.HasPrefix(inRepo, prefix) {
-				links[strings.TrimPrefix(inRepo, prefix)] = path.Clean(path.Join(path.Dir(inRepo), h.Linkname))
+			if path.IsAbs(h.Linkname) {
+				links[rel] = h.Linkname
+			} else {
+				links[rel] = path.Clean(path.Join(path.Dir(rel), h.Linkname))
 			}
 		}
 	}
 	// A link in the folder becomes a copy of the file that it points to (as for local skills).
+	// The target must be a file in the same folder.
 	for rel, target := range links {
-		f, ok := all[target]
-		if !ok || strings.HasPrefix(target, "../") {
-			return nil, fmt.Errorf("skill %s of %s@%s: the link %s does not point to a file in the repository", folder, repo, ref, rel)
+		i, ok := byRel[target]
+		if !ok || path.IsAbs(target) {
+			return fail("the link %s does not point to a file in the skill folder", rel)
 		}
+		f := files[i]
 		files = append(files, skillFile{rel: rel, data: f.data, exec: f.exec})
 	}
-	hasSkill := false
-	for _, f := range files {
-		if f.rel == "SKILL.md" {
-			hasSkill = true
-		}
-	}
-	if !hasSkill {
-		return nil, fmt.Errorf("%s@%s has no %sSKILL.md", repo, ref, prefix)
+	if _, ok := byRel["SKILL.md"]; !ok {
+		return fail("the folder has no SKILL.md")
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].rel < files[j].rel })
 	return files, nil
+}
+
+// capReader stops with an error after `left` bytes.
+type capReader struct {
+	r    io.Reader
+	left int64
+}
+
+func (c *capReader) Read(p []byte) (int, error) {
+	if c.left <= 0 {
+		return 0, fmt.Errorf("the archive is larger than %d bytes", int64(maxArchive))
+	}
+	if int64(len(p)) > c.left {
+		p = p[:c.left]
+	}
+	n, err := c.r.Read(p)
+	c.left -= int64(n)
+	return n, err
 }
