@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "browser-use"
-description = "Browser control CLI with local and hosted browser sessions"
 version = "@FAM_VERSION@"
 requiredSecrets { "BROWSER_USE_API_KEY" }
 tasks {

@@ -33,7 +33,6 @@ local installTailscale = #"""
   """#
 
 name = "tailscale"
-description = "Connect worker machines through the Tailscale private network"
 version = "@FAM_VERSION@"
 tasks {
   when (facts.os == "linux") {

@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "d2"
-description = "Official text to diagram CLI for architecture and system designs"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

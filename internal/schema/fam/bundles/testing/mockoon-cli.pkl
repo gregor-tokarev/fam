@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "mockoon-cli"
-description = "Official Mockoon CLI for headless API mock servers"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

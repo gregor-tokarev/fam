@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "uv"
-description = "Manage Python interpreters, packages, environments, and command-line tools"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

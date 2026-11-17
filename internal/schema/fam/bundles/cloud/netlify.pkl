@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "netlify"
-description = "Deploy and manage Netlify sites"
 version = "@FAM_VERSION@"
 requiredSecrets { "NETLIFY_AUTH_TOKEN" }
 tasks {

@@ -3,7 +3,6 @@ import "@fam/tasks.pkl" as fam
 import "@fam/facts.pkl"
 
 name = "go"
-description = "Go from the OS package manager"
 
 tasks {
   new fam.Package {

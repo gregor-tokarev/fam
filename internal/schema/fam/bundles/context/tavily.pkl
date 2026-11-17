@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "tavily"
-description = "Search the web and extract content with the official Tavily CLI."
 version = "@FAM_VERSION@"
 requiredSecrets { "TAVILY_API_KEY" }
 tasks {

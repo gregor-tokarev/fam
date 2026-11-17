@@ -10,7 +10,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "difftastic"
-description = "Compare source files through syntax-aware diffs"
 version = "@FAM_VERSION@"
 supported = !(facts.os == "linux" && facts.libc == "musl" && facts.arch == "arm64")
 unsupportedReason = "The vendor supplies no arm64 musl build."

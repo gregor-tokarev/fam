@@ -15,7 +15,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "agent-browser"
-description = "Browser automation CLI for AI agents"
 version = "@FAM_VERSION@"
 tasks {
   // npm by default. Another manager: package = new { package = "agent-browser"; manager = "brew" }

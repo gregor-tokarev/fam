@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "usql"
-description = "Query many database systems through a common CLI"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

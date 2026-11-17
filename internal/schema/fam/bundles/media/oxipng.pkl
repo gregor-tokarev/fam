@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "oxipng"
-description = "Lossless PNG optimization CLI with parallel processing"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

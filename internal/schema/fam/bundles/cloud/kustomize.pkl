@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "kustomize"
-description = "Customize Kubernetes manifests without templates"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

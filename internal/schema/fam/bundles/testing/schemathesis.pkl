@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "schemathesis"
-description = "CLI for property based API tests from OpenAPI and GraphQL schemas"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "fd"
-description = "Find files and directories through a concise headless CLI"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "issue-graph"
-description = "Related issues and changes before you start work"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

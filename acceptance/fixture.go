@@ -138,7 +138,6 @@ bundles {
 import "@fam/tasks.pkl" as fam
 
 name = "tool"
-description = "A test tool for the acceptance harness"
 env {
   ["FAM_TOOL_MODE"] = "acceptance"
 }
@@ -185,7 +184,6 @@ import "@fam/tasks.pkl" as fam
 import "@fam/facts.pkl"
 
 name = "node"
-description = "Node.js: upstream binaries in ~/.local, or the OS package on Alpine"
 tasks {
   when (facts.distro == "alpine") {
     new fam.Package { binary = "npm"; sudo = true; install = "apk add --no-cache nodejs npm"; uninstall = "apk del nodejs npm" }

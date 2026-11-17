@@ -9,7 +9,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "turso"
-description = "Manage Turso databases, branches, and access tokens"
 version = "@FAM_VERSION@"
 supported = facts.libc != "musl"
 unsupportedReason = "The vendor supplies no musl release."

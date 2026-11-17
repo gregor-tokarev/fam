@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "doctl"
-description = "Manage DigitalOcean compute, Kubernetes, and platform resources"
 version = "@FAM_VERSION@"
 requiredSecrets { "DIGITALOCEAN_ACCESS_TOKEN" }
 tasks {

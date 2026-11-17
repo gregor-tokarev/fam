@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "wandb"
-description = "Inspect and synchronize Weights & Biases runs, artifacts, and experiment data"
 version = "@FAM_VERSION@"
 requiredSecrets { "WANDB_API_KEY" }
 tasks {

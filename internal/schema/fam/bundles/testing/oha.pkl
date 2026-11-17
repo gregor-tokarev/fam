@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "oha"
-description = "HTTP load generator with JSON output and a noninteractive mode"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

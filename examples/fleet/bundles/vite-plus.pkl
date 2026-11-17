@@ -3,7 +3,6 @@ amends "@fam/Bundle.pkl"
 import "@fam/tasks.pkl" as fam
 
 name = "vite-plus"
-description = "Vite+ and the Node.js LTS that it manages"
 path { "~/.local/share/vite-plus/bin" }
 
 tasks {

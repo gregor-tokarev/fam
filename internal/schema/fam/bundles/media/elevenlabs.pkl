@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "elevenlabs"
-description = "Official ElevenLabs CLI for speech, audio, media generation, and API access"
 version = "@FAM_VERSION@"
 requiredSecrets { "ELEVENLABS_API_KEY" }
 tasks {

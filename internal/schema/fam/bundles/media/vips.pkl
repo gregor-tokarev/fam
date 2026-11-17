@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "vips"
-description = "Official image processing CLI for large images and batch operations"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

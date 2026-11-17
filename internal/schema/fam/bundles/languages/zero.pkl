@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "zero"
-description = "The Zero programming language for agents"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

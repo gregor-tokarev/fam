@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "duckdb"
-description = "Query local files and analytical datasets with SQL"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

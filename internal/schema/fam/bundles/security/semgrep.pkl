@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "semgrep"
-description = "Scan source code for security issues through Semgrep rules"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

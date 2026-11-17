@@ -41,7 +41,6 @@ local installHelm = #"""
   """#
 
 name = "helm"
-description = "Package and deploy applications on Kubernetes"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

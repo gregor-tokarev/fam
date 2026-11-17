@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "repomix"
-description = "Pack local or remote source repositories into context for coding agents."
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

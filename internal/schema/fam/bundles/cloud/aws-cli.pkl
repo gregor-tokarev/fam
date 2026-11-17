@@ -37,7 +37,6 @@ local installAws = #"""
   """#
 
 name = "aws-cli"
-description = "Manage AWS services with AWS CLI v2"
 version = "@FAM_VERSION@"
 requiredSecrets { "AWS_ACCESS_KEY_ID"; "AWS_SECRET_ACCESS_KEY"; "AWS_SESSION_TOKEN" }
 tasks {

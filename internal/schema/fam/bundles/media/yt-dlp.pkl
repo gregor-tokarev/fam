@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "yt-dlp"
-description = "Command line downloader for video, audio, subtitles, and metadata"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

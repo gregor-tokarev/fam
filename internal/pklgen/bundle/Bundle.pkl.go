@@ -35,9 +35,6 @@ type Bundle struct {
 	// Two different files with the same name are an error.
 	Name string `pkl:"name"`
 
-	// A short description for output.
-	Description *string `pkl:"description"`
-
 	// Whether the tool supports the current machine facts.
 	// When false, FAM skips a present bundle and its verify scripts without an error.
 	// A skipped bundle adds no variables or PATH entries to ~/.config/fam/env.sh.

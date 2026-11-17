@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "fal"
-description = "Official fal CLI for model API calls, generation queues, and deployments"
 version = "@FAM_VERSION@"
 requiredSecrets { "FAL_KEY" }
 tasks {

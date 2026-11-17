@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "opentofu"
-description = "Plan and apply infrastructure changes with OpenTofu"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "rustup"
-description = "Manage Rust toolchains with Rustup"
 version = "@FAM_VERSION@"
 path { "~/.local/share/fam/rustup/bin" }
 tasks {

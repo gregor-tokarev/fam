@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "cloudflared"
-description = "Expose local services through Cloudflare Tunnel"
 version = "@FAM_VERSION@"
 requiredSecrets { "TUNNEL_TOKEN" }
 tasks {

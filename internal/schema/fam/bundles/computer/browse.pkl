@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "browse"
-description = "Official Browserbase CLI for browser control and hosted browser APIs"
 version = "@FAM_VERSION@"
 requiredSecrets { "BROWSERBASE_API_KEY" }
 tasks {

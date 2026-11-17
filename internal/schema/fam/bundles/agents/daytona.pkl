@@ -10,7 +10,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "daytona"
-description = "Create and manage Daytona sandboxes, snapshots, and remote command execution"
 version = "@FAM_VERSION@"
 supported = facts.libc != "musl"
 unsupportedReason = "The Linux release requires glibc. Alpine is not supported."

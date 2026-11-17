@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "kind"
-description = "Run local Kubernetes clusters in containers"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

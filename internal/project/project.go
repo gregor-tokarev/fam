@@ -184,7 +184,6 @@ const helloBundle = `amends "@fam/Bundle.pkl"
 import "@fam/tasks.pkl" as fam
 
 name = "hello"
-description = "An example bundle: one small script in ~/.local/bin"
 
 env {
   ["FAM_HELLO_GREETING"] = "Hello from FAM"
@@ -212,7 +211,6 @@ import "@fam/tasks.pkl" as fam
 import "@fam/facts.pkl"
 
 name = "worker-setup"
-description = "An example setup for the worker machines"
 
 tasks {
   when (facts.os == "linux") {

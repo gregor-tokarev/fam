@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "newrelic"
-description = "Query New Relic data and manage observability resources"
 version = "@FAM_VERSION@"
 requiredSecrets { "NEW_RELIC_API_KEY" }
 tasks {

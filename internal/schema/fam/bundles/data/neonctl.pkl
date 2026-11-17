@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "neonctl"
-description = "Manage Neon PostgreSQL projects, branches, and database resources"
 version = "@FAM_VERSION@"
 requiredSecrets { "NEON_API_KEY" }
 tasks {

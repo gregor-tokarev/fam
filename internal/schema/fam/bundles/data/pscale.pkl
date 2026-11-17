@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "pscale"
-description = "Manage PlanetScale databases, branches, and schema changes"
 version = "@FAM_VERSION@"
 requiredSecrets { "PLANETSCALE_SERVICE_TOKEN_ID"; "PLANETSCALE_SERVICE_TOKEN" }
 tasks {
