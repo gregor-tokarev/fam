@@ -317,6 +317,85 @@ func WriteProject(base string, p *Package) error {
 	return writeAtomic(dp, append(out, '\n'))
 }
 
+// WriteEditorState writes `.pkl-lsp/projects.json`, the project state of the Pkl language server
+// (pkl-lsp), from PklProject.deps.json. pkl-lsp writes this file on "Sync Projects", and reads
+// it when it starts. Editors that cannot send that request (Zed) then resolve `@fam/…` too. It
+// keeps the other entries and the other declared dependencies of an existing state.
+func WriteEditorState(base string, p *Package) error {
+	b, err := os.ReadFile(filepath.Join(base, DepsFile))
+	if err != nil {
+		return err
+	}
+	var deps struct {
+		ResolvedDependencies map[string]map[string]any `json:"resolvedDependencies"`
+	}
+	if err := json.Unmarshal(b, &deps); err != nil {
+		return fmt.Errorf("read %s: %w", DepsFile, err)
+	}
+	resolved := map[string]any{}
+	for k, d := range deps.ResolvedDependencies {
+		e := map[string]any{}
+		for f, v := range d {
+			switch f {
+			case "type":
+				e["myType"] = v
+			case "uri":
+				s, _ := v.(string)
+				e["uri"] = strings.Replace(s, "projectpackage://", "package://", 1)
+			default:
+				e[f] = v
+			}
+		}
+		resolved[k] = e
+	}
+
+	dir := filepath.Join(base, ".pkl-lsp")
+	sp := filepath.Join(dir, "projects.json")
+	var state struct {
+		SchemaVersion int              `json:"schemaVersion"`
+		PklProjects   []map[string]any `json:"pklProjects"`
+	}
+	if old, err := os.ReadFile(sp); err == nil {
+		// A damaged state is a cache: replace it.
+		if json.Unmarshal(old, &state) != nil {
+			state.PklProjects = nil
+		}
+	}
+	var entry map[string]any
+	for _, e := range state.PklProjects {
+		if e["projectFile"] == ProjectFile {
+			entry = e
+		}
+	}
+	if entry == nil {
+		entry = map[string]any{"projectFile": ProjectFile, "packageName": nil, "packageUri": nil, "evaluatorSettings": map[string]any{}}
+		state.PklProjects = append(state.PklProjects, entry)
+	}
+	declared, _ := entry["declaredDependencies"].(map[string]any)
+	if declared == nil {
+		declared = map[string]any{}
+	}
+	declared["fam"] = URI(p.Version)
+	entry["declaredDependencies"] = declared
+	entry["resolvedDependencies"] = resolved
+	state.SchemaVersion = 1
+
+	out, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	// pkl-lsp writes the same .gitignore: the state is local to the machine.
+	if _, err := os.Stat(filepath.Join(dir, ".gitignore")); errors.Is(err, fs.ErrNotExist) {
+		if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*\n"), 0o644); err != nil {
+			return err
+		}
+	}
+	return writeAtomic(sp, append(out, '\n'))
+}
+
 // Pinned returns the FAM version and the checksum that PklProject.deps.json of a project pins.
 func Pinned(base string) (v, checksum string, err error) {
 	b, err := os.ReadFile(filepath.Join(base, DepsFile))

@@ -25,6 +25,7 @@ bundles/tool.pkl      # amends "@fam/Bundle.pkl"
 
 - The package is in the FAM binary. `fam new`, `fam migrate`, `fam plan`, `fam apply`, and `fam verify` put it into the Pkl cache (`~/.cache/pkl`, or `$XDG_CACHE_HOME/pkl`, and `~/.pkl/cache` for editors with an older Pkl). So FAM never downloads its own schema.
 - Editors with the Pkl plugin read `PklProject` and the same cache, so completion and go-to-definition work for `@fam/…` and `std.…`. On a machine without FAM, the editor downloads the package once from the GitHub release.
+- `fam new` and `fam migrate` also write `.pkl-lsp/projects.json`, the project state that the Pkl language server writes on "Sync Projects". So the editor needs no sync after these commands, also in editors that have no "Sync Projects" command, such as Zed. Restart the language server after `fam migrate`. The folder has its own `.gitignore`.
 - The project pins one FAM version. A binary of another patch release of the same minor version works with it: patch releases do not change the schema. Otherwise FAM asks for `fam migrate` (an older project) or `fam update` (a newer project).
 - `fam migrate` changes the version in `PklProject` and the checksum in `PklProject.deps.json`. It keeps the other dependencies of the project.
 - A standard bundle comes from the package, so it has no folder: it cannot use `fam.Skill` with a local folder.

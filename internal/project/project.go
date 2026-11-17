@@ -84,8 +84,9 @@ func Migrate(base string) (old string, err error) {
 	return old, pinPackage(base)
 }
 
-// pinPackage writes PklProject and PklProject.deps.json for the package of this binary, and puts
-// the package into the Pkl cache, so that editors find it at once.
+// pinPackage writes PklProject and PklProject.deps.json for the package of this binary, puts
+// the package into the Pkl cache, and writes the project state of the Pkl language server, so
+// that editors find the package at once, without "Sync Projects".
 func pinPackage(base string) error {
 	p, err := schema.Current()
 	if err != nil {
@@ -94,7 +95,13 @@ func pinPackage(base string) error {
 	if err := schema.SeedAll(p); err != nil {
 		return fmt.Errorf("write the fam package into the Pkl cache: %w", err)
 	}
-	return schema.WriteProject(base, p)
+	if err := schema.WriteProject(base, p); err != nil {
+		return err
+	}
+	if err := schema.WriteEditorState(base, p); err != nil {
+		return fmt.Errorf("write the editor state in .pkl-lsp: %w", err)
+	}
+	return nil
 }
 
 // DetectAgents returns the agents that it finds on this machine.
