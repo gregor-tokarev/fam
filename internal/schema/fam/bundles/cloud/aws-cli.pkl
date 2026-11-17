@@ -108,6 +108,7 @@ description = "Manage AWS services with AWS CLI v2"
 version = "@FAM_VERSION@"
 requiredSecrets { "AWS_ACCESS_KEY_ID"; "AWS_SECRET_ACCESS_KEY"; "AWS_SESSION_TOKEN" }
 supported = facts.libc != "musl"
+unsupportedReason = "AWS supplies no musl build."
 tasks {
   new fam.Package {
     binary = "~/.local/bin/aws"

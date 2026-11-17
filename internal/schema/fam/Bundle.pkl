@@ -31,8 +31,14 @@ name: String(matches(Regex("[a-z0-9][a-z0-9._-]*")))
 description: String?
 
 /// Whether the tool supports the current machine facts.
-/// The acceptance harness omits unsupported bundles.
+/// When false, FAM skips a present bundle and its verify scripts without an error.
+/// A skipped bundle adds no variables or PATH entries to ~/.config/fam/env.sh.
+/// FAM leaves files from an earlier installation on the machine and does not remove them.
+/// An absent bundle ignores this field.
 supported: Boolean = true
+
+/// Why the tool does not support the machine. FAM shows this when it skips the bundle.
+unsupportedReason: String?
 
 /// The version of the bundle. Standard bundles have the FAM version.
 version: String?

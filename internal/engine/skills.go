@@ -351,10 +351,13 @@ func (t *SkillPruneTask) Apply(ctx context.Context, env *Env) (string, error) {
 // skillsSection copies the project skills (the folders of skills/) and removes the managed
 // skills that the config no longer lists. bundleSkills are the skills of the bundle tasks:
 // name -> source, for the name check and for the list of skills to keep.
-func skillsSection(env *Env, bundleSkills map[string]string) (Section, error) {
+func skillsSection(env *Env, bundleSkills map[string]string, preserved map[string]bool) (Section, error) {
 	g := base{group: "skills"}
 	sec := Section{Name: "skills"}
 	keep := map[string]bool{}
+	for n := range preserved {
+		keep[n] = true
+	}
 	for n := range bundleSkills {
 		keep[n] = true
 	}

@@ -13,6 +13,7 @@ name = "pitchfork"
 description = "Start, inspect, and stop project services with readiness and dependency checks"
 version = "@FAM_VERSION@"
 supported = !(facts.os == "linux" && facts.libc == "musl")
+unsupportedReason = "The vendor supplies no musl build."
 tasks {
   new fam.GitHubRelease {
     repo = "jdx/pitchfork"

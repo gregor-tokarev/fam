@@ -12,6 +12,7 @@ name = "lat-md"
 description = "Markdown knowledge graph of a codebase"
 version = "@FAM_VERSION@"
 supported = facts.distro != "alpine"
+unsupportedReason = "The database module has no build for musl (Alpine)."
 tasks {
   new fam.Package {
     package = "lat.md"

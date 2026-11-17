@@ -13,6 +13,7 @@ name = "axiom"
 description = "Query Axiom datasets, logs, and traces from the command line"
 version = "@FAM_VERSION@"
 supported = facts.libc != "musl"
+unsupportedReason = "Linux binaries require glibc. Musl is not supported."
 requiredSecrets { "AXIOM_TOKEN" }
 tasks {
   new fam.GitHubRelease {

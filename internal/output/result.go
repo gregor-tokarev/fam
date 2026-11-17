@@ -46,7 +46,7 @@ type TaskResult struct {
 	Group string `json:"group" toon:"group"`
 	Kind  string `json:"kind" toon:"kind"`
 	Name  string `json:"name" toon:"name"`
-	// Status: plan gives "satisfied", "change", "conflict", "error".
+	// Status: plan gives "satisfied", "change", "conflict", "error", "skipped".
 	// Apply gives "unchanged", "changed", "failed", "conflict", "skipped".
 	Status string `json:"status" toon:"status"`
 	Detail string `json:"detail,omitempty" toon:"detail,omitempty"`

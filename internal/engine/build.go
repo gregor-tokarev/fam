@@ -19,6 +19,8 @@ type Section struct {
 	Tasks []Task
 	// RestartUnits marks the sections that restart units at their end (present bundles).
 	RestartUnits bool
+	// SkipReason marks an unsupported bundle. Its tasks do not run.
+	SkipReason string
 }
 
 // convert turns a schema task into an engine task.
@@ -123,20 +125,38 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string, f fa
 	return nil, fmt.Errorf("%s: unknown task type %T", group, t)
 }
 
+// bundleSkillName resolves a skill name without reading or downloading its source.
+func bundleSkillName(t tasks.Task, u config.BundleUse) (string, bool) {
+	switch x := t.(type) {
+	case tasks.GitHubSkill:
+		if n := x.GetName(); n != nil {
+			return *n, true
+		}
+		return path.Base(x.GetPath()), true
+	case tasks.Skill:
+		if n := x.GetName(); n != nil {
+			return *n, true
+		}
+		name := filepath.Base(filepath.Join(u.Dir, x.GetPath()))
+		if name == "skill" || name == "." {
+			name = u.Bundle.Name
+		}
+		return name, true
+	}
+	return "", false
+}
+
 // skillTasks turns a Skill or GitHubSkill task into engine tasks: the copy and the Claude link,
 // or the removal when the task or the bundle is absent. ok is false for other task types.
 func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group string, absent bool) (out []Task, ok bool, err error) {
 	g := base{group: group}
-	var name, origin = "", "bundle " + u.Bundle.Name
+	name, _ := bundleSkillName(t, u)
+	origin := "bundle " + u.Bundle.Name
 	var load func(name string) (*SkillSource, error)
 	switch x := t.(type) {
 	// GitHubSkill first: its interface also matches tasks.Skill (GetPath, GetName).
 	case tasks.GitHubSkill:
 		absent = absent || x.GetState() == "absent"
-		name = path.Base(x.GetPath())
-		if n := x.GetName(); n != nil {
-			name = *n
-		}
 		load = func(name string) (*SkillSource, error) {
 			return loadGitHubSkill(ctx, x.GetRepo(), x.GetPath(), x.GetRef(), name, origin)
 		}
@@ -146,13 +166,6 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 			return nil, true, fmt.Errorf("%s: the bundle comes from a package, so it has no folder for the skill %q. Use fam.GitHubSkill", group, x.GetPath())
 		}
 		dir := filepath.Join(u.Dir, x.GetPath())
-		name = filepath.Base(filepath.Clean(dir))
-		if name == "skill" || name == "." {
-			name = u.Bundle.Name
-		}
-		if n := x.GetName(); n != nil {
-			name = *n
-		}
 		load = func(name string) (*SkillSource, error) { return loadSkill(name, dir, origin) }
 	default:
 		return nil, false, nil
@@ -188,6 +201,10 @@ var skillName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string, f facts.Facts) (Section, error) {
 	group := "bundle " + u.Bundle.Name
 	sec := Section{Name: group}
+	if u.Skipped() {
+		sec.SkipReason = u.SkipReason()
+		return sec, nil
+	}
 	if u.State == "absent" {
 		for i := len(u.Bundle.Tasks) - 1; i >= 0; i-- {
 			if st, ok, err := skillTasks(ctx, u.Bundle.Tasks[i], u, group, true); ok || err != nil {

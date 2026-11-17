@@ -12,6 +12,7 @@ name = "wrangler"
 description = "Develop and deploy Cloudflare Workers and related resources"
 version = "@FAM_VERSION@"
 supported = facts.libc != "musl"
+unsupportedReason = "The workerd runtime does not support musl."
 requiredSecrets { "CLOUDFLARE_API_TOKEN" }
 tasks {
   new fam.Package {

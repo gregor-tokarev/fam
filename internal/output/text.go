@@ -78,7 +78,7 @@ func WriteText(w io.Writer, r *Run) {
 	c := r.Summary
 	switch r.Command {
 	case "plan":
-		fmt.Fprintf(w, "Plan: %d satisfied, %d to change, %d conflicts, %d errors.\n", c.Satisfied, c.Change, c.Conflict, c.Error)
+		fmt.Fprintf(w, "Plan: %d satisfied, %d to change, %d conflicts, %d errors, %d skipped.\n", c.Satisfied, c.Change, c.Conflict, c.Error, c.Skipped)
 	case "apply":
 		fmt.Fprintf(w, "Apply: %d unchanged, %d changed, %d failed, %d conflicts, %d skipped. Verify: %d passed, %d failed.\n",
 			c.Unchanged, c.Changed, c.Failed+c.Error, c.Conflict, c.Skipped, c.VerifyOK, c.VerifyBad)

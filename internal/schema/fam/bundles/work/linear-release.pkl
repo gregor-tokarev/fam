@@ -13,6 +13,7 @@ name = "linear-release"
 description = "Report CI deployments and release changes to Linear"
 version = "@FAM_VERSION@"
 supported = facts.libc != "musl"
+unsupportedReason = "No musl build is available."
 requiredSecrets { "LINEAR_ACCESS_KEY" }
 tasks {
   new fam.GitHubRelease {

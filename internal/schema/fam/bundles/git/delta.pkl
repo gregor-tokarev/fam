@@ -13,6 +13,7 @@ name = "delta"
 description = "Display Git and diff output with syntax and line highlights"
 version = "@FAM_VERSION@"
 supported = !(facts.os == "linux" && facts.libc == "musl" && facts.arch == "arm64")
+unsupportedReason = "The vendor supplies no arm64 musl build."
 tasks {
   new fam.GitHubRelease {
     repo = "dandavison/delta"

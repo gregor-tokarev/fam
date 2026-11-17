@@ -24,31 +24,41 @@ const (
 
 // --- environment and secrets ---
 
+// envPathLine is one PATH entry in ~/.config/fam/env.sh.
+func envPathLine(d string) string {
+	if strings.HasPrefix(d, "~/") {
+		d = "$HOME/" + d[2:]
+	}
+	d = strings.ReplaceAll(d, `"`, `\"`)
+	return fmt.Sprintf("case \":$PATH:\" in *\":%[1]s:\"*) ;; *) PATH=\"%[1]s:$PATH\" ;; esac\n", d)
+}
+
 // envScript returns ~/.config/fam/env.sh: bundle variables, ~/.local/bin in PATH, and the secrets.
+// A skipped bundle adds no variables or PATH entries.
 func envScript(spec *config.Spec) []byte {
 	var b strings.Builder
 	b.WriteString("# Written by FAM. Do not edit. FAM replaces this file on each apply.\n")
 	b.WriteString("# Shells load it from a marked block in ~/.zshenv, ~/.bashrc, and ~/.profile.\n")
 	dirs := []string{"~/.local/bin"}
+	seenDirs := map[string]bool{"~/.local/bin": true}
 	for _, u := range spec.Bundles {
-		if u.State == "present" {
-			dirs = append(dirs, u.Bundle.Path...)
+		if u.State != "present" || u.Skipped() {
+			continue
+		}
+		for _, d := range u.Bundle.Path {
+			if !seenDirs[d] {
+				dirs = append(dirs, d)
+				seenDirs[d] = true
+			}
 		}
 	}
 	// FAM prepends in reverse order, so the first directory is first in PATH.
 	for i := len(dirs) - 1; i >= 0; i-- {
-		d := dirs[i]
-		if strings.HasPrefix(d, "~/") {
-			d = "$HOME/" + d[2:]
-		}
-		d = strings.ReplaceAll(d, `"`, `\"`)
-		fmt.Fprintf(&b, "case \":$PATH:\" in *\":%[1]s:\"*) ;; *) PATH=\"%[1]s:$PATH\" ;; esac\n", d)
+		b.WriteString(envPathLine(dirs[i]))
 	}
 	b.WriteString("export PATH\n")
-	type kv struct{ k, v, bundle string }
-	var vars []kv
 	for _, u := range spec.Bundles {
-		if u.State != "present" {
+		if u.State != "present" || u.Skipped() {
 			continue
 		}
 		keys := make([]string, 0, len(u.Bundle.Env))
@@ -56,17 +66,12 @@ func envScript(spec *config.Spec) []byte {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
+		if len(keys) > 0 {
+			fmt.Fprintf(&b, "# bundle %s\n", u.Bundle.Name)
+		}
 		for _, k := range keys {
-			vars = append(vars, kv{k, u.Bundle.Env[k], u.Bundle.Name})
+			fmt.Fprintf(&b, "export %s=%s\n", k, transport.Quote(u.Bundle.Env[k]))
 		}
-	}
-	bundle := ""
-	for _, v := range vars {
-		if v.bundle != bundle {
-			bundle = v.bundle
-			fmt.Fprintf(&b, "# bundle %s\n", bundle)
-		}
-		fmt.Fprintf(&b, "export %s=%s\n", v.k, transport.Quote(v.v))
 	}
 	b.WriteString("[ -r \"$HOME/" + secretsFile + "\" ] && . \"$HOME/" + secretsFile + "\"\n")
 	return []byte(b.String())
