@@ -1,54 +1,28 @@
 /// helm: Package and deploy applications on Kubernetes (https://github.com/helm/helm).
 ///
-/// FAM downloads the latest official tarball and checks the vendor SHA-256 file.
-/// It installs the CLI atomically into ~/.local/bin, without sudo.
-/// Installation needs curl, tar, and sha256sum on Linux or shasum on macOS.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official Go package helm.sh/helm/v4/cmd/helm.
 /// Cluster operations need a kubeconfig and cluster credentials.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 
-local installHelm = #"""
-  set -eu
-  mkdir -p "$HOME/.local/bin"
-  work=$(mktemp -d "$HOME/.local/bin/.helm.XXXXXX")
-  trap 'rm -rf "$work"' EXIT HUP INT TERM
-  case "$(uname -s)" in
-    Linux) os=linux ;;
-    Darwin) os=darwin ;;
-    *) echo 'Unsupported operating system' >&2; exit 1 ;;
-  esac
-  case "$(uname -m)" in
-    x86_64) arch=amd64 ;;
-    aarch64|arm64) arch=arm64 ;;
-    *) echo 'Unsupported architecture' >&2; exit 1 ;;
-  esac
-  release=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/helm/helm/releases/latest)
-  version=${release##*/}
-  printf '%s\n' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
-  archive="helm-${version}-${os}-${arch}.tar.gz"
-  curl -fsSL "https://get.helm.sh/$archive" -o "$work/$archive"
-  curl -fsSL "https://get.helm.sh/$archive.sha256sum" -o "$work/sums"
-  expected=$(awk -v archive="$archive" '$2 == archive {print $1}' "$work/sums")
-  case "$os" in
-    darwin) actual=$(shasum -a 256 "$work/$archive" | awk '{print $1}') ;;
-    linux) actual=$(sha256sum "$work/$archive" | awk '{print $1}') ;;
-  esac
-  [ "${#expected}" -eq 64 ] && [ "$actual" = "$expected" ] || { echo 'SHA-256 mismatch' >&2; exit 1; }
-  tar -xzf "$work/$archive" -C "$work" "$os-$arch/helm"
-  chmod 755 "$work/$os-$arch/helm"
-  mv -f "$work/$os-$arch/helm" "$HOME/.local/bin/helm"
-  """#
+local systemPackage = packages.system(new Mapping {
+  ["dnf"] = "helm"
+  ["pacman"] = "helm"
+  ["apk"] = "helm"
+  ["brew"] = "helm"
+})
 
 name = "helm"
 description = "Package and deploy applications on Kubernetes"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {
-    binary = "~/.local/bin/helm"
-    install = installHelm
-    update = installHelm
-    uninstall = "rm -f ~/.local/bin/helm"
+    package = systemPackage ?? new fam.PackageRef { package = "helm.sh/helm/v4/cmd/helm"; manager = "go" }
+    binary = "helm"
     versionCommand = "helm version --short"
   }
 }

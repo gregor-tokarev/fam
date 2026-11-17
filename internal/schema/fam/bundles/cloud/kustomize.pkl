@@ -1,27 +1,34 @@
 /// kustomize: Customize Kubernetes manifests without templates (https://github.com/kubernetes-sigs/kustomize).
 ///
-/// FAM installs the standalone CLI from GitHub and checks the vendor SHA-256 file.
-/// Local manifest builds need no cluster or login.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official Go package sigs.k8s.io/kustomize/kustomize/v5.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["dnf"] = "kustomize"
+  ["pacman"] = "kustomize"
+  ["apk"] = "kustomize"
+  ["brew"] = "kustomize"
+})
 
 name = "kustomize"
 description = "Customize Kubernetes manifests without templates"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "kubernetes-sigs/kustomize"
+  packages.retireRelease("kustomize", "kubernetes-sigs/kustomize")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "sigs.k8s.io/kustomize/kustomize/v5"; manager = "go" }
     binary = "kustomize"
     versionCommand = "kustomize version"
-    assets {
-      ["linux-amd64"] { name = "kustomize_v{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "kustomize"; checksum = "checksums.txt" }
-      ["linux-arm64"] { name = "kustomize_v{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "kustomize"; checksum = "checksums.txt" }
-      ["darwin-arm64"] { name = "kustomize_v{version}_darwin_arm64.tar.gz"; format = "tar.gz"; file = "kustomize"; checksum = "checksums.txt" }
-    }
   }
 }
 
 verify {
   new { name = "kustomize version"; script = "kustomize version" }
 }
+
+uninstall { packages.retireRelease("kustomize", "kubernetes-sigs/kustomize") }

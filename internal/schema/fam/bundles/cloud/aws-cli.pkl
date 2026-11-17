@@ -1,39 +1,36 @@
 /// aws-cli: Manage AWS services from the command line (https://github.com/aws/aws-cli).
 ///
-/// FAM installs AWS CLI v2 with the Linux system package manager, including Alpine.
-/// Linux packages verify downloads through their package manager without a separate GnuPG command.
-/// macOS uses the official pkg for the current user, with Apple's signature and Gatekeeper checks.
+/// FAM installs AWS CLI v2 with the system package manager, or Homebrew on macOS.
+/// Ubuntu before 26 has no v2 package. It uses the official installer with its PGP signature.
+/// FAM installs unzip and GnuPG with Package tasks for this fallback.
 /// Use AWS credentials or a configured profile. AWS_SESSION_TOKEN applies only to temporary credentials.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
+local useInstaller = facts.distro == "ubuntu" && facts.distroVersion.split(".")[0].toInt() < 26
+local signingKey = read("aws-cli-signing-key.asc").text
 local installAws = #"""
   set -eu
-  mkdir -p "$HOME/.local/bin"
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT HUP INT TERM
-  case "$(uname -s)" in
-    Darwin)
-      curl -fsSL https://awscli.amazonaws.com/AWSCLIV2.pkg -o "$work/AWSCLIV2.pkg"
-      pkgutil --check-signature "$work/AWSCLIV2.pkg"
-      spctl --assess --type install "$work/AWSCLIV2.pkg"
-      cat > "$work/choices.xml" <<AWS_CHOICES
-  <?xml version="1.0" encoding="UTF-8"?>
-  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-  <plist version="1.0"><array><dict>
-  <key>choiceAttribute</key><string>customLocation</string>
-  <key>attributeSetting</key><string>$HOME/.local</string>
-  <key>choiceIdentifier</key><string>default</string>
-  </dict></array></plist>
-  AWS_CHOICES
-      installer -pkg "$work/AWSCLIV2.pkg" -target CurrentUserHomeDirectory -applyChoiceChangesXML "$work/choices.xml"
-      ln -sf "$HOME/.local/aws-cli/aws" "$HOME/.local/bin/aws"
-      ln -sf "$HOME/.local/aws-cli/aws_completer" "$HOME/.local/bin/aws_completer"
-      ;;
-    *) echo 'Unsupported operating system' >&2; exit 1 ;;
+  mkdir -m 700 "$work/keyring"
+  cat > "$work/key.asc" <<'FAM_AWS_KEY'
+  \#(signingKey)
+  FAM_AWS_KEY
+  case "$(uname -m)" in
+    x86_64) arch=x86_64 ;;
+    aarch64|arm64) arch=aarch64 ;;
+    *) echo 'Unsupported AWS CLI architecture' >&2; exit 1 ;;
   esac
+  url="https://awscli.amazonaws.com/awscli-exe-linux-$arch.zip"
+  curl -fsSL "$url" -o "$work/aws.zip"
+  curl -fsSL "$url.sig" -o "$work/aws.zip.sig"
+  gpg --batch --homedir "$work/keyring" --import "$work/key.asc"
+  gpg --batch --homedir "$work/keyring" --verify "$work/aws.zip.sig" "$work/aws.zip"
+  unzip -q "$work/aws.zip" -d "$work"
+  "$work/aws/install" --install-dir "$HOME/.local/aws-cli" --bin-dir "$HOME/.local/bin" --update
   """#
 
 name = "aws-cli"
@@ -41,7 +38,18 @@ description = "Manage AWS services with AWS CLI v2"
 version = "@FAM_VERSION@"
 requiredSecrets { "AWS_ACCESS_KEY_ID"; "AWS_SECRET_ACCESS_KEY"; "AWS_SESSION_TOKEN" }
 tasks {
-  when (facts.os == "linux") {
+  when (useInstaller) {
+    for (p in List("unzip", "gnupg")) {
+      new fam.Package { package = new fam.PackageRef { package = p; manager = "system" } }
+    }
+    new fam.Package {
+      binary = "~/.local/bin/aws"
+      install = installAws
+      update = installAws
+      uninstall = #"rm -f -- "$HOME/.local/bin/aws" "$HOME/.local/bin/aws_completer" && rm -rf -- "$HOME/.local/aws-cli""#
+      versionCommand = "aws --version"
+    }
+  } else {
     new fam.Package {
       package = new fam.PackageRef {
         package = "awscli"
@@ -49,13 +57,6 @@ tasks {
         names { ["apk"] = "aws-cli"; ["dnf"] = "awscli2"; ["pacman"] = "aws-cli" }
       }
       binary = "aws"
-    }
-  } else {
-    new fam.Package {
-      binary = "~/.local/bin/aws"
-      install = installAws
-      update = installAws
-      uninstall = #"rm -f "$HOME/.local/bin/aws" "$HOME/.local/bin/aws_completer" && rm -rf "$HOME/.local/aws-cli""#
       versionCommand = "aws --version"
     }
   }

@@ -1,27 +1,34 @@
 /// crane: Inspect, copy, and modify container images in registries (https://github.com/google/go-containerregistry).
 ///
-/// FAM installs the standalone CLI from GitHub and checks the vendor SHA-256 file.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/google/go-containerregistry/cmd/crane.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 /// Private registries need Docker credentials or crane auth login. It needs no container daemon.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "crane"
+  ["apk"] = "crane"
+  ["brew"] = "crane"
+})
 
 name = "crane"
 description = "Inspect, copy, and modify container images in registries"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "google/go-containerregistry"
+  packages.retireRelease("crane", "google/go-containerregistry")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/google/go-containerregistry/cmd/crane"; manager = "go" }
     binary = "crane"
     versionCommand = "crane version"
-    assets {
-      ["linux-amd64"] { name = "go-containerregistry_Linux_x86_64.tar.gz"; format = "tar.gz"; file = "crane"; checksum = "checksums.txt" }
-      ["linux-arm64"] { name = "go-containerregistry_Linux_arm64.tar.gz"; format = "tar.gz"; file = "crane"; checksum = "checksums.txt" }
-      ["darwin-arm64"] { name = "go-containerregistry_Darwin_arm64.tar.gz"; format = "tar.gz"; file = "crane"; checksum = "checksums.txt" }
-    }
   }
 }
 
 verify {
   new { name = "crane version"; script = "crane version" }
 }
+
+uninstall { packages.retireRelease("crane", "google/go-containerregistry") }

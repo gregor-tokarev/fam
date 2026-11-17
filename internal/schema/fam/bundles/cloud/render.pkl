@@ -1,24 +1,39 @@
 /// render: Deploy and manage Render services (https://github.com/render-oss/cli).
 ///
-/// FAM installs the standalone CLI from the latest GitHub release.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official release download.
 /// Cloud operations need RENDER_API_KEY or a login. Use --output json --confirm for automation.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "render"
+})
 
 name = "render"
 description = "Deploy and manage Render services"
 version = "@FAM_VERSION@"
 requiredSecrets { "RENDER_API_KEY" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "render-oss/cli"
-    binary = "render"
-    versionCommand = "render --version"
-    assets {
-      ["linux-amd64"] { name = "cli_{version}_linux_amd64.zip"; format = "zip"; file = "cli_{tag}" }
-      ["darwin-arm64"] { name = "cli_{version}_darwin_arm64.zip"; format = "zip"; file = "cli_{tag}" }
-      ["linux-arm64"] { name = "cli_{version}_linux_arm64.zip"; format = "zip"; file = "cli_{tag}" }
+  when (systemPackage != null) {
+    packages.retireRelease("render", "render-oss/cli")
+    new fam.Package {
+      package = systemPackage!!
+      binary = "render"
+      versionCommand = "render --version"
+    }
+  } else {
+    new fam.GitHubRelease {
+      repo = "render-oss/cli"
+      binary = "render"
+      versionCommand = "render --version"
+      assets {
+        ["linux-amd64"] { name = "cli_{version}_linux_amd64.zip"; format = "zip"; file = "cli_{tag}" }
+        ["darwin-arm64"] { name = "cli_{version}_darwin_arm64.zip"; format = "zip"; file = "cli_{tag}" }
+        ["linux-arm64"] { name = "cli_{version}_linux_arm64.zip"; format = "zip"; file = "cli_{tag}" }
+      }
     }
   }
 }
@@ -26,3 +41,5 @@ tasks {
 verify {
   new { name = "render --version"; script = "render --version" }
 }
+
+uninstall { packages.retireRelease("render", "render-oss/cli") }

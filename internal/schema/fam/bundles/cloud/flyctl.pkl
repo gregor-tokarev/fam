@@ -1,28 +1,33 @@
 /// flyctl: Deploy applications and manage Fly.io machines (https://github.com/superfly/flyctl).
 ///
-/// FAM installs the standalone CLI from the latest GitHub release.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official Go package github.com/superfly/flyctl.
 /// Cloud operations need FLY_API_TOKEN or flyctl auth login.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "flyctl"
+})
 
 name = "flyctl"
 description = "Deploy applications and manage Fly.io machines"
 version = "@FAM_VERSION@"
 requiredSecrets { "FLY_API_TOKEN" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "superfly/flyctl"
+  packages.retireRelease("flyctl", "superfly/flyctl")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/superfly/flyctl"; manager = "go" }
     binary = "flyctl"
     versionCommand = "flyctl version"
-    assets {
-      ["linux-amd64"] { name = "flyctl_{version}_Linux_x86_64.tar.gz"; format = "tar.gz"; file = "flyctl" }
-      ["darwin-arm64"] { name = "flyctl_{version}_macOS_arm64.tar.gz"; format = "tar.gz"; file = "flyctl" }
-      ["linux-arm64"] { name = "flyctl_{version}_Linux_arm64.tar.gz"; format = "tar.gz"; file = "flyctl" }
-    }
   }
 }
 
 verify {
   new { name = "flyctl version"; script = "flyctl version" }
 }
+
+uninstall { packages.retireRelease("flyctl", "superfly/flyctl") }

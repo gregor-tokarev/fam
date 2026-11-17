@@ -1,26 +1,32 @@
 /// github: Manage GitHub repositories, issues, pull requests, releases, and workflows (https://github.com/cli/cli).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// Repository operations need Git.
+/// FAM uses the system package manager where this tool is packaged.
 /// Use GH_TOKEN or GITHUB_TOKEN, or an existing login, for GitHub.
 /// Enterprise hosts can use GH_ENTERPRISE_TOKEN or GITHUB_ENTERPRISE_TOKEN.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 
 name = "github"
 description = "Manage GitHub repositories, issues, pull requests, releases, and workflows"
 version = "@FAM_VERSION@"
 requiredSecrets { "GH_TOKEN"; "GITHUB_TOKEN"; "GH_ENTERPRISE_TOKEN"; "GITHUB_ENTERPRISE_TOKEN" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "cli/cli"
-    binary = "gh"
-    assets {
-      ["linux-amd64"] { name = "gh_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "gh_{version}_linux_amd64/bin/gh" }
-      ["linux-arm64"] { name = "gh_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "gh_{version}_linux_arm64/bin/gh" }
-      ["darwin-arm64"] { name = "gh_{version}_macOS_arm64.zip"; format = "zip"; file = "gh_{version}_macOS_arm64/bin/gh" }
+  packages.retireRelease("gh", "cli/cli")
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "gh"
+      manager = "system"
+      names {
+        ["apt"] = "gh"
+        ["dnf"] = "gh"
+        ["pacman"] = "github-cli"
+        ["apk"] = "github-cli"
+        ["brew"] = "gh"
+      }
     }
+    binary = "gh"
   }
   new fam.GitHubSkill {
     repo = "cli/cli"
@@ -35,3 +41,5 @@ tasks {
 verify {
   new { name = "version"; script = "gh --version" }
 }
+
+uninstall { packages.retireRelease("gh", "cli/cli") }

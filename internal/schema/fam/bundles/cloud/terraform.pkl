@@ -1,13 +1,12 @@
 /// terraform: Plan and apply infrastructure changes with Terraform (https://github.com/hashicorp/terraform).
 ///
-/// FAM downloads the latest official binary and checks the vendor SHA-256 file.
-/// It installs only the CLI atomically into ~/.local/bin, without sudo.
-/// Installation needs curl and sha256sum on Linux or shasum on macOS.
-/// ZIP extraction uses unzip, busybox unzip, bsdtar, or python3, in that order.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official release download.
 /// Provider credentials depend on the project. Use -input=false for automation.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 
 local installTerraform = #"""
   set -eu
@@ -53,16 +52,29 @@ local installTerraform = #"""
   mv -f "$work/terraform" "$HOME/.local/bin/terraform"
   """#
 
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "terraform"
+  ["brew"] = "hashicorp/tap/terraform"
+})
+
 name = "terraform"
 description = "Plan and apply infrastructure changes with Terraform"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    binary = "~/.local/bin/terraform"
-    install = installTerraform
-    update = installTerraform
-    uninstall = "rm -f ~/.local/bin/terraform"
-    versionCommand = "CHECKPOINT_DISABLE=1 terraform version"
+  when (systemPackage != null) {
+    new fam.Package {
+      package = systemPackage!!
+      binary = "terraform"
+      versionCommand = "CHECKPOINT_DISABLE=1 terraform version"
+    }
+  } else {
+    new fam.Package {
+      binary = "~/.local/bin/terraform"
+      install = installTerraform
+      update = installTerraform
+      uninstall = "rm -f ~/.local/bin/terraform"
+      versionCommand = "CHECKPOINT_DISABLE=1 terraform version"
+    }
   }
 }
 

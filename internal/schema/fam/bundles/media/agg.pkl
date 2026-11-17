@@ -1,27 +1,40 @@
 /// agg: Official renderer that converts asciinema recordings to GIF files (https://github.com/asciinema/agg).
 ///
-/// FAM installs the CLI with a GitHub release.
-/// No runtime or login is required. Linux arm64 has no musl build.
-/// The crates.io package named agg is an unrelated tool.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official release download.
+/// The crates.io package agg belongs to a different project.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 import "../../facts.pkl"
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "agg"
+})
 
 name = "agg"
 description = "Official renderer that converts asciinema recordings to GIF files"
 version = "@FAM_VERSION@"
-supported = facts.os != "linux" || facts.libc != "musl" || facts.arch != "arm64"
+supported = systemPackage != null || (facts.os != "linux" || facts.libc != "musl" || facts.arch != "arm64")
 unsupportedReason = "Linux arm64 has no musl build."
 tasks {
-  new fam.GitHubRelease {
-    repo = "asciinema/agg"
-    binary = "agg"
-    assets {
-      ["linux-amd64"] { name = "agg-x86_64-unknown-linux-musl" }
-      ["linux-arm64"] { name = "agg-aarch64-unknown-linux-gnu" }
-      ["linux-amd64-musl"] { name = "agg-x86_64-unknown-linux-musl" }
-      ["darwin-arm64"] { name = "agg-aarch64-apple-darwin" }
+  when (systemPackage != null) {
+    packages.retireRelease("agg", "asciinema/agg")
+    new fam.Package {
+      package = systemPackage!!
+      binary = "agg"
+    }
+  } else {
+    new fam.GitHubRelease {
+      repo = "asciinema/agg"
+      binary = "agg"
+      assets {
+        ["linux-amd64"] { name = "agg-x86_64-unknown-linux-musl" }
+        ["linux-arm64"] { name = "agg-aarch64-unknown-linux-gnu" }
+        ["linux-amd64-musl"] { name = "agg-x86_64-unknown-linux-musl" }
+        ["darwin-arm64"] { name = "agg-aarch64-apple-darwin" }
+      }
     }
   }
 }
@@ -29,3 +42,5 @@ tasks {
 verify {
   new { name = "agg runs"; script = "agg --version" }
 }
+
+uninstall { packages.retireRelease("agg", "asciinema/agg") }

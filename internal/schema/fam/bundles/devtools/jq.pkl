@@ -1,26 +1,34 @@
 /// jq: Read, transform, and query JSON in shell workflows (https://github.com/jqlang/jq).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// The binary needs no runtime or login.
+/// FAM uses the system package manager where this tool is packaged.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 
 name = "jq"
 description = "Read, transform, and query JSON in shell workflows"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "jqlang/jq"
-    binary = "jq"
-    assets {
-      ["linux-amd64"] { name = "jq-linux-amd64" }
-      ["linux-arm64"] { name = "jq-linux-arm64" }
-      ["darwin-arm64"] { name = "jq-macos-arm64" }
+  packages.retireRelease("jq", "jqlang/jq")
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "jq"
+      manager = "system"
+      names {
+        ["apt"] = "jq"
+        ["dnf"] = "jq"
+        ["pacman"] = "jq"
+        ["apk"] = "jq"
+        ["brew"] = "jq"
+      }
     }
+    binary = "jq"
   }
 }
 
 verify {
   new { name = "version"; script = "jq --version" }
 }
+
+uninstall { packages.retireRelease("jq", "jqlang/jq") }

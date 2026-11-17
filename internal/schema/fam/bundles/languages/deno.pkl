@@ -1,30 +1,35 @@
 /// deno: Run JavaScript and TypeScript with the Deno toolchain (https://github.com/denoland/deno).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// The vendor supplies no musl build. FAM skips musl Linux.
+/// FAM uses the system package where available. Other systems use npm package deno.
+/// Node.js and npm must exist.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 import "../../facts.pkl"
 
-supported = !(facts.os == "linux" && facts.libc == "musl")
+supported = systemPackage != null || !(facts.os == "linux" && facts.libc == "musl")
 unsupportedReason = "The vendor supplies no musl build."
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "deno"
+  ["apk"] = "deno"
+  ["brew"] = "deno"
+})
 
 name = "deno"
 description = "Run JavaScript and TypeScript with the Deno toolchain"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "denoland/deno"
+  packages.retireRelease("deno", "denoland/deno")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "deno"; manager = "npm" }
     binary = "deno"
-    assets {
-      ["linux-amd64"] { name = "deno-x86_64-unknown-linux-gnu.zip"; format = "zip"; file = "deno"; checksum = "deno-x86_64-unknown-linux-gnu.zip.sha256sum" }
-      ["linux-arm64"] { name = "deno-aarch64-unknown-linux-gnu.zip"; format = "zip"; file = "deno"; checksum = "deno-aarch64-unknown-linux-gnu.zip.sha256sum" }
-      ["darwin-arm64"] { name = "deno-aarch64-apple-darwin.zip"; format = "zip"; file = "deno"; checksum = "deno-aarch64-apple-darwin.zip.sha256sum" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "deno --version" }
 }
+
+uninstall { packages.retireRelease("deno", "denoland/deno") }

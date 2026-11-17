@@ -1,27 +1,35 @@
 /// direnv: Load project environment variables through explicit shell or exec integration (https://github.com/direnv/direnv).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// Bash evaluates .envrc files. Use direnv exec for commands. Shell hooks and project approval stay separate.
+/// FAM uses the system package manager where this tool is packaged.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 
 name = "direnv"
 description = "Load project environment variables through explicit shell or exec integration"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "direnv/direnv"
+  packages.retireRelease("direnv", "direnv/direnv")
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "direnv"
+      manager = "system"
+      names {
+        ["apt"] = "direnv"
+        ["dnf"] = "direnv"
+        ["pacman"] = "direnv"
+        ["apk"] = "direnv"
+        ["brew"] = "direnv"
+      }
+    }
     binary = "direnv"
     versionCommand = "direnv version"
-    assets {
-      ["linux-amd64"] { name = "direnv.linux-amd64" }
-      ["linux-arm64"] { name = "direnv.linux-arm64" }
-      ["darwin-arm64"] { name = "direnv.darwin-arm64" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "direnv version" }
 }
+
+uninstall { packages.retireRelease("direnv", "direnv/direnv") }

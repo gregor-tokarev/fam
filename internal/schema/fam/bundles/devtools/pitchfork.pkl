@@ -1,29 +1,23 @@
 /// pitchfork: Start, inspect, and stop project services with readiness and dependency checks (https://github.com/jdx/pitchfork).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// The binary needs no runtime or compiler.
-/// The vendor supplies no musl build. FAM skips musl Linux.
-/// Services need their own programs. FAM does not start a daemon or install services.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Cargo package pitchfork-cli.
+/// A current Rust toolchain and a C compiler must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
-import "../../facts.pkl"
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "pitchfork"
+})
 
 name = "pitchfork"
 description = "Start, inspect, and stop project services with readiness and dependency checks"
 version = "@FAM_VERSION@"
-supported = !(facts.os == "linux" && facts.libc == "musl")
-unsupportedReason = "The vendor supplies no musl build."
 tasks {
-  new fam.GitHubRelease {
-    repo = "jdx/pitchfork"
-    binary = "pitchfork"
-    assets {
-      ["linux-amd64"] { name = "pitchfork-x86_64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "pitchfork" }
-      ["linux-arm64"] { name = "pitchfork-aarch64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "pitchfork" }
-      ["darwin-arm64"] { name = "pitchfork-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "pitchfork" }
-    }
-  }
+  packages.retireRelease("pitchfork", "jdx/pitchfork")
+  packages.cargo("pitchfork-cli", "pitchfork", systemPackage)
   new fam.GitHubSkill {
     repo = "jdx/pitchfork"
     path = "skills/pitchfork"
@@ -33,3 +27,5 @@ tasks {
 verify {
   new { name = "version"; script = "pitchfork --version" }
 }
+
+uninstall { packages.retireRelease("pitchfork", "jdx/pitchfork") }

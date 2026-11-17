@@ -1,25 +1,27 @@
-/// tokei: a code counter with language totals (https://github.com/XAMPPRocky/tokei).
+/// tokei: Count source lines, comments, and language totals (https://github.com/XAMPPRocky/tokei).
 ///
-/// FAM installs the tokei system package (Homebrew on macOS).
-/// Upstream v15.0.0 has no release binaries.
-/// Ubuntu 26.04 supplies 13.0.0 and Alpine 3.24 supplies 14.0.0.
-/// These versions provide the code counts and language totals.
-/// FAM needs no Rust or C toolchain.
+/// FAM uses the system package where available. Older Ubuntu releases build the Cargo package.
+/// The Cargo package needs a current Rust toolchain and a C compiler.
 amends "../../Bundle.pkl"
 
-import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  when (facts.distro != "ubuntu" || facts.distroVersion.split(".")[0].toInt() >= 26) {
+    ["apt"] = "tokei"
+  }
+  ["dnf"] = "tokei"
+  ["pacman"] = "tokei"
+  ["apk"] = "tokei"
+  ["brew"] = "tokei"
+})
 
 name = "tokei"
 description = "Count source lines, comments, and language totals across a repository"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    package = new fam.PackageRef {
-      package = "tokei"
-      manager = "system"
-    }
-    binary = "tokei"
-  }
+  packages.cargo("tokei", "tokei", systemPackage)
 }
 
 verify {

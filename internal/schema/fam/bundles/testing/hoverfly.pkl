@@ -1,27 +1,31 @@
 /// hoverfly: HTTP service simulation and API mock proxy CLI (https://github.com/SpectoLabs/hoverfly).
 ///
-/// FAM installs the CLI with a GitHub release.
-/// No runtime or login is required. The bundle installs hoverfly, without hoverctl.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official Go package github.com/SpectoLabs/hoverfly/core/cmd/hoverfly.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "hoverfly"
+})
 
 name = "hoverfly"
 description = "HTTP service simulation and API mock proxy CLI"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "SpectoLabs/hoverfly"
+  packages.retireRelease("hoverfly", "SpectoLabs/hoverfly")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/SpectoLabs/hoverfly/core/cmd/hoverfly"; manager = "go" }
     binary = "hoverfly"
     versionCommand = "hoverfly -version"
-    assets {
-      ["linux-amd64"] { name = "hoverfly_bundle_linux_amd64.zip"; format = "zip"; file = "hoverfly" }
-      ["linux-arm64"] { name = "hoverfly_bundle_linux_arm64.zip"; format = "zip"; file = "hoverfly" }
-      ["darwin-arm64"] { name = "hoverfly_bundle_OSX_arm64.zip"; format = "zip"; file = "hoverfly" }
-    }
   }
 }
 
 verify {
   new { name = "hoverfly runs"; script = "hoverfly -version" }
 }
+
+uninstall { packages.retireRelease("hoverfly", "SpectoLabs/hoverfly") }

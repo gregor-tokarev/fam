@@ -1,27 +1,31 @@
 /// usql: Query many database systems through a common CLI (https://github.com/xo/usql).
 ///
-/// FAM downloads the latest release binary. Linux uses the static build, including on musl.
-/// The vendor supplies no checksum file.
-/// Some database drivers need native libraries. Connection credentials depend on the database.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/xo/usql.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
+/// A C compiler supplies native database driver support.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "xo/xo/usql"
+})
 
 name = "usql"
 description = "Query many database systems through a common CLI"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "xo/usql"
+  packages.retireRelease("usql", "xo/usql")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/xo/usql"; manager = "go" }
     binary = "usql"
-    assets {
-      ["linux-amd64"] { name = "usql_static-{version}-linux-amd64.tar.bz2"; format = "tar.bz2"; file = "usql_static" }
-      ["linux-arm64"] { name = "usql_static-{version}-linux-arm64.tar.bz2"; format = "tar.bz2"; file = "usql_static" }
-      ["darwin-arm64"] { name = "usql-{version}-darwin-arm64.tar.bz2"; format = "tar.bz2"; file = "usql" }
-    }
   }
 }
 
 verify {
   new { name = "usql --version"; script = "usql --version" }
 }
+
+uninstall { packages.retireRelease("usql", "xo/usql") }

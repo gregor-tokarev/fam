@@ -1,28 +1,29 @@
 /// oxipng: Lossless PNG optimization CLI with parallel processing (https://github.com/oxipng/oxipng).
 ///
-/// FAM installs the CLI from the latest GitHub release.
-/// Uses static musl binaries on Linux. No runtime or login is required.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Cargo package oxipng.
+/// A current Rust toolchain and a C compiler must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
-import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["dnf"] = "oxipng"
+  ["pacman"] = "oxipng"
+  ["apk"] = "oxipng"
+  ["brew"] = "oxipng"
+})
 
 name = "oxipng"
 description = "Lossless PNG optimization CLI with parallel processing"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "oxipng/oxipng"
-    binary = "oxipng"
-    assets {
-      ["linux-amd64"] { name = "oxipng-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "oxipng-{version}-x86_64-unknown-linux-musl/oxipng" }
-      ["linux-arm64"] { name = "oxipng-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "oxipng-{version}-aarch64-unknown-linux-musl/oxipng" }
-      ["linux-amd64-musl"] { name = "oxipng-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "oxipng-{version}-x86_64-unknown-linux-musl/oxipng" }
-      ["linux-arm64-musl"] { name = "oxipng-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "oxipng-{version}-aarch64-unknown-linux-musl/oxipng" }
-      ["darwin-arm64"] { name = "oxipng-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "oxipng-{version}-aarch64-apple-darwin/oxipng" }
-    }
-  }
+  packages.retireRelease("oxipng", "oxipng/oxipng")
+  packages.cargo("oxipng", "oxipng", systemPackage)
 }
 
 verify {
   new { name = "oxipng runs"; script = "oxipng --version" }
 }
+
+uninstall { packages.retireRelease("oxipng", "oxipng/oxipng") }

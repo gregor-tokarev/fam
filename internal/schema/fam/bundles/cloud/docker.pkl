@@ -1,12 +1,13 @@
 /// docker: Build images and control local or remote Docker engines (https://github.com/docker/cli).
 ///
-/// FAM downloads the latest official binary and checks the vendor SHA-256 file.
-/// It installs only the CLI atomically into ~/.local/bin, without sudo.
-/// Installation needs curl, tar, and sha256sum on Linux or shasum on macOS.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official release download.
 /// Container operations need a separately configured local or remote Docker engine. FAM installs only the CLI.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+import "../packages.pkl" as packages
 
 local installDocker = #"""
   set -eu
@@ -42,16 +43,31 @@ local installDocker = #"""
   mv -f "$work/docker/docker" "$HOME/.local/bin/docker"
   """#
 
+local systemPackage = packages.system(new Mapping {
+  when (facts.distro == "debian") { ["apt"] = "docker-cli" }
+  ["dnf"] = "docker-cli"
+  ["apk"] = "docker-cli"
+  ["brew"] = "docker"
+})
+
 name = "docker"
 description = "Build images and control local or remote Docker engines"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    binary = "~/.local/bin/docker"
-    install = installDocker
-    update = installDocker
-    uninstall = "rm -f ~/.local/bin/docker"
-    versionCommand = "docker --version"
+  when (systemPackage != null) {
+    new fam.Package {
+      package = systemPackage!!
+      binary = "docker"
+      versionCommand = "docker --version"
+    }
+  } else {
+    new fam.Package {
+      binary = "~/.local/bin/docker"
+      install = installDocker
+      update = installDocker
+      uninstall = "rm -f ~/.local/bin/docker"
+      versionCommand = "docker --version"
+    }
   }
 }
 

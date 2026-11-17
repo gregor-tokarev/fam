@@ -1,32 +1,50 @@
-/// hurl: HTTP request runner and API test CLI with plain text input (https://github.com/Orange-OpenSource/hurl).
+/// hurl: Run HTTP requests and API checks from plain text files (https://github.com/Orange-OpenSource/hurl).
 ///
-/// FAM installs the CLI from the latest GitHub release.
-/// Linux needs glibc, libcurl.so.4, and libxml2.so.2. No musl build is available.
-/// Ubuntu 26 and later lack libxml2.so.2, so this bundle excludes them.
-/// No compiler or login is required.
+/// FAM uses the system package on Arch and macOS. Other systems build the official Cargo package.
+/// A current Rust toolchain and a C compiler must exist. FAM installs the native build dependencies.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
-import "../../facts.pkl"
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "hurl"
+  ["brew"] = "hurl"
+})
 
 name = "hurl"
 description = "HTTP request runner and API test CLI with plain text input"
 version = "@FAM_VERSION@"
-supported = (facts.os != "linux" || facts.libc != "musl")
-  && (facts.distro != "ubuntu" || facts.distroVersion.split(".")[0].toInt() < 26)
-unsupportedReason = "No musl build is available. Ubuntu 26 and later lack libxml2.so.2."
 tasks {
-  new fam.GitHubRelease {
-    repo = "Orange-OpenSource/hurl"
-    binary = "hurl"
-    assets {
-      ["linux-amd64"] { name = "hurl-{version}-x86_64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "hurl-{version}-x86_64-unknown-linux-gnu/bin/hurl"; checksum = "hurl-{version}-x86_64-unknown-linux-gnu.tar.gz.sha256" }
-      ["linux-arm64"] { name = "hurl-{version}-aarch64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "hurl-{version}-aarch64-unknown-linux-gnu/bin/hurl"; checksum = "hurl-{version}-aarch64-unknown-linux-gnu.tar.gz.sha256" }
-      ["darwin-arm64"] { name = "hurl-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "hurl-{version}-aarch64-apple-darwin/bin/hurl"; checksum = "hurl-{version}-aarch64-apple-darwin.tar.gz.sha256" }
+  when (systemPackage == null) {
+    new fam.Package {
+      package = new fam.PackageRef {
+        package = "libcurl4-openssl-dev"
+        manager = "system"
+        names { ["dnf"] = "libcurl-devel"; ["apk"] = "curl-dev" }
+      }
+    }
+    new fam.Package {
+      package = new fam.PackageRef {
+        package = "libxml2-dev"
+        manager = "system"
+        names { ["dnf"] = "libxml2-devel" }
+      }
+    }
+    new fam.Package {
+      package = new fam.PackageRef {
+        package = "libclang-dev"
+        manager = "system"
+        names { ["dnf"] = "clang-devel"; ["apk"] = "clang-dev" }
+      }
     }
   }
+  packages.retireRelease("hurl", "Orange-OpenSource/hurl")
+  packages.cargo("hurl", "hurl", systemPackage)
 }
 
 verify {
   new { name = "hurl runs"; script = "hurl --version" }
 }
+
+uninstall { packages.retireRelease("hurl", "Orange-OpenSource/hurl") }

@@ -1,76 +1,51 @@
-/// go: Build and format Go programs with the official toolchain (https://github.com/golang/go).
+/// go: Build and format Go programs with the Go toolchain (https://github.com/golang/go).
 ///
-/// FAM reads the latest stable release and its SHA-256 from https://go.dev/dl/?mode=json.
-/// It installs the official tarball under ~/.local/share/fam/go and links go and gofmt into ~/.local/bin.
-/// curl and tar must exist. The Linux toolchain also runs on musl without a C compiler.
-/// Go finds its own installation through the links. No GOROOT or shell configuration is necessary.
+/// FAM uses the system package manager where this tool is packaged.
+/// Homebrew provides Go on macOS. Linux uses the distribution package, including gofmt.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
 
-name = "go"
-description = "Build and format Go programs with the official toolchain"
-version = "@FAM_VERSION@"
-local installScript = #"""
+local legacyOwnership = #"""
   set -eu
-  case "$(uname -s)-$(uname -m)" in
-    Linux-x86_64) os=linux; arch=amd64 ;;
-    Linux-aarch64|Linux-arm64) os=linux; arch=arm64 ;;
-    Darwin-arm64) os=darwin; arch=arm64 ;;
-    *) echo "Unsupported Go platform" >&2; exit 1 ;;
-  esac
   root="$HOME/.local/share/fam/go"
-  mkdir -p "$root" "$HOME/.local/bin"
-  stage=$(mktemp -d "$root/.install.XXXXXX")
-  trap 'rm -rf "$stage"' EXIT HUP INT TERM
-  curl -fsSL 'https://go.dev/dl/?mode=json' -o "$stage/releases.json"
-  # The official response puts each field on its own line. Select the first stable release.
-  awk -F '"' -v os="$os" -v arch="$arch" '
-    /"stable":/ { stable = ($0 ~ /true/) }
-    /"filename":/ { filename = $4; fileos = ""; filearch = ""; hash = ""; kind = "" }
-    /"os":/ { fileos = $4 }
-    /"arch":/ { filearch = $4 }
-    /"sha256":/ { hash = $4 }
-    /"kind":/ { kind = $4 }
-    /}/ && stable && fileos == os && filearch == arch && kind == "archive" {
-      print filename, hash
-      exit
-    }
-  ' "$stage/releases.json" > "$stage/selected"
-  read -r asset expected < "$stage/selected"
-  case "$asset" in go[0-9]*."$os"-"$arch".tar.gz) ;; *) echo "No stable Go archive" >&2; exit 1 ;; esac
-  [ "${#expected}" -eq 64 ]
-  # The version is the prefix before the platform suffix, including all patch digits.
-  release=${asset%.$os-$arch.tar.gz}
-  case "$(readlink "$HOME/.local/bin/go" 2>/dev/null || true)" in
-    "$root"/*/toolchain/bin/go)
-      if [ "$("$HOME/.local/bin/go" version)" = "go version $release $os/$arch" ] &&
-         [ "$(readlink "$HOME/.local/bin/gofmt" 2>/dev/null || true)" = "$(dirname "$(readlink "$HOME/.local/bin/go")")/gofmt" ]; then
-        exit 0
-      fi ;;
+  target=$(readlink "$HOME/.local/bin/go" 2>/dev/null || true)
+  case "$target" in
+    "$root"/*/toolchain/bin/go) ;;
+    *) exit 0 ;;
   esac
-  curl -fsSL "https://go.dev/dl/$asset" -o "$stage/go.tar.gz"
-  if command -v sha256sum >/dev/null 2>&1; then
-    actual=$(sha256sum "$stage/go.tar.gz" | awk '{print $1}')
-  else
-    actual=$(shasum -a 256 "$stage/go.tar.gz" | awk '{print $1}')
+  fmt=$(readlink "$HOME/.local/bin/gofmt" 2>/dev/null || true)
+  if [ -e "$HOME/.local/bin/gofmt" ] || [ -L "$HOME/.local/bin/gofmt" ]; then
+    if [ "$fmt" != "${target%/go}/gofmt" ]; then
+      echo 'The previous FAM gofmt link changed. Preserve or remove it before apply.' >&2
+      exit 1
+    fi
   fi
-  [ "$actual" = "$expected" ] || { echo "Go SHA-256 mismatch" >&2; exit 1; }
-  tar -xzf "$stage/go.tar.gz" -C "$stage"
-  # A distinct directory preserves the previous toolchain until the new links replace it.
-  installDir=$(mktemp -d "$root/$release.XXXXXX")
-  mv "$stage/go" "$installDir/toolchain"
-  for binary in go gofmt; do
-    ln -s "$installDir/toolchain/bin/$binary" "$stage/$binary-link"
-    mv -f "$stage/$binary-link" "$HOME/.local/bin/$binary"
-  done
   """#
+local retireLegacy = new fam.Script {
+  name = "Replace the previous FAM Go toolchain"
+  check = legacyOwnership + "\nexit 100"
+  apply = legacyOwnership + "\n" + #"rm -f -- "$HOME/.local/bin/go" "$HOME/.local/bin/gofmt" && rm -rf -- "$HOME/.local/share/fam/go""#
+}
+
+name = "go"
+description = "Build and format Go programs with the Go toolchain"
+version = "@FAM_VERSION@"
 tasks {
+  retireLegacy
   new fam.Package {
-    binary = "~/.local/bin/go"
-    install = installScript
-    update = installScript
-    uninstall = #"rm -f "$HOME/.local/bin/go" "$HOME/.local/bin/gofmt"; rm -rf "$HOME/.local/share/fam/go""#
+    package = new fam.PackageRef {
+      package = "go"
+      manager = "system"
+      names {
+        ["apt"] = "golang-go"
+        ["dnf"] = "golang"
+        ["pacman"] = "go"
+        ["apk"] = "go"
+        ["brew"] = "go"
+      }
+    }
+    binary = "go"
     versionCommand = "go version"
   }
 }
@@ -78,3 +53,5 @@ tasks {
 verify {
   new { name = "version"; script = #"go version && printf 'package main\n' | gofmt"# }
 }
+
+uninstall { retireLegacy }

@@ -1,28 +1,31 @@
 /// langsmith: a CLI for LangSmith traces, runs, and evaluations (https://github.com/langchain-ai/langsmith-cli).
 ///
-/// FAM installs the upstream release binary into ~/.local/bin.
-/// Linux binaries are static and also run on musl.
+/// FAM uses the system package where available. Other systems build the official Go package.
+/// Go must exist. PyPI publishing is not available yet.
 /// Credentials: LANGSMITH_API_KEY.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "langchain-ai/tap/langsmith-cli"
+})
 
 name = "langsmith"
 description = "Inspect LangSmith traces, runs, datasets, and evaluations"
 version = "@FAM_VERSION@"
 requiredSecrets { "LANGSMITH_API_KEY" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "langchain-ai/langsmith-cli"
+  packages.retireRelease("langsmith", "langchain-ai/langsmith-cli")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/langchain-ai/langsmith-cli/cmd/langsmith"; manager = "go" }
     binary = "langsmith"
-    assets {
-      ["linux-amd64"] { name = "langsmith_linux_amd64.tar.gz"; format = "tar.gz"; file = "langsmith"; checksum = "checksums.txt" }
-      ["linux-arm64"] { name = "langsmith_linux_arm64.tar.gz"; format = "tar.gz"; file = "langsmith"; checksum = "checksums.txt" }
-      ["darwin-arm64"] { name = "langsmith_darwin_arm64.tar.gz"; format = "tar.gz"; file = "langsmith"; checksum = "checksums.txt" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "langsmith --version" }
 }
+
+uninstall { packages.retireRelease("langsmith", "langchain-ai/langsmith-cli") }

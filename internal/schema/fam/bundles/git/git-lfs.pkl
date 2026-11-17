@@ -1,28 +1,36 @@
 /// git-lfs: Store and transfer large files through Git LFS (https://github.com/git-lfs/git-lfs).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// FAM uses the system package manager where this tool is packaged.
 /// Git must exist. Run git lfs install separately to configure Git filters and hooks.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 
 name = "git-lfs"
 description = "Store and transfer large files through Git LFS"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "git-lfs/git-lfs"
-    binary = "git-lfs"
-    // FAM needs a version word without the git-lfs/ prefix.
-    versionCommand = #"fam_git_lfs_version=$(git-lfs version) && printf '%s\n' "${fam_git_lfs_version#git-lfs/}""#
-    assets {
-      ["linux-amd64"] { name = "git-lfs-linux-amd64-{tag}.tar.gz"; format = "tar.gz"; file = "git-lfs-{version}/git-lfs"; checksum = "sha256sums.asc" }
-      ["linux-arm64"] { name = "git-lfs-linux-arm64-{tag}.tar.gz"; format = "tar.gz"; file = "git-lfs-{version}/git-lfs"; checksum = "sha256sums.asc" }
-      ["darwin-arm64"] { name = "git-lfs-darwin-arm64-{tag}.zip"; format = "zip"; file = "git-lfs-{version}/git-lfs"; checksum = "sha256sums.asc" }
+  packages.retireRelease("git-lfs", "git-lfs/git-lfs")
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "git-lfs"
+      manager = "system"
+      names {
+        ["apt"] = "git-lfs"
+        ["dnf"] = "git-lfs"
+        ["pacman"] = "git-lfs"
+        ["apk"] = "git-lfs"
+        ["brew"] = "git-lfs"
+      }
     }
+    binary = "git-lfs"
+    versionCommand = #"fam_git_lfs_version=$(git-lfs version) && printf '%s\n' "${fam_git_lfs_version#git-lfs/}""#
   }
 }
 
 verify {
   new { name = "version"; script = "git-lfs version" }
 }
+
+uninstall { packages.retireRelease("git-lfs", "git-lfs/git-lfs") }

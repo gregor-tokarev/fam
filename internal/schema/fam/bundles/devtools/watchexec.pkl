@@ -1,27 +1,28 @@
 /// watchexec: Run commands after files change, with debounce and process control (https://github.com/watchexec/watchexec).
 ///
-/// FAM installs the latest GitHub release and checks its SHA-256.
-/// FAM extracts tar.xz itself. Linux uses static musl builds. No compiler is necessary.
-/// Watched commands need their own shell or interpreter.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Cargo package watchexec-cli.
+/// A current Rust toolchain and a C compiler must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
-import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "watchexec"
+  ["apk"] = "watchexec"
+  ["brew"] = "watchexec"
+})
 
 name = "watchexec"
 description = "Run commands after files change, with debounce and process control"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "watchexec/watchexec"
-    binary = "watchexec"
-    assets {
-      ["linux-amd64"] { name = "watchexec-{version}-x86_64-unknown-linux-musl.tar.xz"; format = "tar.xz"; file = "watchexec-{version}-x86_64-unknown-linux-musl/watchexec"; checksum = "SHA256SUMS" }
-      ["linux-arm64"] { name = "watchexec-{version}-aarch64-unknown-linux-musl.tar.xz"; format = "tar.xz"; file = "watchexec-{version}-aarch64-unknown-linux-musl/watchexec"; checksum = "SHA256SUMS" }
-      ["darwin-arm64"] { name = "watchexec-{version}-aarch64-apple-darwin.tar.xz"; format = "tar.xz"; file = "watchexec-{version}-aarch64-apple-darwin/watchexec"; checksum = "SHA256SUMS" }
-    }
-  }
+  packages.retireRelease("watchexec", "watchexec/watchexec")
+  packages.cargo("watchexec-cli", "watchexec", systemPackage)
 }
 
 verify {
   new { name = "version"; script = "watchexec --version" }
 }
+
+uninstall { packages.retireRelease("watchexec", "watchexec/watchexec") }
