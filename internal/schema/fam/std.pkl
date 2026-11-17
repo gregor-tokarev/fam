@@ -7,47 +7,63 @@
 /// ```
 module fam.std
 
+import "std/computer.pkl" as computerGroup
+import "std/context.pkl" as contextGroup
+import "std/media.pkl" as mediaGroup
+import "std/networking.pkl" as networkingGroup
+import "std/testing.pkl" as testingGroup
+import "std/agents.pkl" as agentsGroup
+import "std/languages.pkl" as languagesGroup
+import "std/cloud.pkl" as cloudGroup
+import "std/data.pkl" as dataGroup
+import "std/observability.pkl" as observabilityGroup
+import "std/work.pkl" as workGroup
+import "std/git.pkl" as gitGroup
+import "std/security.pkl" as securityGroup
+import "std/ai.pkl" as aiGroup
+import "std/devtools.pkl" as devtoolsGroup
+
 /// Tools that let agents use a computer: browsers and desktop apps.
-computer = import("std/computer.pkl")
+computer: computerGroup = import("std/computer.pkl")
 
 /// Tools that give agents context: source code of packages, a knowledge graph of a codebase, related issues.
-context = import("std/context.pkl")
+context: contextGroup = import("std/context.pkl")
 
 /// Tools that make media: video, images, and text.
-media = import("std/media.pkl")
+media: mediaGroup = import("std/media.pkl")
 
 /// Tools for local networking.
-networking = import("std/networking.pkl")
+networking: networkingGroup = import("std/networking.pkl")
 
 /// Tools for tests.
-testing = import("std/testing.pkl")
+testing: testingGroup = import("std/testing.pkl")
 
 /// Tools for the agents themselves.
-agents = import("std/agents.pkl")
+agents: agentsGroup = import("std/agents.pkl")
 
 /// Programming languages for agents.
-languages = import("std/languages.pkl")
+languages: languagesGroup = import("std/languages.pkl")
 
 /// Cloud platforms and their tools.
-cloud = import("std/cloud.pkl")
+cloud: cloudGroup = import("std/cloud.pkl")
 
 /// Databases and data tools.
-data = import("std/data.pkl")
+data: dataGroup = import("std/data.pkl")
 
 /// Logs, metrics, and error reports.
-observability = import("std/observability.pkl")
+observability: observabilityGroup = import("std/observability.pkl")
 
 /// Tools for daily work.
-work = import("std/work.pkl")
+work: workGroup = import("std/work.pkl")
 
 /// Git repositories and code review.
-git = import("std/git.pkl")
+git: gitGroup = import("std/git.pkl")
 
 /// Tools for security.
-security = import("std/security.pkl")
+security: securityGroup = import("std/security.pkl")
 
 /// AI services and tools.
-ai = import("std/ai.pkl")
+ai: aiGroup = import("std/ai.pkl")
 
 /// Tools for software development.
-devtools = import("std/devtools.pkl")
+devtools: devtoolsGroup = import("std/devtools.pkl")
