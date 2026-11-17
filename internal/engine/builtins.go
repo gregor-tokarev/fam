@@ -34,42 +34,19 @@ func envPathLine(d string) string {
 }
 
 // envScript returns ~/.config/fam/env.sh: bundle variables, ~/.local/bin in PATH, and the secrets.
-// A skipped bundle keeps its existing exports and PATH entries, but adds none.
-func envScript(spec *config.Spec, previous []byte) []byte {
-	// Exports already have bundle headers, so preserve the old values of skipped bundles.
-	oldExports := map[string][]string{}
-	bundle := ""
-	quoted := false
-	for _, line := range strings.Split(string(previous), "\n") {
-		if !quoted && strings.HasPrefix(line, "# bundle ") {
-			bundle = strings.TrimPrefix(line, "# bundle ")
-			continue
-		}
-		if bundle == "" || (!quoted && !strings.HasPrefix(line, "export ")) {
-			continue
-		}
-		oldExports[bundle] = append(oldExports[bundle], line)
-		// transport.Quote uses single quotes. A value can span lines or contain a header.
-		for i := 0; i < len(line); i++ {
-			if line[i] == '\\' && !quoted {
-				i++
-			} else if line[i] == '\'' {
-				quoted = !quoted
-			}
-		}
-	}
-	oldPaths, _, _ := bytes.Cut(previous, []byte("export PATH\n"))
+// A skipped bundle adds no variables or PATH entries.
+func envScript(spec *config.Spec) []byte {
 	var b strings.Builder
 	b.WriteString("# Written by FAM. Do not edit. FAM replaces this file on each apply.\n")
 	b.WriteString("# Shells load it from a marked block in ~/.zshenv, ~/.bashrc, and ~/.profile.\n")
 	dirs := []string{"~/.local/bin"}
 	seenDirs := map[string]bool{"~/.local/bin": true}
 	for _, u := range spec.Bundles {
-		if u.State != "present" {
+		if u.State != "present" || u.Skipped() {
 			continue
 		}
 		for _, d := range u.Bundle.Path {
-			if !seenDirs[d] && (!u.Skipped() || bytes.Contains(oldPaths, []byte(envPathLine(d)))) {
+			if !seenDirs[d] {
 				dirs = append(dirs, d)
 				seenDirs[d] = true
 			}
@@ -81,16 +58,7 @@ func envScript(spec *config.Spec, previous []byte) []byte {
 	}
 	b.WriteString("export PATH\n")
 	for _, u := range spec.Bundles {
-		if u.State != "present" {
-			continue
-		}
-		if u.Skipped() {
-			if lines := oldExports[u.Bundle.Name]; len(lines) > 0 {
-				fmt.Fprintf(&b, "# bundle %s\n", u.Bundle.Name)
-				for _, line := range lines {
-					fmt.Fprintln(&b, line)
-				}
-			}
+		if u.State != "present" || u.Skipped() {
 			continue
 		}
 		keys := make([]string, 0, len(u.Bundle.Env))
@@ -286,7 +254,7 @@ fi`, true, "reload sshd")
 	return "sshd reloaded", sudoHint(err, true, "sshd")
 }
 
-func environmentSection(ctx context.Context, env *Env, spec *config.Spec, secretList []secrets.Secret) (Section, error) {
+func environmentSection(env *Env, spec *config.Spec, secretList []secrets.Secret) (Section, error) {
 	g := base{group: "environment"}
 	sec := Section{Name: "environment"}
 	if spec.Secrets != nil && env.Machine.IsCockpit() {
@@ -302,12 +270,8 @@ func environmentSection(ctx context.Context, env *Env, spec *config.Spec, secret
 	} else {
 		sec.Tasks = append(sec.Tasks, &OwnedRemoveTask{base: g, Path: "~/" + secretsFile, Header: secrets.Header, Label: "~/" + secretsFile + " (no secrets in the config)"})
 	}
-	previous, _, err := env.T.ReadFile(ctx, env.Home(envFile), false)
-	if err != nil {
-		return sec, err
-	}
 	sec.Tasks = append(sec.Tasks,
-		&FileTask{base: g, Path: "~/" + envFile, Content: envScript(spec, previous), Mode: 0o644},
+		&FileTask{base: g, Path: "~/" + envFile, Content: envScript(spec), Mode: 0o644},
 		&BlockTask{base: g, Path: "~/.zshenv", Block: loaderBlock()},
 		&BlockTask{base: g, Path: "~/.bashrc", Block: loaderBlock(), Top: true},
 		&BlockTask{base: g, Path: "~/.profile", Block: loaderBlock()},

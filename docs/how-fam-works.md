@@ -126,7 +126,8 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 - `supported` defaults to `true`. Set it from the machine facts, for example `supported = facts.libc != "musl"`.
 - When `supported` is `false`, FAM skips a present bundle and its verify scripts. Plan, apply, and verify show the skip. Text, JSON, and TOON show its reason. A skip does not fail the run.
 - `unsupportedReason: String?` gives the reason, for example `"no musl build"`. Without a reason, FAM says the bundle does not support the machine.
-- A skip leaves an earlier installation, its skills, and its existing environment entries on the machine. FAM does not install, update, or remove the bundle. Use `state = "absent"` to remove it. Absent bundles ignore `supported`.
+- A skipped bundle adds no variables and no PATH entries to `~/.config/fam/env.sh`. FAM replaces this file on each apply, so earlier environment entries from the skipped bundle disappear.
+- Files and managed skills from an earlier installation stay on the machine. FAM does not install, update, or remove the skipped bundle. Use `state = "absent"` to remove it. Absent bundles ignore `supported`.
 - An absent bundle undoes its typed tasks in reverse order (`File`, `Symlink`, `Merge` keys, `Service`, `Linger`, `Package` with an `uninstall` command, `GitHubRelease`), then runs its `uninstall` tasks. FAM cannot undo a `Script`, so it skips scripts. FAM also removes the skill, the Claude link, and the variables of the bundle.
 
 ## Standard bundles

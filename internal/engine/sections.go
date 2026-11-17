@@ -24,7 +24,7 @@ type VerifySpec struct {
 // skills, instructions.
 func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section, []VerifySpec, error) {
 	var out []Section
-	envSec, err := environmentSection(ctx, env, spec, env.Secrets)
+	envSec, err := environmentSection(env, spec, env.Secrets)
 	if err != nil {
 		return nil, nil, err
 	}
