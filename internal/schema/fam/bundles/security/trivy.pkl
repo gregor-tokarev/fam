@@ -1,8 +1,7 @@
 /// trivy: Scan files, images, dependencies, secrets, and infrastructure configuration
 /// (https://github.com/aquasecurity/trivy).
 ///
-/// FAM runs the official install script to install trivy into ~/.local/bin.
-/// The current binary exceeds the 128 MiB limit of a FAM GitHubRelease task.
+/// FAM installs the latest GitHub release into ~/.local/bin and checks its SHA-256.
 /// The binary needs no runtime or login for public scans. Vulnerability scans normally download databases.
 amends "../../Bundle.pkl"
 
@@ -12,12 +11,14 @@ name = "trivy"
 description = "Scan files, images, dependencies, secrets, and infrastructure configuration"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    binary = "~/.local/bin/trivy"
-    install = #"curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$HOME/.local/bin""#
-    update = #"curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$HOME/.local/bin""#
-    uninstall = "rm -f ~/.local/bin/trivy"
-    versionCommand = "trivy --version"
+  new fam.GitHubRelease {
+    repo = "aquasecurity/trivy"
+    binary = "trivy"
+    assets {
+      ["linux-amd64"] { name = "trivy_{version}_Linux-64bit.tar.gz"; format = "tar.gz"; file = "trivy"; checksum = "trivy_{version}_checksums.txt" }
+      ["linux-arm64"] { name = "trivy_{version}_Linux-ARM64.tar.gz"; format = "tar.gz"; file = "trivy"; checksum = "trivy_{version}_checksums.txt" }
+      ["darwin-arm64"] { name = "trivy_{version}_macOS-ARM64.tar.gz"; format = "tar.gz"; file = "trivy"; checksum = "trivy_{version}_checksums.txt" }
+    }
   }
 }
 

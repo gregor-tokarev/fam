@@ -124,11 +124,11 @@ local selectedGroups = %q.split(",").map((name) -> name.trim())
 
 bundles {
   import("bundles/node.pkl")
-  import("bundles/uv.pkl")
+  std.languages.uv
   for (group, tools in std.toDynamic().toMap()) {
     when (selectedGroups == List("") || selectedGroups.contains(group)) {
       for (_, bundle in tools.toDynamic().toMap()) {
-        when (bundle.supported) { bundle }
+        when (bundle.supported && bundle.name != std.languages.uv.name) { bundle }
       }
     }
   }
@@ -207,18 +207,6 @@ tasks {
         curl -fsSL "https://nodejs.org/dist/$v/node-$v-$os-$a.tar.gz" | tar -xz -C "$HOME/.local" --strip-components=1
         """#
     }
-  }
-}
-`,
-		"bundles/uv.pkl": `amends "@fam/Bundle.pkl"
-import "@fam/tasks.pkl" as fam
-
-name = "uv"
-description = "uv from its upstream binaries"
-tasks {
-  new fam.Package {
-    binary = "uv"
-    install = #"curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$HOME/.local/bin" UV_NO_MODIFY_PATH=1 sh"#
   }
 }
 `,

@@ -38,7 +38,12 @@ go run ./acceptance clean                   # delete base images and runtime fil
 - Scenario 9 stops the network card of the VM with the QEMU monitor (`set_link nic0 off`) while FAM runs a slow script.
 - The test project, its secrets file, and the run logs of each scenario are in `~/.cache/fam-acceptance/run/`. Results go to `acceptance/results/<target>.json`.
 
-Scenario 16 installs Node.js, npm, and uv inside the VM of the current run. The system package manager is also available. It installs no Go, Rust, or C compiler. The shared base images stay unchanged.
+Scenario 16 installs Node.js and npm inside the VM of the current run.
+It puts `std.languages.uv` before the selected bundles, even with a group filter.
+FAM manages this one uv binary for both the prerequisite and the standard bundle.
+The system package manager is also available.
+The prerequisites include no Go, Rust, or C compiler. The `go` bundle installs its own toolchain.
+The shared base images stay unchanged.
 
 Scenario 16 must not install unzip, OpenSSL, or other extra tools to make standard bundles pass. Bundle install scripts must use baseline tools or the documented fallback commands.
 

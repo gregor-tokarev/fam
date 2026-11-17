@@ -1,7 +1,7 @@
 /// Zero: the programming language for agents (https://github.com/vercel-labs/zerolang).
 ///
-/// FAM installs `zero` with its install script into `~/.zero/bin`, and copies the skill of the latest
-/// release from GitHub.
+/// FAM installs the latest GitHub release into ~/.local/bin and checks its SHA-256.
+/// Linux uses static musl builds. FAM copies the skill from the same release.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
@@ -9,13 +9,15 @@ import "../../tasks.pkl" as fam
 name = "zero"
 description = "The Zero programming language for agents"
 version = "@FAM_VERSION@"
-path { "~/.zero/bin" }
 tasks {
-  new fam.Package {
-    binary = "~/.zero/bin/zero"
-    install = "curl -fsSL https://zerolang.ai/install.sh | sh"
-    update = "curl -fsSL https://zerolang.ai/install.sh | sh"
-    uninstall = "rm -f ~/.zero/bin/zero"
+  new fam.GitHubRelease {
+    repo = "vercel-labs/zerolang"
+    binary = "zero"
+    assets {
+      ["linux-amd64"] { name = "zero-linux-musl-x64"; checksum = "CHECKSUMS.txt" }
+      ["linux-arm64"] { name = "zero-linux-musl-arm64"; checksum = "CHECKSUMS.txt" }
+      ["darwin-arm64"] { name = "zero-darwin-arm64"; checksum = "CHECKSUMS.txt" }
+    }
   }
   new fam.GitHubSkill {
     repo = "vercel-labs/zerolang"
