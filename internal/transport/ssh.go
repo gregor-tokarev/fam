@@ -18,8 +18,9 @@ type SSH struct {
 	// Target is `user@address` or `address`.
 	Target string
 	// ConfigFile is given to `ssh -F` when it is not empty.
-	ConfigFile string
-	Observer   Observer
+	ConfigFile     string
+	ConnectTimeout time.Duration
+	Observer       Observer
 	files
 }
 
@@ -59,12 +60,16 @@ func (s *SSH) baseArgs() ([]string, error) {
 	if s.ConfigFile != "" {
 		args = append(args, "-F", s.ConfigFile)
 	}
+	timeout := 20
+	if s.ConnectTimeout > 0 {
+		timeout = int(s.ConnectTimeout.Seconds())
+	}
 	args = append(args,
 		"-o", "ControlMaster=auto",
 		"-o", "ControlPath="+filepath.Join(dir, "%C"),
 		"-o", "ControlPersist=120",
 		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=20",
+		"-o", fmt.Sprintf("ConnectTimeout=%d", timeout),
 		"-o", "ServerAliveInterval=5",
 		"-o", "ServerAliveCountMax=3",
 	)

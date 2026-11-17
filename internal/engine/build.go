@@ -148,7 +148,7 @@ func bundleSkillName(t tasks.Task, u config.BundleUse) (string, bool) {
 
 // skillTasks turns a Skill or GitHubSkill task into engine tasks: the copy and the Claude link,
 // or the removal when the task or the bundle is absent. ok is false for other task types.
-func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group string, absent bool) (out []Task, ok bool, err error) {
+func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group string, absent bool, staticOnly bool) (out []Task, ok bool, err error) {
 	g := base{group: group}
 	name, _ := bundleSkillName(t, u)
 	origin := "bundle " + u.Bundle.Name
@@ -158,6 +158,9 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 	case tasks.GitHubSkill:
 		absent = absent || x.GetState() == "absent"
 		load = func(name string) (*SkillSource, error) {
+			if staticOnly {
+				return &SkillSource{Name: name, Dir: x.GetRepo() + "/" + x.GetPath(), Origin: origin}, nil
+			}
 			return loadGitHubSkill(ctx, x.GetRepo(), x.GetPath(), x.GetRef(), name, origin)
 		}
 	case tasks.Skill:
@@ -199,6 +202,10 @@ var skillName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 // changed tasks once, at its end. A restart of a unit that a Service task of the same bundle
 // manages uses the scope of that task.
 func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string, f facts.Facts) (Section, error) {
+	return bundleSection(ctx, u, pm, f, false)
+}
+
+func bundleSection(ctx context.Context, u config.BundleUse, pm map[string]string, f facts.Facts, staticOnly bool) (Section, error) {
 	group := "bundle " + u.Bundle.Name
 	sec := Section{Name: group}
 	if u.Skipped() {
@@ -207,7 +214,7 @@ func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 	}
 	if u.State == "absent" {
 		for i := len(u.Bundle.Tasks) - 1; i >= 0; i-- {
-			if st, ok, err := skillTasks(ctx, u.Bundle.Tasks[i], u, group, true); ok || err != nil {
+			if st, ok, err := skillTasks(ctx, u.Bundle.Tasks[i], u, group, true, staticOnly); ok || err != nil {
 				if err != nil {
 					return sec, err
 				}
@@ -223,7 +230,7 @@ func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 			}
 		}
 		for _, ut := range u.Bundle.Uninstall {
-			if st, ok, err := skillTasks(ctx, ut, u, group, false); ok || err != nil {
+			if st, ok, err := skillTasks(ctx, ut, u, group, false, staticOnly); ok || err != nil {
 				if err != nil {
 					return sec, err
 				}
@@ -255,7 +262,7 @@ func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 		delete(scopes, n)
 	}
 	for _, bt := range u.Bundle.Tasks {
-		ts, ok, err := skillTasks(ctx, bt, u, group, false)
+		ts, ok, err := skillTasks(ctx, bt, u, group, false, staticOnly)
 		if err != nil {
 			return sec, err
 		}

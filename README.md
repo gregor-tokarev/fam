@@ -14,6 +14,7 @@ You run coding agents on several machines. Each machine needs the same CLIs, the
 
 - **One config.** Machines, reusable bundles of tools and setup, agents, and secrets in typed Pkl files, with editor help.
 - **Nothing on the machines.** Workers need only SSH. FAM checks the real state on each run, so a plan always shows the truth.
+- **Agents can do the edits.** Each project has a short guide for Claude Code and Codex, so you can ask an agent to change the fleet.
 - **Ready bundles.** agent-browser, agent-desktop, portless, HyperFrames, and more agent tools with their skills, in one line each.
 - **Proof, not hope.** Each bundle has checks that FAM runs in new shells after each apply.
 - **Safe changes.** `fam plan` changes nothing. FAM never shows secret values, stops on files that it did not make, and saves a copy before it replaces your own instruction files.
@@ -33,12 +34,15 @@ To update FAM, run `fam update`.
 ## Use
 
 ```sh
-fam new      # create a project
-fam plan     # show what is different on each machine
-fam apply    # make the machines match, then prove that the tools work
-fam verify   # prove it again
-fam migrate  # pin the schema of a new FAM version in a project
-fam update   # update FAM itself
+fam new       # create a project
+fam std list  # find ready bundles
+fam check     # find mistakes in the project, without a connection to the machines
+fam plan      # show what is different on each machine
+fam apply     # make the machines match, then prove that the tools work
+fam verify    # prove it again
+fam doctor    # find problems in the setup, the editor, and the connections
+fam migrate   # pin the schema of a new FAM version in a project
+fam update    # update FAM itself
 ```
 
 ## Build from source

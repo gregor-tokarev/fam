@@ -30,11 +30,23 @@ type Entry struct {
 
 // LinuxFacts fixes the inputs of the generated documentation.
 func LinuxFacts() facts.Facts {
-	return facts.Facts{OS: "linux", Distro: "ubuntu", DistroVersion: "26.04", Arch: "amd64", Libc: "glibc", CPUs: 4, Home: "/home/fam", User: "fam", Hostname: "fam-docs", Init: "systemd", Shell: "/bin/bash", Machine: "docs", Role: "worker"}
+	return facts.Reference()
 }
 
 // Read evaluates std.pkl with the given facts. It needs no project or network downloads.
 func Read(ctx context.Context, f facts.Facts) ([]Group, error) {
+	return read(ctx, f, "", false)
+}
+
+// Catalogue reads only names and comments, without evaluation of bundle tasks.
+func Catalogue(ctx context.Context) ([]Group, error) { return read(ctx, LinuxFacts(), "", true) }
+
+// Lookup evaluates only the selected bundle.
+func Lookup(ctx context.Context, f facts.Facts, name string) ([]Group, error) {
+	return read(ctx, f, name, false)
+}
+
+func read(ctx context.Context, f facts.Facts, selected string, namesOnly bool) ([]Group, error) {
 	pkg, err := schema.Current()
 	if err != nil {
 		return nil, err
@@ -69,14 +81,40 @@ func Read(ctx context.Context, f facts.Facts) ([]Group, error) {
 		return nil, fmt.Errorf("read the functions of the standard bundles: %w", err)
 	}
 	var groups map[string]map[string]bundle.Bundle
-	if err := ev.EvaluateExpression(ctx, src, callAll(docs), &groups); err != nil {
-		return nil, fmt.Errorf("read standard bundles: %w", err)
+	if !namesOnly {
+		calls := docs
+		if selected != "" {
+			calls = map[string]map[string]string{}
+			for g, fns := range docs {
+				for n, doc := range fns {
+					if g+"."+n == selected {
+						calls[g] = map[string]string{n: doc}
+					}
+				}
+			}
+		}
+		if err := ev.EvaluateExpression(ctx, src, callAll(calls), &groups); err != nil {
+			return nil, fmt.Errorf("read standard bundles: %w", err)
+		}
 	}
 	var out []Group
 	for name, fns := range docs {
 		g := Group{Name: name}
 		for n, doc := range fns {
-			g.Bundles = append(g.Bundles, Entry{Name: n, Bundle: groups[name][n], Doc: doc})
+			if selected != "" && name+"."+n != selected {
+				continue
+			}
+			b := groups[name][n]
+			if selected != "" {
+				var full string
+				if err := ev.EvaluateExpression(ctx, pkl.UriSource(b.Source), `import("pkl:reflect").Module(module).docComment ?? ""`, &full); err != nil {
+					return nil, err
+				}
+				if full != "" {
+					doc = full
+				}
+			}
+			g.Bundles = append(g.Bundles, Entry{Name: n, Bundle: b, Doc: doc})
 		}
 		sort.Slice(g.Bundles, func(i, j int) bool { return g.Bundles[i].Name < g.Bundles[j].Name })
 		out = append(out, g)
@@ -131,3 +169,6 @@ func Select(groups []Group, filter string) ([]Group, error) {
 	}
 	return out, nil
 }
+
+// Summary returns the first sentence used by the catalogue.
+func Summary(doc string) string { return summary(doc) }

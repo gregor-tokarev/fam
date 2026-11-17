@@ -24,12 +24,29 @@ type Evaluator struct {
 	path     string
 	project  *pkl.Project
 	cacheDir string
+	readonly *schema.Package
+	base     string
 }
 
 // NewEvaluator starts the pinned pkl binary, and reads the PklProject in base (the dependency on
 // the fam package). Close it after use.
 func NewEvaluator(ctx context.Context, base, configPath string, progress io.Writer) (*Evaluator, error) {
-	bin, err := pklbin.Path(ctx, progress)
+	return newEvaluator(ctx, base, configPath, progress, false)
+}
+
+// NewReadOnlyEvaluator uses cached packages and the pinned Pkl binary without writes or network access.
+func NewReadOnlyEvaluator(ctx context.Context, base, configPath string) (*Evaluator, error) {
+	return newEvaluator(ctx, base, configPath, nil, true)
+}
+
+func newEvaluator(ctx context.Context, base, configPath string, progress io.Writer, readonly bool) (*Evaluator, error) {
+	var bin string
+	var err error
+	if readonly {
+		bin, err = pklbin.CachedPath()
+	} else {
+		bin, err = pklbin.Path(ctx, progress)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +58,18 @@ func NewEvaluator(ctx context.Context, base, configPath string, progress io.Writ
 	if rel, err := filepath.Rel(base, configPath); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return nil, fmt.Errorf("the config %s is not in the project %s: it must be in the folder of PklProject, or below it", configPath, base)
 	}
-	e := &Evaluator{manager: pkl.NewEvaluatorManagerWithCommand([]string{bin}), path: configPath, cacheDir: cacheDir}
-	ev, err := e.manager.NewEvaluator(ctx, pkl.PreconfiguredOptions, func(o *pkl.EvaluatorOptions) { o.CacheDir = cacheDir })
+	e := &Evaluator{manager: pkl.NewEvaluatorManagerWithCommand([]string{bin}), path: configPath, cacheDir: cacheDir, base: base}
+	if readonly {
+		e.readonly, err = schema.Current()
+		if err != nil {
+			e.Close()
+			return nil, err
+		}
+	}
+	ev, err := e.manager.NewEvaluator(ctx, pkl.PreconfiguredOptions, func(o *pkl.EvaluatorOptions) {
+		o.CacheDir = cacheDir
+		e.readOnlyOptions(o)
+	})
 	if err != nil {
 		e.Close()
 		return nil, fmt.Errorf("start the Pkl evaluator: %w", err)
@@ -66,6 +93,7 @@ func (e *Evaluator) options(props map[string]string) []func(*pkl.EvaluatorOption
 			o.CacheDir = e.cacheDir
 			o.Properties = props
 			o.Logger = pkl.NoopLogger
+			e.readOnlyOptions(o)
 		},
 	}
 }
@@ -143,4 +171,14 @@ func FileFromURI(uri string) (string, error) {
 		return "", fmt.Errorf("module %s is not a local file. FAM supports only file modules for bundles", uri)
 	}
 	return u.Path, nil
+}
+
+func (e *Evaluator) readOnlyOptions(o *pkl.EvaluatorOptions) {
+	if e.readonly == nil {
+		return
+	}
+	o.CacheDir = ""
+	o.AllowedModules = []string{"pkl:", "file:", "package:", "projectpackage:"}
+	o.AllowedResources = []string{"prop:", "env:", "file:", "package:", "projectpackage:"}
+	embeddedOptions(e.readonly, e.project, e.base)(o)
 }

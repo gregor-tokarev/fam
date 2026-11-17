@@ -22,7 +22,7 @@ type VerifySpec struct {
 // buildSections returns the task sections of one machine in run order:
 // environment and secrets, agents, bundles (every machine, then the role, then the machine),
 // skills, instructions.
-func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section, []VerifySpec, error) {
+func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly bool) ([]Section, []VerifySpec, error) {
 	var out []Section
 	envSec, err := environmentSection(env, spec, env.Secrets)
 	if err != nil {
@@ -40,7 +40,7 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec) ([]Section,
 	}
 	var verify []VerifySpec
 	for _, u := range spec.Bundles {
-		s, err := BundleSection(ctx, u, spec.PackageManagers, env.Facts)
+		s, err := bundleSection(ctx, u, spec.PackageManagers, env.Facts, staticOnly)
 		if err != nil {
 			return nil, nil, err
 		}

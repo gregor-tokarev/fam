@@ -2,6 +2,8 @@
 package project
 
 import (
+	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gregor-tokarev/fam/internal/schema"
+	"github.com/gregor-tokarev/fam/internal/version"
 )
 
 // NewOptions configures `fam new`.
@@ -68,10 +71,14 @@ func New(opts NewOptions) ([]string, error) {
 		}
 		written = append(written, name)
 	}
+	_, claudeErr := os.Lstat(filepath.Join(base, "CLAUDE.md"))
 	if err := pinPackage(base); err != nil {
 		return written, err
 	}
-	written = append(written, schema.ProjectFile, schema.DepsFile)
+	written = append(written, schema.ProjectFile, schema.DepsFile, "AGENTS.md")
+	if errors.Is(claudeErr, os.ErrNotExist) {
+		written = append(written, "CLAUDE.md")
+	}
 	return written, nil
 }
 
@@ -101,7 +108,53 @@ func pinPackage(base string) error {
 	if err := schema.WriteEditorState(base, p); err != nil {
 		return fmt.Errorf("write the editor state in .pkl-lsp: %w", err)
 	}
-	return nil
+	return WriteGuide(base)
+}
+
+//go:embed guide.md
+var guide string
+
+// WriteGuide updates only the FAM section and creates the Claude import when absent.
+func WriteGuide(base string) error {
+	const begin, end = "<!-- fam:begin -->", "<!-- fam:end -->"
+	path := filepath.Join(base, "AGENTS.md")
+	old, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	section := begin + "\n" + strings.TrimSpace(strings.ReplaceAll(guide, "{{version}}", version.Version)) + "\n" + end
+	text := string(old)
+	start, stop := strings.Index(text, begin), strings.Index(text, end)
+	if start >= 0 || stop >= 0 {
+		if start < 0 || stop < start || strings.Count(text, begin) != 1 || strings.Count(text, end) != 1 {
+			return fmt.Errorf("%s has invalid FAM guide markers. Keep one complete section", path)
+		}
+		text = text[:start] + section + text[stop+len(end):]
+	} else {
+		if text != "" && !strings.HasSuffix(text, "\n") {
+			text += "\n"
+		}
+		if text != "" {
+			text += "\n"
+		}
+		text += section + "\n"
+	}
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(filepath.Join(base, "CLAUDE.md"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if errors.Is(err, os.ErrExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString("@AGENTS.md\n")
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
 }
 
 // DetectAgents returns the agents that it finds on this machine.

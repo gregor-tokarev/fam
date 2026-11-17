@@ -215,6 +215,10 @@ var commentStart = regexp.MustCompile(`(^|\s)(//|/\*)`)
 // replaceURI replaces the URI of the fam dependency in the code of a PklProject file, not in its
 // comments. It returns the number of URIs that it found.
 func replaceURI(b []byte, uri string) ([]byte, int) {
+	return mapURIs(b, func(match string) string { return uriPattern.ReplaceAllString(match, "${1}"+uri+"${2}") })
+}
+
+func mapURIs(b []byte, transform func(string) string) ([]byte, int) {
 	lines := strings.SplitAfter(string(b), "\n")
 	n := 0
 	block := false // in a /* */ comment
@@ -241,7 +245,7 @@ func replaceURI(b []byte, uri string) ([]byte, int) {
 			continue
 		}
 		n += k
-		lines[i] = line[:from] + uriPattern.ReplaceAllString(code, "${1}"+uri+"${2}") + line[to:]
+		lines[i] = line[:from] + uriPattern.ReplaceAllStringFunc(code, transform) + line[to:]
 	}
 	return []byte(strings.Join(lines, "")), n
 }
@@ -466,4 +470,40 @@ func minorOf(v string) string {
 		return v
 	}
 	return parts[0] + "." + parts[1]
+}
+
+// ProjectPin reads the declared fam URI without changes to the project.
+func ProjectPin(base string) (string, error) {
+	b, err := os.ReadFile(filepath.Join(base, ProjectFile))
+	if err != nil {
+		return "", err
+	}
+	var found []string
+	mapURIs(b, func(match string) string {
+		_, tail, _ := strings.Cut(match, "/fam@")
+		found = append(found, strings.TrimRight(tail, "\"#"))
+		return match
+	})
+	if len(found) != 1 {
+		return "", fmt.Errorf("%s must declare one fam package. Run `fam migrate`", ProjectFile)
+	}
+	return found[0], nil
+}
+
+// CacheStatus verifies both package files without changes.
+func CacheStatus(dir string, p *Package) error {
+	base := filepath.Join(dir, "package-2", filepath.FromSlash(releaseBase+p.Version), "fam@"+p.Version)
+	for _, f := range []struct {
+		name string
+		data []byte
+	}{{"fam@" + p.Version + ".zip", p.Zip}, {"fam@" + p.Version + ".json", p.Metadata}} {
+		b, err := os.ReadFile(filepath.Join(base, f.name))
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(b, f.data) {
+			return fmt.Errorf("%s differs from this binary", filepath.Join(base, f.name))
+		}
+	}
+	return nil
 }

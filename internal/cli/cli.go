@@ -57,7 +57,7 @@ func Execute() int {
 	pf.StringVar(&opts.SudoPasswordFile, "sudo-password-file", "", "file with the sudo password of the cockpit, for runs without a terminal")
 	pf.StringVar(&opts.SSHConfig, "ssh-config", os.Getenv("FAM_SSH_CONFIG"), "ssh config file that FAM gives to `ssh -F` (default: the normal ssh configuration)")
 
-	root.AddCommand(newCmd(opts), migrateCmd(opts), updateCmd(), versionCmd(), internalCmd())
+	root.AddCommand(newCmd(opts), migrateCmd(opts), updateCmd(), versionCmd(), internalCmd(), stdCmd(opts), checkCmd(opts), doctorCmd(opts))
 	addRunCommands(root, opts)
 
 	if err := root.ExecuteContext(context.Background()); err != nil {
