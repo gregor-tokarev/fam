@@ -1,7 +1,9 @@
 /// aws-cli: Manage AWS services from the command line (https://github.com/aws/aws-cli).
 ///
 /// FAM installs AWS CLI v2 with the official installer, without sudo.
-/// Linux installation needs glibc, curl, unzip, and GnuPG. AWS supplies no musl build.
+/// Linux installation needs glibc, curl, and GnuPG. AWS supplies no musl build.
+/// ZIP extraction uses unzip, busybox unzip, bsdtar, or python3, in that order.
+/// Without GnuPG, installation stops because FAM must verify the archive signature.
 /// FAM verifies the Linux archive's PGP signature with the embedded AWS CLI Team public key.
 /// Its fingerprint is FB5DB77FD5C118B80511ADA8A6310ACC4672475C, from the AWS installation guide.
 /// macOS uses the official pkg for the current user, with Apple's signature and Gatekeeper checks.
@@ -18,6 +20,10 @@ local installAws = #"""
   trap 'rm -rf "$work"' EXIT HUP INT TERM
   case "$(uname -s)" in
     Linux)
+      command -v gpg >/dev/null 2>&1 || {
+        echo 'AWS CLI v2 installation needs GnuPG (gpg) to verify the official archive signature' >&2
+        exit 1
+      }
       case "$(uname -m)" in
         x86_64) arch=x86_64 ;;
         aarch64|arm64) arch=aarch64 ;;
@@ -60,7 +66,20 @@ local installAws = #"""
   AWS_KEY
       gpg --homedir "$work/gnupg" --batch --import "$work/aws-key.asc"
       gpg --homedir "$work/gnupg" --batch --verify "$work/awscliv2.sig" "$work/awscliv2.zip"
-      unzip -q "$work/awscliv2.zip" -d "$work"
+      if command -v unzip >/dev/null 2>&1; then
+        unzip -q "$work/awscliv2.zip" -d "$work"
+      elif command -v busybox >/dev/null 2>&1 && busybox --list | grep -qx unzip; then
+        busybox unzip -q "$work/awscliv2.zip" -d "$work"
+      elif command -v bsdtar >/dev/null 2>&1; then
+        bsdtar -xf "$work/awscliv2.zip" -C "$work"
+      elif command -v python3 >/dev/null 2>&1; then
+        python3 -m zipfile -e "$work/awscliv2.zip" "$work"
+        # zipfile does not preserve the executable modes that the AWS installer needs.
+        chmod 755 "$work/aws/install" "$work/aws/dist/aws" "$work/aws/dist/aws_completer"
+      else
+        echo 'AWS CLI v2 ZIP extraction needs unzip, busybox with unzip, bsdtar, or python3' >&2
+        exit 1
+      fi
       "$work/aws/install" -i "$HOME/.local/aws-cli" -b "$HOME/.local/bin" --update
       ;;
     Darwin)

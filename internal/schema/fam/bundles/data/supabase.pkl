@@ -1,32 +1,29 @@
 /// supabase: Manage Supabase projects, migrations, functions, and local databases (https://github.com/supabase/cli).
 ///
-/// FAM installs the CLI with the official release installer into ~/.local/bin.
-/// The release binary exceeds FAM's 128 MiB binary limit. The npm package does not support global installation.
-/// The installer needs Bash, curl, tar, and standard shell tools.
+/// FAM installs the CLI from GitHub releases and checks the vendor SHA-256 file.
+/// It needs no installer tools on the target. The npm package does not support global installation.
 /// On musl Linux, Supabase also needs libstdc++ and libgcc.
-/// The installer selects APK builds on musl and leaves shell configuration unchanged.
+/// FAM extracts only the CLI from the APK archive on musl, without a system package install.
 /// Cloud operations need SUPABASE_ACCESS_TOKEN or a login. Local stack commands need Docker.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
-
-local installSupabase = #"""
-  set -e;
-  supabase_release=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/supabase/cli/releases/latest);
-  curl -fsSL "https://github.com/supabase/cli/releases/download/${supabase_release##*/}/install" | SUPABASE_INSTALL_DIR="$HOME/.local/bin" bash -s -- --no-modify-path --version "${supabase_release##*/}"
-  """#
 
 name = "supabase"
 description = "Manage Supabase projects, migrations, functions, and local databases"
 version = "@FAM_VERSION@"
 requiredSecrets { "SUPABASE_ACCESS_TOKEN" }
 tasks {
-  new fam.Package {
+  new fam.GitHubRelease {
+    repo = "supabase/cli"
     binary = "supabase"
-    install = installSupabase
-    update = installSupabase
-    uninstall = "rm -f ~/.local/bin/supabase"
-    versionCommand = "supabase --version"
+    assets {
+      ["linux-amd64"] { name = "supabase_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "supabase"; checksum = "checksums.txt" }
+      ["linux-arm64"] { name = "supabase_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "supabase"; checksum = "checksums.txt" }
+      ["linux-amd64-musl"] { name = "supabase_{version}_linux_amd64.apk"; format = "tar.gz"; file = "usr/bin/supabase"; checksum = "checksums.txt" }
+      ["linux-arm64-musl"] { name = "supabase_{version}_linux_arm64.apk"; format = "tar.gz"; file = "usr/bin/supabase"; checksum = "checksums.txt" }
+      ["darwin-arm64"] { name = "supabase_{version}_darwin_arm64.tar.gz"; format = "tar.gz"; file = "supabase"; checksum = "checksums.txt" }
+    }
   }
 }
 

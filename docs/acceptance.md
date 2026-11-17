@@ -40,6 +40,8 @@ go run ./acceptance clean                   # delete base images and runtime fil
 
 Scenario 16 installs Node.js, npm, and uv inside the VM of the current run. The system package manager is also available. It installs no Go, Rust, or C compiler. The shared base images stay unchanged.
 
+Scenario 16 must not install unzip, OpenSSL, or other extra tools to make standard bundles pass. Bundle install scripts must use baseline tools or the documented fallback commands.
+
 Scenario 16 discovers all standard bundles from the package. `-std-groups cloud,data` or `FAM_STD_GROUPS=cloud,data` limits it to those groups. Bundles with `supported = false` for the target facts are omitted. The scenario reads expected skills from the first plan, requires every verify to pass, and requires a satisfied second plan.
 
 ## Windows
