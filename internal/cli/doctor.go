@@ -101,7 +101,7 @@ func doctorCmd(o *Options) *cobra.Command {
 		result := engine.CheckProject(cmd.Context(), o.project())
 		status := "ok"
 		fix := ""
-		detail := fmt.Sprintf("%d errors, %d warnings", result.Errors, result.Warnings)
+		detail := plural(result.Errors, "error") + ", " + plural(result.Warnings, "warning")
 		if !result.OK {
 			status = "fail"
 			fix = "fam check"

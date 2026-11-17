@@ -12,6 +12,7 @@
 | `internal/engine/check.go` | Static project validation through the config validators and task builders. It uses the embedded package and cached dependencies. It blocks network reads. |
 | `internal/stdlib` | Catalogue reflection, selected bundle evaluation, and generated documentation. |
 | `internal/cli` | Command registration, project diagnostics, and environment checks. |
+| `agentbench` | Agent tasks, guide variants, measured results, and reports. See [the benchmark](agent-benchmark.md). |
 
 ## Build
 

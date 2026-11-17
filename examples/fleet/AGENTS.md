@@ -1,29 +1,31 @@
 <!-- fam:begin -->
-## FAM project guide
+FAM project: the tools, skills, and agent instructions of a fleet of machines (FAM 0.16.0).
 
-This folder defines a fleet with FAM 0.15.0.
-Edit the project files to describe the tools and instructions for each machine.
+Where things go:
+- Every machine: `bundles` in `config.pkl`. A role: `roles { ["worker"] { bundles {...} } }`. One machine: `bundles` of its entry in `machines.pkl` (add `import "@fam/std.pkl"` there for std bundles).
+- An entry with the name of an earlier bundle replaces it, so a role or a machine can change or remove a bundle of every machine.
+- Machines: `machines.pkl`, `["name"] { role = "worker"; address = "host"; user = "me" }`. Roles: `"cockpit"` (this machine), `"worker"`.
+- Agent settings: `agents.pkl`, `["claude"] { settings { key = value } }`.
+- `instructions/AGENTS.md` goes to every agent on every machine. This file is only for this folder.
+- `skills/<name>/SKILL.md` (front matter `name`, `description`) goes to every machine.
+- Secrets: `KEY=value` lines in the file of `secrets` in `config.pkl`. Bundles name theirs in `requiredSecrets`. Never print values.
 
-- `config.pkl` selects bundles, roles, agents, and the secrets source.
-- `machines.pkl` lists machines, addresses, users, and roles.
-- `agents.pkl` selects coding tools and their settings.
-- `bundles/` holds local bundle files and their resources.
-- `skills/` holds local skill folders. Each folder needs `SKILL.md`.
-- `instructions/AGENTS.md` contains instructions that FAM installs on machines.
-- The secrets source stays outside this folder. Never print secret values.
+Bundles:
+- Standard: `std.<group>.<name>()`. Find with `fam std list`. Details and secrets: `fam std show <group>.<name>`.
+- Own: `bundles/<name>.pkl`, added with `import("bundles/<name>.pkl")` in a `bundles` list:
+  ```pkl
+  amends "@fam/Bundle.pkl"
+  import "@fam/tasks.pkl" as fam
+  name = "tool"
+  env { ["PAGER"] = "less" }
+  tasks {
+    new fam.File { path = "~/.config/tool/config.toml"; content = "key = 1\n" }
+    new fam.Package { package = new { package = "htop"; manager = "system" } }
+    new fam.GitHubSkill { repo = "owner/repo"; path = "skills/name" }
+  }
+  ```
+- Other tasks in `@fam/tasks.pkl`: `Merge`, `Symlink`, `GitHubRelease`, `Skill`, `Service`, `Linger`, `Script`.
+- Uninstall: keep the entry as `new { bundle = std.networking.cloudflared(); state = "absent" }`. A deleted line stays installed.
 
-Import `@fam/std.pkl` and add `std.<group>.<name>()` to a `bundles` listing.
-Use `fam std list` or `fam std list <group>` to find standard bundles.
-Use `fam std show <group>.<name>` to read requirements, skills, and verify commands.
-A local bundle file amends `@fam/Bundle.pkl`. Import it from a `bundles` listing.
-To remove a bundle from machines, keep its entry and set `state = "absent"`.
-For example: `new { bundle = std.computer.agentBrowser(); state = "absent" }`.
-Deletion of an entry does not uninstall its bundle.
-
-Run `fam check` after each edit. It validates the project without SSH or changes.
-`fam plan` is read only. It connects to machines to report differences.
-Never run `fam apply` unless the user asks.
-Use `fam doctor` for environment and editor problems, or `fam doctor --offline` without network access.
-Use `--json` or `--toon` for machine-readable output.
-Use `--machine <name>` to limit runs to selected machines.
+Commands: `fam check` after each edit (no network). `fam plan` is read only. Do not run `fam apply` unless the user asks. `fam doctor` for setup and editor problems. After `fam migrate`, restart the editor language server.
 <!-- fam:end -->

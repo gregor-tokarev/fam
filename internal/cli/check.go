@@ -39,7 +39,7 @@ func checkCmd(o *Options) *cobra.Command {
 					fmt.Fprintln(cmd.ErrOrStderr(), p.Pkl)
 				}
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "check: %d errors, %d warnings\n", r.Errors, r.Warnings)
+			fmt.Fprintf(cmd.OutOrStdout(), "check: %s, %s\n", plural(r.Errors, "error"), plural(r.Warnings, "warning"))
 		}); err != nil {
 			return err
 		}
@@ -48,4 +48,12 @@ func checkCmd(o *Options) *cobra.Command {
 		}
 		return nil
 	}}
+}
+
+// plural gives "1 error" or "2 errors".
+func plural(n int, word string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", word)
+	}
+	return fmt.Sprintf("%d %ss", n, word)
 }

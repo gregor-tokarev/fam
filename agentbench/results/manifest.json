@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-17",
+  "famVersion": "0.16.0",
+  "implementationCommit": "ec88224a25b5e4c907a1bc9dd9d5f27f55eb14a7",
+  "pklVersion": "0.33.0",
+  "models": {
+    "sol": {
+      "model": "gpt-6.1-sol",
+      "effort": "low"
+    },
+    "haiku": {
+      "model": "claude-haiku-5-5"
+    },
+    "sonnet": {
+      "model": "claude-sonnet-5-5"
+    }
+  },
+  "guideSHA256": {
+    "g3b-dense": "08d1fb7bc3fb8322614fb002c68e1abe9b50eed7609861d07606af10667cf836",
+    "g2-short": "f370c493f6c222a1a7f7b34a9aa0de37478823900b875aa86c676f39816e8bed",
+    "g4b-lean": "9c7dc0a711bef277d5acca4a108b846a27faa58a5b603385d4cc097adea107f9",
+    "g5-xl": "d2e7e09331183d84c184b7858e53844d59dce6f08aced85bd12440a3dcfbc8bf",
+    "g6-min": "f72f93fc9bb748c021d1af850e939a0875c2aef82a4d843d956deb1a4fe24d2d",
+    "g1-tiny": "1e7cec24ff6bb5cb29b58879261752fbe101e174533807cdebc1b95b19f31f21",
+    "g3-medium": "75945585d061f0e57d3f50252fdd444e99a3fe373b2c7067e523b9851482f753",
+    "g4-long": "cb3c848ec38d8fc43ddd485c3de6a3cb9c32e55c796b49b727af116f60c8c9ec",
+    "g6-lean": "38a39da13639b448d6102d8eee4e96013440646c1a12706f8004fb3935dd2ba1",
+    "g4c-min": "2c9f8f56d0610c263ae5c5839dd1fc16fbd2a9a784d9100ccc36784dd7ddd07c",
+    "embedded": "d10eeb416ca22ff62e305773aa689db70c80d5754a41525ffcf5d75d924f05dc"
+  },
+  "note": "Per-run records omit answers and local artifact paths. Original records and transcripts remain in /tmp/ab-r1 through /tmp/ab-r5 on the benchmark host. Later rounds add tasks and refine graders. Round 5 uses neutral examples. Older embedded records refer to original-guide.md, not the current embedded template. Each file includes original errors and retry attempts. Use the latest record per agent/guide/task/rep. This records requested model identifiers, not independently verified backend model identities."
+}
