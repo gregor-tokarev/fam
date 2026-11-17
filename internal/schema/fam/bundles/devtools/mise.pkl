@@ -2,7 +2,8 @@
 ///
 /// FAM installs the official mise package with global npm on glibc Linux and macOS.
 /// On musl Linux, FAM runs the official installer for its static binary.
-/// That binary exceeds the 128 MiB limit of a FAM GitHubRelease task.
+/// The installer checks SHA-256 entries with ./ prefixes, which GitHubRelease does not yet accept.
+/// It uses POSIX sh, curl, tar.gz, and the baseline checksum tools.
 /// The npm installation needs Node.js.
 /// FAM installs only mise. Each project selects and installs its own runtimes.
 amends "../../Bundle.pkl"

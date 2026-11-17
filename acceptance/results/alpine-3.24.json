@@ -13,7 +13,7 @@
     "name": "apply, then plan is satisfied and apply changes nothing",
     "result": "pass",
     "detail": "first apply 25 changed, second plan 28 satisfied, second apply 0 changed",
-    "duration": "23s"
+    "duration": "31s"
   },
   {
     "target": "alpine-3.24",
@@ -21,7 +21,7 @@
     "name": "verify: fresh_shell and reconnect",
     "result": "pass",
     "detail": "5 checks passed",
-    "duration": "22s"
+    "duration": "30s"
   },
   {
     "target": "alpine-3.24",
@@ -37,7 +37,7 @@
     "name": "absent bundle removes skill, links, files, merged keys, variables",
     "result": "pass",
     "detail": "file, link, merged keys, skill, Claude link, variables removed",
-    "duration": "23s"
+    "duration": "31s"
   },
   {
     "target": "alpine-3.24",
@@ -45,7 +45,7 @@
     "name": "global bundle removed on one machine",
     "result": "pass",
     "detail": "global bundle removed by the machine entry, other bundles kept",
-    "duration": "23s"
+    "duration": "31s"
   },
   {
     "target": "alpine-3.24",
@@ -53,7 +53,7 @@
     "name": "secrets in shells, never in output or logs",
     "result": "pass",
     "detail": "6 shells export both secrets; values absent from 14 outputs and 7 run logs",
-    "duration": "27s"
+    "duration": "35s"
   },
   {
     "target": "alpine-3.24",
@@ -69,7 +69,7 @@
     "name": "network stop gives a connection error (255)",
     "result": "pass",
     "detail": "error: connection error to vm (fam@fam-alpine-3-24): ssh exit code 255: no message from ssh",
-    "duration": "37s"
+    "duration": "45s"
   },
   {
     "target": "alpine-3.24",
@@ -85,15 +85,15 @@
     "name": "unknown template variable stops FAM",
     "result": "pass",
     "detail": "error: instruction template /home/gregor/.cache/fam-acceptance/run/projects/alpine-3.24-s11/instructions-bad/AGENTS.md: template: AGENTS.md:1:10: executing \"AGENTS.md\" at \u003c.Agent\u003e: map has no entry for key \"Agent\"",
-    "duration": "20s"
+    "duration": "28s"
   },
   {
     "target": "alpine-3.24",
     "n": 12,
     "name": "Claude Code and Codex: install, update, settings, paths",
     "result": "pass",
-    "detail": "pinned 27 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.325 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.325 (Claude Code), codex-cli 0.169.0",
-    "duration": "1m22s"
+    "detail": "pinned 29 changed; update: claude updated 2.1.311 (Claude Code) -\u003e 2.1.326 (Claude Code); codex updated codex-cli 0.168.0 -\u003e codex-cli 0.169.0; now 2.1.326 (Claude Code), codex-cli 0.169.0",
+    "duration": "1m18s"
   },
   {
     "target": "alpine-3.24",
@@ -101,7 +101,7 @@
     "name": "standard bundle agentBrowser",
     "result": "pass",
     "detail": "30 changed; agent-browser 0.43.0",
-    "duration": "1m4s"
+    "duration": "32s"
   },
   {
     "target": "alpine-3.24",
@@ -116,8 +116,8 @@
     "n": 16,
     "name": "all standard bundles: install, verify, satisfied, archive cache",
     "result": "pass",
-    "detail": "304 changed, 104 skills; apply 8m34s, plan 1m35s",
-    "duration": "11m22s"
+    "detail": "451 changed, 148 skills; apply 15m13s, plan 3m21s",
+    "duration": "20m53s"
   },
   {
     "target": "alpine-3.24",
