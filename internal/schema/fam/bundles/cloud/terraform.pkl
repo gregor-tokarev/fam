@@ -2,7 +2,8 @@
 ///
 /// FAM downloads the latest official binary and checks the vendor SHA-256 file.
 /// It installs only the CLI atomically into ~/.local/bin, without sudo.
-/// Installation needs curl, unzip, and sha256sum on Linux or shasum on macOS.
+/// Installation needs curl and sha256sum on Linux or shasum on macOS.
+/// ZIP extraction uses unzip, busybox unzip, bsdtar, or python3, in that order.
 /// Provider credentials depend on the project. Use -input=false for automation.
 amends "../../Bundle.pkl"
 
@@ -36,7 +37,18 @@ local installTerraform = #"""
     linux) actual=$(sha256sum "$work/terraform.zip" | awk '{print $1}') ;;
   esac
   [ "${#expected}" -eq 64 ] && [ "$actual" = "$expected" ] || { echo 'SHA-256 mismatch' >&2; exit 1; }
-  unzip -q "$work/terraform.zip" terraform -d "$work"
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -q "$work/terraform.zip" terraform -d "$work"
+  elif command -v busybox >/dev/null 2>&1 && busybox --list | grep -qx unzip; then
+    busybox unzip -q "$work/terraform.zip" terraform -d "$work"
+  elif command -v bsdtar >/dev/null 2>&1; then
+    bsdtar -xf "$work/terraform.zip" -C "$work" terraform
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -m zipfile -e "$work/terraform.zip" "$work"
+  else
+    echo 'Terraform ZIP extraction needs unzip, busybox with unzip, bsdtar, or python3' >&2
+    exit 1
+  fi
   chmod 755 "$work/terraform"
   mv -f "$work/terraform" "$HOME/.local/bin/terraform"
   """#

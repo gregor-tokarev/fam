@@ -116,8 +116,8 @@
     "n": 16,
     "name": "all standard bundles: install, verify, satisfied, archive cache",
     "result": "pass",
-    "detail": "67 changed, 17 skills; apply 1m38s, plan 20s",
-    "duration": "2m44s"
+    "detail": "304 changed, 104 skills; apply 8m34s, plan 1m35s",
+    "duration": "11m22s"
   },
   {
     "target": "alpine-3.24",
