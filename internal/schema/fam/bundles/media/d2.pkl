@@ -1,26 +1,33 @@
 /// d2: Official text to diagram CLI for architecture and system designs (https://github.com/d2lang/d2).
 ///
-/// FAM installs the CLI from the latest GitHub release.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/d2lang/d2.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 /// Uses static binaries on Linux. SVG output needs no browser or login.
 /// Other export formats can need separate tools.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["dnf"] = "d2"
+  ["pacman"] = "d2"
+  ["brew"] = "d2"
+})
 
 name = "d2"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "d2lang/d2"
+  packages.retireRelease("d2", "d2lang/d2")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/d2lang/d2"; manager = "go" }
     binary = "d2"
-    assets {
-      ["linux-amd64"] { name = "d2-{tag}-linux-amd64.tar.gz"; format = "tar.gz"; file = "d2-{tag}/bin/d2"; checksum = "SHA256SUMS" }
-      ["linux-arm64"] { name = "d2-{tag}-linux-arm64.tar.gz"; format = "tar.gz"; file = "d2-{tag}/bin/d2"; checksum = "SHA256SUMS" }
-      ["darwin-arm64"] { name = "d2-{tag}-macos-arm64.tar.gz"; format = "tar.gz"; file = "d2-{tag}/bin/d2"; checksum = "SHA256SUMS" }
-    }
   }
 }
 
 verify {
   new { name = "d2 runs"; script = "d2 --version" }
 }
+
+uninstall { packages.retireRelease("d2", "d2lang/d2") }

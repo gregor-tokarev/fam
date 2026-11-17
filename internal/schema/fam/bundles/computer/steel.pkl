@@ -1,7 +1,8 @@
 /// steel: Official Steel CLI for browser sessions, scraping, and screenshots (https://github.com/steel-dev/cli).
 ///
 /// FAM installs the CLI with a GitHub release.
-/// Uses native releases because the npm launcher predates the current CLI.
+/// The npm package is a download shim with no managed update or removal.
+/// The published steel-cli crate belongs to another project.
 /// Needs STEEL_API_KEY for Steel Cloud. No musl build is available.
 amends "../../Bundle.pkl"
 

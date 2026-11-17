@@ -1,25 +1,30 @@
 /// scc: a code counter and complexity estimator (https://github.com/boyter/scc).
 ///
-/// FAM installs the upstream release binary into ~/.local/bin.
-/// Linux binaries are static and also run on musl.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/boyter/scc/v4.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["apk"] = "scc"
+  ["brew"] = "scc"
+})
 
 name = "scc"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "boyter/scc"
+  packages.retireRelease("scc", "boyter/scc")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/boyter/scc/v4"; manager = "go" }
     binary = "scc"
-    assets {
-      ["linux-amd64"] { name = "scc_Linux_x86_64.tar.gz"; format = "tar.gz"; file = "scc"; checksum = "checksums.txt" }
-      ["linux-arm64"] { name = "scc_Linux_arm64.tar.gz"; format = "tar.gz"; file = "scc"; checksum = "checksums.txt" }
-      ["darwin-arm64"] { name = "scc_Darwin_arm64.tar.gz"; format = "tar.gz"; file = "scc"; checksum = "checksums.txt" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "scc --version" }
 }
+
+uninstall { packages.retireRelease("scc", "boyter/scc") }

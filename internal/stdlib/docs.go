@@ -36,8 +36,8 @@ func Docs(ctx context.Context) ([]byte, error) {
 							return nil, fmt.Errorf("std.%s.%s: %w", g.Name, entry.Name, err)
 						}
 						install = append(install, mgr+": `"+name+"`")
-					} else if cmd := x.GetInstall(); cmd != nil {
-						install = append(install, "script: `"+*cmd+"`")
+					} else if x.GetInstall() != nil {
+						install = append(install, "custom installer")
 					}
 				case tasks.GitHubRelease:
 					tag := "latest"
@@ -60,8 +60,6 @@ func Docs(ctx context.Context) ([]byte, error) {
 						name = *x.GetName()
 					}
 					skills = append(skills, name)
-				case tasks.Script:
-					install = append(install, "script: "+x.GetName())
 				}
 			}
 			desc := summary(entry.Doc)

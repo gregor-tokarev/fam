@@ -1,27 +1,35 @@
 /// doctl: Manage DigitalOcean compute, Kubernetes, and platform resources (https://github.com/digitalocean/doctl).
 ///
-/// FAM installs the standalone CLI from GitHub and checks the vendor SHA-256 file.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/digitalocean/doctl/cmd/doctl.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 /// Cloud operations need DIGITALOCEAN_ACCESS_TOKEN or a configured login.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["dnf"] = "doctl"
+  ["pacman"] = "doctl"
+  ["apk"] = "doctl"
+  ["brew"] = "doctl"
+})
 
 name = "doctl"
 version = "@FAM_VERSION@"
 requiredSecrets { "DIGITALOCEAN_ACCESS_TOKEN" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "digitalocean/doctl"
+  packages.retireRelease("doctl", "digitalocean/doctl")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/digitalocean/doctl/cmd/doctl"; manager = "go" }
     binary = "doctl"
     versionCommand = "doctl version"
-    assets {
-      ["linux-amd64"] { name = "doctl-{version}-linux-amd64.tar.gz"; format = "tar.gz"; file = "doctl"; checksum = "doctl-{version}-checksums.sha256" }
-      ["linux-arm64"] { name = "doctl-{version}-linux-arm64.tar.gz"; format = "tar.gz"; file = "doctl"; checksum = "doctl-{version}-checksums.sha256" }
-      ["darwin-arm64"] { name = "doctl-{version}-darwin-arm64.tar.gz"; format = "tar.gz"; file = "doctl"; checksum = "doctl-{version}-checksums.sha256" }
-    }
   }
 }
 
 verify {
   new { name = "doctl version"; script = "doctl version" }
 }
+
+uninstall { packages.retireRelease("doctl", "digitalocean/doctl") }

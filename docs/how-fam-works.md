@@ -133,9 +133,13 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 
 ## Standard bundles
 
-`@fam/std.pkl` has ready bundles for agent tools, in groups: `bundles { std.networking.portless; std.media.hyperframes }`. Each one installs its tool with a package manager, an install script, or a GitHub release and copies its skills from the latest GitHub release. A bundle can use the OS package manager for its CLI. Bundles do not install browsers, runtimes, or system configuration. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
+`@fam/std.pkl` has ready bundles for agent tools, in groups: `bundles { std.networking.portless; std.media.hyperframes }`. Each bundle uses `fam.Package` when a suitable package exists. It selects the system package for the distribution, or an official npm, uv, Go, or Cargo package. Release downloads remain as fallbacks when no suitable package exists. Skills come from GitHub. CLI bundles do not install browsers or configure services. Language bundles install their named toolchain or manager. Other bundles require their documented runtimes or compilers. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
 
 See the [standard bundle catalogue](std.md) for descriptions, install methods, skills, and required secrets.
+
+Source packages need their build prerequisites before their bundle. Go packages need Go. Cargo packages need a current Rust toolchain and a C compiler. The Rustup bundle installs the manager, without a default compiler. Select the toolchain separately. Source builds need adequate temporary disk space. Set `TMPDIR` to a disk directory if `/tmp` has a small quota.
+
+A bundle removes its previous FAM release binary before a package replaces it. FAM checks the repository and SHA-256 receipt first. A changed binary or receipt stops that task. Downloads from old custom scripts can lack a receipt. Remove those binaries manually if they hide a system package. The Go bundle recognizes and removes its previous FAM toolchain links.
 
 ## Services
 

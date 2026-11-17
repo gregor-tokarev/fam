@@ -1,0 +1,98 @@
+/// Package names for the system package managers used by standard bundles.
+module fam.bundles.packages
+
+import "../tasks.pkl" as fam
+import "../facts.pkl"
+
+local selectedManager = if (facts.os == "darwin") "brew"
+  else if (List("ubuntu", "debian", "linuxmint", "pop", "raspbian", "kali").contains(facts.distro)) "apt"
+  else if (List("fedora", "rhel", "centos", "rocky", "almalinux", "amzn").contains(facts.distro)) "dnf"
+  else if (List("arch", "manjaro", "endeavouros").contains(facts.distro)) "pacman"
+  else if (facts.distro == "alpine") "apk"
+  else ""
+
+/// Select a verified package name, or use the bundle's fallback when no name exists.
+function system(packageNames: Mapping<String, String>): fam.PackageRef? =
+  if (packageNames.containsKey(selectedManager)) new fam.PackageRef {
+    package = packageNames[selectedManager]
+    manager = "system"
+    names = packageNames
+  } else null
+
+/// Build official Cargo packages with native dynamic libraries on musl.
+/// Rust's static musl build scripts cannot load libclang for generated bindings.
+function cargo(packageName: String, binaryName: String, systemPackage: fam.PackageRef?): fam.Package = new fam.Package {
+  package = systemPackage ?? new fam.PackageRef { package = packageName; manager = "cargo" }
+  binary = binaryName
+  when (systemPackage == null && facts.os == "linux" && facts.libc == "musl") {
+    install = cargoInstall(packageName)
+    update = cargoInstall(packageName)
+  }
+}
+
+local function cargoInstall(packageName: String): String = #"""
+  RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C target-feature=-crt-static" cargo install --locked --root "$HOME/.local" '\#(packageName)'
+  """#
+
+/// Remove a previous FAM release only when its receipt and binary still match.
+function retireRelease(binary: String, repo: String): fam.Script = new fam.Script {
+  name = "Replace the previous FAM release of \(binary)"
+  check = releaseOwnership(binary, repo) + "\nexit 100"
+  apply = releaseOwnership(binary, repo) + "\n" + #"rm -f -- "$HOME/.local/bin/\#(binary)" "$HOME/.local/state/fam/releases/\#(binary).json""#
+}
+
+/// Expose a differently named system binary, including during a release migration.
+function releaseAlias(binary: String, repo: String, target: String): fam.Script = new fam.Script {
+  name = "Link \(binary) to \(target)"
+  check = aliasOwnership(binary, repo, target) + "\nexit 100"
+  apply = aliasOwnership(binary, repo, target) + "\n" + #"""
+    mkdir -p "$HOME/.local/bin"
+    rm -f -- "$HOME/.local/bin/\#(binary)" "$HOME/.local/state/fam/releases/\#(binary).json"
+    ln -s '\#(target)' "$HOME/.local/bin/\#(binary)"
+    """#
+}
+
+local function aliasOwnership(binary: String, repo: String, target: String): String = #"""
+  set -eu
+  executable="$HOME/.local/bin/\#(binary)"
+  [ "$(readlink "$executable" 2>/dev/null || true)" != '\#(target)' ] || exit 0
+  if [ -e "$executable" ] || [ -L "$executable" ]; then
+    if [ ! -f "$HOME/.local/state/fam/releases/\#(binary).json" ]; then
+      echo 'An unmanaged \#(binary) exists. Preserve or remove it before apply.' >&2
+      exit 1
+    fi
+    \#(releaseOwnership(binary, repo))
+  fi
+  """#
+
+local function releaseOwnership(binary: String, repo: String): String = #"""
+  set -eu
+  receipt="$HOME/.local/state/fam/releases/\#(binary).json"
+  executable="$HOME/.local/bin/\#(binary)"
+  [ -e "$receipt" ] || [ -L "$receipt" ] || exit 0
+  if [ ! -f "$receipt" ] || [ -L "$receipt" ]; then
+    echo 'Invalid FAM release receipt for \#(binary)' >&2
+    exit 1
+  fi
+  recorded_repo=$(sed -n 's/.*"repo":"\([^"]*\)".*/\1/p' "$receipt")
+  expected=$(sed -n 's/.*"sha256":"\([^"]*\)".*/\1/p' "$receipt")
+  if [ "$recorded_repo" != '\#(repo)' ] || ! printf '%s\n' "$expected" | grep -Eq '^[0-9a-f]{64}$'; then
+    echo 'Invalid FAM release receipt for \#(binary)' >&2
+    exit 1
+  fi
+  if [ -e "$executable" ] || [ -L "$executable" ]; then
+    if [ ! -f "$executable" ] || [ -L "$executable" ]; then
+      echo 'The previous FAM release of \#(binary) changed. Preserve or remove it before apply.' >&2
+      exit 1
+    fi
+    if command -v sha256sum >/dev/null 2>&1; then
+      actual=$(sha256sum "$executable" | awk '{print $1}')
+    else
+      actual=$(shasum -a 256 "$executable" | awk '{print $1}')
+    fi
+    if [ "$actual" != "$expected" ]; then
+      echo 'The previous FAM release of \#(binary) changed. Preserve or remove it before apply.' >&2
+      exit 1
+    fi
+  fi
+  """#

@@ -1,12 +1,13 @@
 /// kubectl: Manage Kubernetes resources and clusters (https://github.com/kubernetes/kubernetes).
 ///
-/// FAM downloads the latest official binary and checks the vendor SHA-256 file.
-/// It installs only the CLI atomically into ~/.local/bin, without sudo.
-/// Installation needs curl, standard shell tools, and sha256sum on Linux or shasum on macOS.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official release download.
 /// Cluster operations need a kubeconfig, cluster credentials, and a reachable cluster.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+import "../packages.pkl" as packages
 
 local installKubectl = #"""
   set -eu
@@ -37,15 +38,31 @@ local installKubectl = #"""
   mv -f "$work/kubectl" "$HOME/.local/bin/kubectl"
   """#
 
+local systemPackage = packages.system(new Mapping {
+  when (facts.distro == "debian") { ["apt"] = "kubectl" }
+  ["dnf"] = "kubernetes1.35-client"
+  ["pacman"] = "kubectl"
+  ["apk"] = "kubectl"
+  ["brew"] = "kubernetes-cli"
+})
+
 name = "kubectl"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.Package {
-    binary = "~/.local/bin/kubectl"
-    install = installKubectl
-    update = installKubectl
-    uninstall = "rm -f ~/.local/bin/kubectl"
-    versionCommand = "kubectl version --client --output=yaml"
+  when (systemPackage != null) {
+    new fam.Package {
+      package = systemPackage!!
+      binary = "kubectl"
+      versionCommand = "kubectl version --client --output=yaml"
+    }
+  } else {
+    new fam.Package {
+      binary = "~/.local/bin/kubectl"
+      install = installKubectl
+      update = installKubectl
+      uninstall = "rm -f ~/.local/bin/kubectl"
+      versionCommand = "kubectl version --client --output=yaml"
+    }
   }
 }
 

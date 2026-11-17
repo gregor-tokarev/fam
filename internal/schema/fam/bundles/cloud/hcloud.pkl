@@ -1,27 +1,35 @@
 /// hcloud: Manage Hetzner Cloud servers, networks, and storage (https://github.com/hetznercloud/cli).
 ///
-/// FAM installs the standalone CLI from the latest GitHub release.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official Go package github.com/hetznercloud/cli/cmd/hcloud.
 /// Cloud operations need HCLOUD_TOKEN or a configured context.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["dnf"] = "hcloud"
+  ["pacman"] = "hcloud"
+  ["apk"] = "hcloud"
+  ["brew"] = "hcloud"
+})
 
 name = "hcloud"
 version = "@FAM_VERSION@"
 requiredSecrets { "HCLOUD_TOKEN" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "hetznercloud/cli"
+  packages.retireRelease("hcloud", "hetznercloud/cli")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/hetznercloud/cli/cmd/hcloud"; manager = "go" }
     binary = "hcloud"
     versionCommand = "hcloud version"
-    assets {
-      ["linux-amd64"] { name = "hcloud-linux-amd64.tar.gz"; format = "tar.gz"; file = "hcloud" }
-      ["darwin-arm64"] { name = "hcloud-darwin-arm64.tar.gz"; format = "tar.gz"; file = "hcloud" }
-      ["linux-arm64"] { name = "hcloud-linux-arm64.tar.gz"; format = "tar.gz"; file = "hcloud" }
-    }
   }
 }
 
 verify {
   new { name = "hcloud version"; script = "hcloud version" }
 }
+
+uninstall { packages.retireRelease("hcloud", "hetznercloud/cli") }

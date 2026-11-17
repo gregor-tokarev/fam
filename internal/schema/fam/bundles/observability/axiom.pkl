@@ -1,28 +1,27 @@
 /// axiom: a CLI for Axiom datasets, logs, and traces (https://github.com/axiomhq/cli).
 ///
-/// FAM installs the upstream release binary into ~/.local/bin.
-/// Linux binaries require glibc. Musl is not supported.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/axiomhq/cli/cmd/axiom.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 /// Credentials: AXIOM_TOKEN.
 /// FAM copies the core skills from the upstream repository.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
-import "../../facts.pkl"
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "axiomhq/tap/axiom"
+})
 
 name = "axiom"
 version = "@FAM_VERSION@"
-supported = facts.libc != "musl"
-unsupportedReason = "Linux binaries require glibc. Musl is not supported."
 requiredSecrets { "AXIOM_TOKEN" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "axiomhq/cli"
+  packages.retireRelease("axiom", "axiomhq/cli")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/axiomhq/cli/cmd/axiom"; manager = "go" }
     binary = "axiom"
-    assets {
-      ["linux-amd64"] { name = "axiom_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "axiom_{version}_linux_amd64/axiom"; checksum = "checksums.txt" }
-      ["linux-arm64"] { name = "axiom_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "axiom_{version}_linux_arm64/axiom"; checksum = "checksums.txt" }
-      ["darwin-arm64"] { name = "axiom_{version}_darwin_arm64.tar.gz"; format = "tar.gz"; file = "axiom_{version}_darwin_arm64/axiom"; checksum = "checksums.txt" }
-    }
   }
   new fam.GitHubSkill {
     repo = "axiomhq/cli"
@@ -45,3 +44,5 @@ tasks {
 verify {
   new { name = "version"; script = "axiom --version" }
 }
+
+uninstall { packages.retireRelease("axiom", "axiomhq/cli") }

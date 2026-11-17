@@ -1,27 +1,31 @@
 /// litestream: Replicate SQLite databases to external storage (https://github.com/benbjohnson/litestream).
 ///
-/// FAM installs the standalone CLI from the latest GitHub release.
-/// Replication needs a configuration file. Storage credentials depend on the configured backend.
-/// FAM does not start a replication service.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official Go package github.com/benbjohnson/litestream/cmd/litestream.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
+/// A C compiler supplies native database driver support.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "benbjohnson/litestream/litestream"
+})
 
 name = "litestream"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "benbjohnson/litestream"
+  packages.retireRelease("litestream", "benbjohnson/litestream")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/benbjohnson/litestream/cmd/litestream"; manager = "go" }
     binary = "litestream"
     versionCommand = "litestream version"
-    assets {
-      ["linux-amd64"] { name = "litestream-{version}-linux-x86_64.tar.gz"; format = "tar.gz"; file = "litestream" }
-      ["darwin-arm64"] { name = "litestream-{version}-darwin-arm64.tar.gz"; format = "tar.gz"; file = "litestream" }
-      ["linux-arm64"] { name = "litestream-{version}-linux-arm64.tar.gz"; format = "tar.gz"; file = "litestream" }
-    }
   }
 }
 
 verify {
   new { name = "litestream version"; script = "litestream version" }
 }
+
+uninstall { packages.retireRelease("litestream", "benbjohnson/litestream") }

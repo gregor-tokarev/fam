@@ -1,25 +1,32 @@
 /// shfmt: Format shell scripts and validate their syntax (https://github.com/mvdan/sh).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// The binary needs no runtime or compiler.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package mvdan.cc/sh/v3/cmd/shfmt.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["apt"] = "shfmt"
+  ["pacman"] = "shfmt"
+  ["apk"] = "shfmt"
+  ["brew"] = "shfmt"
+})
 
 name = "shfmt"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "mvdan/sh"
+  packages.retireRelease("shfmt", "mvdan/sh")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "mvdan.cc/sh/v3/cmd/shfmt"; manager = "go" }
     binary = "shfmt"
-    assets {
-      ["linux-amd64"] { name = "shfmt_{tag}_linux_amd64" }
-      ["linux-arm64"] { name = "shfmt_{tag}_linux_arm64" }
-      ["darwin-arm64"] { name = "shfmt_{tag}_darwin_arm64" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "shfmt --version" }
 }
+
+uninstall { packages.retireRelease("shfmt", "mvdan/sh") }

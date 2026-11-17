@@ -124,11 +124,14 @@ local selectedGroups = %q.split(",").map((name) -> name.trim())
 
 bundles {
   import("bundles/node.pkl")
+  std.languages.go
+  std.languages.rustup
+  import("bundles/build-tools.pkl")
   std.languages.uv
   for (group, tools in std.toDynamic().toMap()) {
     when (selectedGroups == List("") || selectedGroups.contains(group)) {
       for (_, bundle in tools.toDynamic().toMap()) {
-        when (bundle.supported && bundle.name != std.languages.uv.name) { bundle }
+        when (bundle.supported && !List("uv", "go", "rustup").contains(bundle.name)) { bundle }
       }
     }
   }
@@ -205,6 +208,78 @@ tasks {
         curl -fsSL "https://nodejs.org/dist/$v/node-$v-$os-$a.tar.gz" | tar -xz -C "$HOME/.local" --strip-components=1
         """#
     }
+  }
+}
+`,
+		// Source packages need compilers only inside this scenario's disposable VM.
+		"bundles/build-tools.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
+import "@fam/facts.pkl"
+
+name = "build-tools"
+env {
+  ["GOTOOLCHAIN"] = "auto"
+  ["CARGO_BUILD_JOBS"] = "2"
+  ["GOFLAGS"] = "-p=2"
+  ["TMPDIR"] = "/var/tmp"
+  ["CARGO_TARGET_DIR"] = "\(facts.home)/.cache/fam-build-target"
+}
+tasks {
+  when (facts.os == "linux") {
+    for (p in List("cloud-guest-utils", "e2fsprogs", "xfsprogs", "btrfs-progs")) {
+      new fam.Package {
+        package = new fam.PackageRef {
+          package = p
+          manager = "system"
+          when (p == "cloud-guest-utils") {
+            names { ["dnf"] = "cloud-utils-growpart"; ["apk"] = "cloud-utils-growpart" }
+          }
+        }
+      }
+    }
+    new fam.Script {
+      name = "Build disk space"
+      sudo = true
+      check = "df -Pk / | awk 'NR == 2 { exit !($2 >= 60 * 1024 * 1024) }' && exit 0 || exit 100"
+      apply = #"""
+        set -eu
+        volume=$(df -P / | awk 'NR == 2 {print $1}')
+        case "$volume" in
+          /dev/vda[0-9]*) growpart /dev/vda "${volume#/dev/vda}" || [ "$?" -eq 1 ] ;;
+          *) echo 'Unsupported VM root volume' >&2; exit 1 ;;
+        esac
+        fs=$(awk '$2 == "/" { print $3 }' /proc/mounts)
+        case "$fs" in
+          ext2|ext3|ext4) resize2fs "$volume" ;;
+          xfs) xfs_growfs / ;;
+          btrfs) btrfs filesystem resize max / ;;
+          *) echo 'Unsupported VM root filesystem' >&2; exit 1 ;;
+        esac
+        """#
+    }
+  }
+  for (p in List("gcc", "g++", "make", "pkg-config", "libssl-dev")) {
+    new fam.Package {
+      package = new fam.PackageRef {
+        package = p
+        manager = "system"
+        names {
+          when (p == "g++") { ["dnf"] = "gcc-c++"; ["pacman"] = "gcc"; ["brew"] = "gcc" }
+          when (p == "pkg-config") { ["dnf"] = "pkgconf-pkg-config"; ["pacman"] = "pkgconf"; ["apk"] = "pkgconf"; ["brew"] = "pkgconf" }
+          when (p == "libssl-dev") { ["dnf"] = "openssl-devel"; ["pacman"] = "openssl"; ["apk"] = "openssl-dev"; ["brew"] = "openssl@3" }
+        }
+      }
+    }
+  }
+  when (facts.distro == "alpine") {
+    for (p in List("musl-dev", "linux-headers")) {
+      new fam.Package { package = new fam.PackageRef { package = p; manager = "system" } }
+    }
+  }
+  new fam.Script {
+    name = "Rust compiler prerequisite"
+    check = "RUSTUP_AUTO_INSTALL=0 rustup run stable rustc --version >/dev/null 2>&1 && exit 0 || exit 100"
+    apply = "rustup default stable"
   }
 }
 `,

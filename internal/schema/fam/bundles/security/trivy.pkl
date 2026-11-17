@@ -1,26 +1,32 @@
 /// trivy: Scan files, images, dependencies, secrets, and infrastructure configuration
-/// (https://github.com/aquasecurity/trivy).
 ///
-/// FAM installs the latest GitHub release into ~/.local/bin and checks its SHA-256.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official Go package github.com/aquasecurity/trivy/cmd/trivy.
 /// The binary needs no runtime or login for public scans. Vulnerability scans normally download databases.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["dnf"] = "trivy"
+  ["pacman"] = "trivy"
+  ["brew"] = "trivy"
+})
 
 name = "trivy"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "aquasecurity/trivy"
+  packages.retireRelease("trivy", "aquasecurity/trivy")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/aquasecurity/trivy/cmd/trivy"; manager = "go" }
     binary = "trivy"
-    assets {
-      ["linux-amd64"] { name = "trivy_{version}_Linux-64bit.tar.gz"; format = "tar.gz"; file = "trivy"; checksum = "trivy_{version}_checksums.txt" }
-      ["linux-arm64"] { name = "trivy_{version}_Linux-ARM64.tar.gz"; format = "tar.gz"; file = "trivy"; checksum = "trivy_{version}_checksums.txt" }
-      ["darwin-arm64"] { name = "trivy_{version}_macOS-ARM64.tar.gz"; format = "tar.gz"; file = "trivy"; checksum = "trivy_{version}_checksums.txt" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "trivy --version" }
 }
+
+uninstall { packages.retireRelease("trivy", "aquasecurity/trivy") }

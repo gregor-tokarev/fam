@@ -1,24 +1,41 @@
 /// pulumi: Manage cloud infrastructure through Pulumi programs (https://github.com/pulumi/pulumi).
 ///
-/// FAM installs the standalone CLI from the latest GitHub release.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the official release download.
 /// Projects need their language runtime. Cloud state uses PULUMI_ACCESS_TOKEN. Local state needs no cloud token.
 /// FAM installs only the CLI. Install language helpers and provider plugins separately when the project needs them.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "pulumi"
+  ["apk"] = "pulumi"
+  ["brew"] = "pulumi"
+})
 
 name = "pulumi"
 version = "@FAM_VERSION@"
 requiredSecrets { "PULUMI_ACCESS_TOKEN" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "pulumi/pulumi"
-    binary = "pulumi"
-    versionCommand = "PULUMI_SKIP_UPDATE_CHECK=true pulumi version"
-    assets {
-      ["linux-amd64"] { name = "pulumi-{tag}-linux-x64.tar.gz"; format = "tar.gz"; file = "pulumi/pulumi" }
-      ["darwin-arm64"] { name = "pulumi-{tag}-darwin-arm64.tar.gz"; format = "tar.gz"; file = "pulumi/pulumi" }
-      ["linux-arm64"] { name = "pulumi-{tag}-linux-arm64.tar.gz"; format = "tar.gz"; file = "pulumi/pulumi" }
+  when (systemPackage != null) {
+    packages.retireRelease("pulumi", "pulumi/pulumi")
+    new fam.Package {
+      package = systemPackage!!
+      binary = "pulumi"
+      versionCommand = "PULUMI_SKIP_UPDATE_CHECK=true pulumi version"
+    }
+  } else {
+    new fam.GitHubRelease {
+      repo = "pulumi/pulumi"
+      binary = "pulumi"
+      versionCommand = "PULUMI_SKIP_UPDATE_CHECK=true pulumi version"
+      assets {
+        ["linux-amd64"] { name = "pulumi-{tag}-linux-x64.tar.gz"; format = "tar.gz"; file = "pulumi/pulumi" }
+        ["darwin-arm64"] { name = "pulumi-{tag}-darwin-arm64.tar.gz"; format = "tar.gz"; file = "pulumi/pulumi" }
+        ["linux-arm64"] { name = "pulumi-{tag}-linux-arm64.tar.gz"; format = "tar.gz"; file = "pulumi/pulumi" }
+      }
     }
   }
 }
@@ -26,3 +43,5 @@ tasks {
 verify {
   new { name = "PULUMI_SKIP_UPDATE_CHECK=true pulumi version"; script = "PULUMI_SKIP_UPDATE_CHECK=true pulumi version" }
 }
+
+uninstall { packages.retireRelease("pulumi", "pulumi/pulumi") }

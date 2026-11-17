@@ -1,21 +1,29 @@
 /// Zero: the programming language for agents (https://github.com/vercel-labs/zerolang).
 ///
-/// FAM installs the latest GitHub release into ~/.local/bin and checks its SHA-256.
+/// Homebrew supplies the official zerolang package. Other systems use the checked GitHub release.
 /// Linux uses static musl builds. FAM copies the skill from the same release.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping { ["brew"] = "zerolang" })
 
 name = "zero"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "vercel-labs/zerolang"
-    binary = "zero"
-    assets {
-      ["linux-amd64"] { name = "zero-linux-musl-x64"; checksum = "CHECKSUMS.txt" }
-      ["linux-arm64"] { name = "zero-linux-musl-arm64"; checksum = "CHECKSUMS.txt" }
-      ["darwin-arm64"] { name = "zero-darwin-arm64"; checksum = "CHECKSUMS.txt" }
+  when (systemPackage != null) {
+    packages.retireRelease("zero", "vercel-labs/zerolang")
+    new fam.Package { package = systemPackage!!; binary = "zero" }
+  } else {
+    new fam.GitHubRelease {
+      repo = "vercel-labs/zerolang"
+      binary = "zero"
+      assets {
+        ["linux-amd64"] { name = "zero-linux-musl-x64"; checksum = "CHECKSUMS.txt" }
+        ["linux-arm64"] { name = "zero-linux-musl-arm64"; checksum = "CHECKSUMS.txt" }
+        ["darwin-arm64"] { name = "zero-darwin-arm64"; checksum = "CHECKSUMS.txt" }
+      }
     }
   }
   new fam.GitHubSkill {
@@ -27,3 +35,5 @@ tasks {
 verify {
   new { name = "zero --version"; script = "zero --version" }
 }
+
+uninstall { packages.retireRelease("zero", "vercel-labs/zerolang") }

@@ -1,27 +1,32 @@
 /// goose: Apply and track database schema migrations (https://github.com/pressly/goose).
 ///
-/// FAM installs the standalone CLI from GitHub and checks the vendor SHA-256 file.
-/// Database operations need GOOSE_DRIVER and a connection string in GOOSE_DBSTRING.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/pressly/goose/v3/cmd/goose.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
+/// A C compiler supplies native database driver support.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "goose"
+})
 
 name = "goose"
 version = "@FAM_VERSION@"
 requiredSecrets { "GOOSE_DBSTRING" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "pressly/goose"
+  packages.retireRelease("goose", "pressly/goose")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/pressly/goose/v3/cmd/goose"; manager = "go" }
     binary = "goose"
     versionCommand = "goose --version"
-    assets {
-      ["linux-amd64"] { name = "goose_linux_x86_64"; checksum = "checksums.txt" }
-      ["linux-arm64"] { name = "goose_linux_arm64"; checksum = "checksums.txt" }
-      ["darwin-arm64"] { name = "goose_darwin_arm64"; checksum = "checksums.txt" }
-    }
   }
 }
 
 verify {
   new { name = "goose --version"; script = "goose --version" }
 }
+
+uninstall { packages.retireRelease("goose", "pressly/goose") }

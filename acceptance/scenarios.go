@@ -40,7 +40,7 @@ type famRun struct {
 }
 
 func (c *Ctx) famCmd(args ...string) famRun {
-	ctx, cancel := context.WithTimeout(c.ctx, 30*time.Minute)
+	ctx, cancel := context.WithTimeout(c.ctx, 90*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, c.fam, args...)
 	cmd.Dir = c.dir
@@ -1013,11 +1013,21 @@ func newScenarioDir(w *Work, fam, label string, machines []machineEntry, secrets
 }
 
 func runOne(ctx context.Context, w *Work, fam string, t Target, s scenario, secretsFile string) (notes []string, err error) {
+	if s.n == 16 && t.BootScript == "" && t.MemoryMB < 8192 {
+		// Large Go packages need more memory than release downloads.
+		t.MemoryMB = 8192
+	}
 	vm, err := w.Start(ctx, t)
 	if err != nil {
 		return nil, err
 	}
 	defer vm.Kill()
+	if s.n == 16 && t.BootScript == "" {
+		// Grow only QEMU's temporary snapshot. The shared base image stays unchanged.
+		if err := vm.qmp("block_resize", map[string]any{"device": "virtio0", "size": int64(80) << 30}); err != nil {
+			return nil, fmt.Errorf("grow the build disk: %w", err)
+		}
+	}
 	dir, logDir, err := newScenarioDir(w, fam, fmt.Sprintf("%s-s%d", t.Name, s.n), []machineEntry{{Name: "vm", Target: t}}, secretsFile)
 	if err != nil {
 		return nil, err

@@ -1,31 +1,24 @@
-/// mise: Manage developer tools, project environments, and task execution (https://github.com/jdx/mise).
+/// mise: Manage developer tools, project environments, and tasks (https://github.com/jdx/mise).
 ///
-/// FAM installs the official mise package with global npm on glibc Linux and macOS.
-/// On musl Linux, FAM runs the official installer for its static binary.
-/// The installer checks SHA-256 entries with ./ prefixes, which GitHubRelease does not yet accept.
-/// It uses POSIX sh, curl, tar.gz, and the baseline checksum tools.
-/// The npm installation needs Node.js.
-/// FAM installs only mise. Each project selects and installs its own runtimes.
+/// FAM uses the system package on Arch, Alpine, and macOS. Other systems use the official npm package.
+/// The npm package needs Node.js. Each project selects and installs its own runtimes.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
-import "../../facts.pkl"
+import "../packages.pkl" as packages
 
 name = "mise"
 version = "@FAM_VERSION@"
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "mise"
+  ["apk"] = "mise"
+  ["brew"] = "mise"
+})
+
 tasks {
-  when (facts.os == "linux" && facts.libc == "musl") {
-    new fam.Package {
-      binary = "~/.local/bin/mise"
-      install = #"curl -fsSL https://mise.run | MISE_INSTALL_MUSL=1 MISE_INSTALL_EXT=tar.gz MISE_INSTALL_PATH="$HOME/.local/bin/mise" MISE_INSTALL_HELP=0 sh"#
-      update = #"curl -fsSL https://mise.run | MISE_INSTALL_MUSL=1 MISE_INSTALL_EXT=tar.gz MISE_INSTALL_PATH="$HOME/.local/bin/mise" MISE_INSTALL_HELP=0 sh"#
-      uninstall = "rm -f ~/.local/bin/mise"
-      versionCommand = "mise --version"
-    }
-  } else {
-    new fam.Package {
-      package = "mise"
-    }
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "mise"; manager = "npm" }
+    binary = "mise"
   }
 }
 

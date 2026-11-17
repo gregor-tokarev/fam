@@ -1,25 +1,31 @@
 /// osv-scanner: Find vulnerable dependencies in source trees, lockfiles, and container images (https://github.com/google/osv-scanner).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// The binary needs no runtime or compiler.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/google/osv-scanner/v2/cmd/osv-scanner.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "osv-scanner"
+  ["apk"] = "osv-scanner"
+  ["brew"] = "osv-scanner"
+})
 
 name = "osv-scanner"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "google/osv-scanner"
+  packages.retireRelease("osv-scanner", "google/osv-scanner")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/google/osv-scanner/v2/cmd/osv-scanner"; manager = "go" }
     binary = "osv-scanner"
-    assets {
-      ["linux-amd64"] { name = "osv-scanner_linux_amd64"; checksum = "osv-scanner_SHA256SUMS" }
-      ["linux-arm64"] { name = "osv-scanner_linux_arm64"; checksum = "osv-scanner_SHA256SUMS" }
-      ["darwin-arm64"] { name = "osv-scanner_darwin_arm64"; checksum = "osv-scanner_SHA256SUMS" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "osv-scanner --version" }
 }
+
+uninstall { packages.retireRelease("osv-scanner", "google/osv-scanner") }

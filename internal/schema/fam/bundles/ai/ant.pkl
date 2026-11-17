@@ -1,27 +1,31 @@
 /// ant: a CLI for the Claude Platform API (https://github.com/anthropics/anthropic-cli).
 ///
-/// FAM installs the upstream release binary into ~/.local/bin.
-/// Linux binaries are static and also run on musl.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Go package github.com/anthropics/anthropic-cli/v2/cmd/ant.
+/// Go must exist. FAM builds the CLI into ~/.local/bin.
 /// Credentials: ANTHROPIC_API_KEY.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "anthropics/tap/ant"
+})
 
 name = "ant"
 version = "@FAM_VERSION@"
 requiredSecrets { "ANTHROPIC_API_KEY" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "anthropics/anthropic-cli"
+  packages.retireRelease("ant", "anthropics/anthropic-cli")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "github.com/anthropics/anthropic-cli/v2/cmd/ant"; manager = "go" }
     binary = "ant"
-    assets {
-      ["linux-amd64"] { name = "ant_{version}_linux_amd64.tar.gz"; format = "tar.gz"; file = "ant"; checksum = "ant_{version}_checksums.txt" }
-      ["linux-arm64"] { name = "ant_{version}_linux_arm64.tar.gz"; format = "tar.gz"; file = "ant"; checksum = "ant_{version}_checksums.txt" }
-      ["darwin-arm64"] { name = "ant_{version}_macos_arm64.zip"; format = "zip"; file = "ant"; checksum = "ant_{version}_checksums.txt" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "ant --version" }
 }
+
+uninstall { packages.retireRelease("ant", "anthropics/anthropic-cli") }

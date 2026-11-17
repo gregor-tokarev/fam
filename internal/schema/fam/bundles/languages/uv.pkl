@@ -1,28 +1,27 @@
 /// uv: Manage Python interpreters, packages, environments, and command-line tools (https://github.com/astral-sh/uv).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// FAM installs only the package manager. Python installation stays separate.
-/// The release avoids a dependency on an existing uv installation.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms build the official Cargo package. A current Rust toolchain and C compiler must exist.
 amends "../../Bundle.pkl"
 
-import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["dnf"] = "uv"
+  ["pacman"] = "uv"
+  ["apk"] = "uv"
+  ["brew"] = "uv"
+})
 
 name = "uv"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "astral-sh/uv"
-    binary = "uv"
-    assets {
-      ["linux-amd64"] { name = "uv-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-x86_64-unknown-linux-musl/uv" }
-      ["linux-arm64"] { name = "uv-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-aarch64-unknown-linux-musl/uv" }
-      ["linux-amd64-musl"] { name = "uv-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-x86_64-unknown-linux-musl/uv" }
-      ["linux-arm64-musl"] { name = "uv-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "uv-aarch64-unknown-linux-musl/uv" }
-      ["darwin-arm64"] { name = "uv-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "uv-aarch64-apple-darwin/uv" }
-    }
-  }
+  packages.retireRelease("uv", "astral-sh/uv")
+  packages.cargo("uv", "uv", systemPackage)
 }
 
 verify {
   new { name = "version"; script = "uv --version" }
 }
+
+uninstall { packages.retireRelease("uv", "astral-sh/uv") }

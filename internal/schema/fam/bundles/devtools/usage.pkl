@@ -1,25 +1,23 @@
 /// usage: Validate CLI specifications and generate command help, documentation, and completions (https://github.com/jdx/usage).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// The binary needs no runtime or compiler.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Cargo package usage-cli.
+/// A current Rust toolchain and a C compiler must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "usage"
+  ["brew"] = "usage"
+})
 
 name = "usage"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "jdx/usage"
-    binary = "usage"
-    assets {
-      ["linux-amd64"] { name = "usage-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "usage" }
-      ["linux-arm64"] { name = "usage-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "usage" }
-      ["linux-amd64-musl"] { name = "usage-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "usage" }
-      ["linux-arm64-musl"] { name = "usage-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "usage" }
-      ["darwin-arm64"] { name = "usage-universal-apple-darwin.tar.gz"; format = "tar.gz"; file = "usage" }
-    }
-  }
+  packages.retireRelease("usage", "jdx/usage")
+  packages.cargo("usage-cli", "usage", systemPackage)
   new fam.GitHubSkill {
     repo = "jdx/usage"
     path = "skills/usage"
@@ -29,3 +27,5 @@ tasks {
 verify {
   new { name = "version"; script = "usage --version" }
 }
+
+uninstall { packages.retireRelease("usage", "jdx/usage") }

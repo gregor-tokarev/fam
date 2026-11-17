@@ -1,26 +1,37 @@
-/// rustup: manage Rust toolchains (https://github.com/rust-lang/rustup).
+/// rustup: Manage Rust toolchains (https://github.com/rust-lang/rustup).
 ///
-/// FAM runs the official installer with --default-toolchain none. It installs only the manager.
-/// The manager and its proxies use ~/.local/share/fam/rustup/bin, without changes to shell files.
-/// FAM does not install a Rust compiler. Cargo bundles need a separate Rust toolchain.
-/// Removal deletes only this prefix. Existing toolchains and Cargo programs keep their own homes.
+/// FAM installs rustup with the system package manager, or Homebrew on macOS.
+/// This bundle installs only the manager. Select a Rust toolchain separately for Cargo packages.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../../facts.pkl"
+
+local initOnly = List("alpine", "fedora", "rhel", "centos", "rocky", "almalinux", "amzn").contains(facts.distro)
 
 name = "rustup"
 version = "@FAM_VERSION@"
-path { "~/.local/share/fam/rustup/bin" }
+path {
+  "~/.cargo/bin"
+  // Homebrew exposes rustup globally, but keeps the compiler proxies in its keg.
+  when (facts.os == "darwin") {
+    if (facts.arch == "arm64") "/opt/homebrew/opt/rustup/bin" else "/usr/local/opt/rustup/bin"
+  }
+}
 tasks {
   new fam.Package {
-    binary = "~/.local/share/fam/rustup/bin/rustup"
-    install = #"curl -fsSL https://sh.rustup.rs | CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 sh -s -- -y --no-modify-path --default-toolchain none"#
-    update = #"CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 rustup self update"#
-    uninstall = #"rm -rf "$HOME/.local/share/fam/rustup""#
-    versionCommand = #"CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 rustup --version"#
+    package = new fam.PackageRef { package = "rustup"; manager = "system" }
+    binary = if (initOnly) "rustup-init" else "rustup"
+    versionCommand = "RUSTUP_AUTO_INSTALL=0 rustup --version"
+  }
+  when (initOnly) {
+    // These distributions package the multiplexer as rustup-init. Its command name selects each proxy.
+    for (binary in List("rustup", "cargo", "rustc", "rustdoc", "rustfmt", "cargo-fmt", "clippy-driver", "cargo-clippy", "rust-gdb", "rust-lldb", "rust-analyzer")) {
+      new fam.Symlink { path = "~/.local/bin/\(binary)"; target = "/usr/bin/rustup-init" }
+    }
   }
 }
 
 verify {
-  new { name = "version"; script = #"CARGO_HOME="$HOME/.local/share/fam/rustup" RUSTUP_AUTO_INSTALL=0 rustup --version"# }
+  new { name = "version"; script = "RUSTUP_AUTO_INSTALL=0 rustup --version" }
 }

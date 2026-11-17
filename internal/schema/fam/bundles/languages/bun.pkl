@@ -1,29 +1,30 @@
 /// bun: Run JavaScript and TypeScript with the Bun toolchain (https://github.com/oven-sh/bun).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
-/// Linux selects the vendor build for its libc. libstdc++ must exist.
-/// The amd64 build supports CPUs without AVX2.
+/// FAM uses the system package where available. Other systems use npm package bun.
+/// Node.js and npm must exist.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "bun"
+  ["brew"] = "bun"
+})
 
 name = "bun"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "oven-sh/bun"
+  packages.retireRelease("bun", "oven-sh/bun")
+  new fam.Package {
+    package = systemPackage ?? new fam.PackageRef { package = "bun"; manager = "npm" }
     binary = "bun"
     versionCommand = #"v=$(bun --version) && printf 'bun-v%s\n' "$v""#
-    assets {
-      ["linux-amd64"] { name = "bun-linux-x64-baseline.zip"; format = "zip"; file = "bun-linux-x64-baseline/bun"; checksum = "SHASUMS256.txt" }
-      ["linux-arm64"] { name = "bun-linux-aarch64.zip"; format = "zip"; file = "bun-linux-aarch64/bun"; checksum = "SHASUMS256.txt" }
-      ["linux-amd64-musl"] { name = "bun-linux-x64-musl-baseline.zip"; format = "zip"; file = "bun-linux-x64-musl-baseline/bun"; checksum = "SHASUMS256.txt" }
-      ["linux-arm64-musl"] { name = "bun-linux-aarch64-musl.zip"; format = "zip"; file = "bun-linux-aarch64-musl/bun"; checksum = "SHASUMS256.txt" }
-      ["darwin-arm64"] { name = "bun-darwin-aarch64.zip"; format = "zip"; file = "bun-darwin-aarch64/bun"; checksum = "SHASUMS256.txt" }
-    }
   }
 }
 
 verify {
   new { name = "version"; script = "bun --version" }
 }
+
+uninstall { packages.retireRelease("bun", "oven-sh/bun") }

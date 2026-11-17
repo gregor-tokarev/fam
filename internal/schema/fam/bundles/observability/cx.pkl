@@ -1,28 +1,35 @@
 /// cx: a CLI for Coralogix telemetry and resources (https://github.com/coralogix/cx-cli).
 ///
-/// FAM installs the upstream release binary into ~/.local/bin.
-/// FAM uses static musl builds on Linux, including glibc workers.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Cargo package coralogix-cli.
+/// A current Rust toolchain and a C compiler must exist. FAM builds the CLI into ~/.local/bin.
+/// FAM declares the D-Bus development package for source builds.
 /// Credentials: CX_API_KEY.
 /// FAM copies the core skills from the upstream repository.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["brew"] = "cx"
+})
 
 name = "cx"
 version = "@FAM_VERSION@"
 requiredSecrets { "CX_API_KEY" }
 tasks {
-  new fam.GitHubRelease {
-    repo = "coralogix/cx-cli"
-    binary = "cx"
-    assets {
-      ["linux-amd64"] { name = "cx-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
-      ["linux-arm64"] { name = "cx-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
-      ["linux-amd64-musl"] { name = "cx-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
-      ["linux-arm64-musl"] { name = "cx-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
-      ["darwin-arm64"] { name = "cx-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "cx"; checksum = "checksums-sha256.txt" }
+  packages.retireRelease("cx", "coralogix/cx-cli")
+  when (systemPackage == null) {
+    new fam.Package {
+      package = new fam.PackageRef {
+        package = "libdbus-1-dev"
+        manager = "system"
+        names { ["dnf"] = "dbus-devel"; ["pacman"] = "dbus"; ["apk"] = "dbus-dev" }
+      }
     }
   }
+  packages.cargo("coralogix-cli", "cx", systemPackage)
   new fam.GitHubSkill {
     repo = "coralogix/cx-cli"
     path = "skills/coralogix-docs"
@@ -104,3 +111,5 @@ tasks {
 verify {
   new { name = "version"; script = "cx --version" }
 }
+
+uninstall { packages.retireRelease("cx", "coralogix/cx-cli") }

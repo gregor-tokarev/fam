@@ -1,31 +1,36 @@
 /// delta: Display Git and diff output with syntax and line highlights (https://github.com/dandavison/delta).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// FAM uses the system package manager where this tool is packaged.
 /// The binary needs no runtime or compiler.
-/// The vendor supplies no arm64 musl build. FAM skips that platform.
 /// Git integration stays separate. Use --paging=never without a terminal.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 import "../../facts.pkl"
 
 name = "delta"
 version = "@FAM_VERSION@"
-supported = !(facts.os == "linux" && facts.libc == "musl" && facts.arch == "arm64")
-unsupportedReason = "The vendor supplies no arm64 musl build."
 tasks {
-  new fam.GitHubRelease {
-    repo = "dandavison/delta"
-    binary = "delta"
-    assets {
-      ["linux-amd64"] { name = "delta-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "delta-{version}-x86_64-unknown-linux-musl/delta" }
-      ["linux-arm64"] { name = "delta-{version}-aarch64-unknown-linux-gnu.tar.gz"; format = "tar.gz"; file = "delta-{version}-aarch64-unknown-linux-gnu/delta" }
-      ["linux-amd64-musl"] { name = "delta-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "delta-{version}-x86_64-unknown-linux-musl/delta" }
-      ["darwin-arm64"] { name = "delta-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "delta-{version}-aarch64-apple-darwin/delta" }
+  packages.retireRelease("delta", "dandavison/delta")
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "git-delta"
+      manager = "system"
+      names {
+        ["apt"] = "git-delta"
+        ["dnf"] = "git-delta"
+        ["pacman"] = "git-delta"
+        ["apk"] = "delta"
+        ["brew"] = "git-delta"
+      }
     }
+    binary = "delta"
   }
 }
 
 verify {
   new { name = "version"; script = "delta --version" }
 }
+
+uninstall { packages.retireRelease("delta", "dandavison/delta") }

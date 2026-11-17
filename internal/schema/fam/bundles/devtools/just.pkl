@@ -1,25 +1,29 @@
 /// just: Run project commands and recipes from a justfile (https://github.com/casey/just).
 ///
-/// FAM installs the binary from the latest GitHub release into ~/.local/bin.
+/// FAM uses the system package manager where this tool is packaged.
 /// The binary needs no runtime or compiler.
-/// Recipes need their declared shell or interpreter.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
 
 name = "just"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "casey/just"
-    binary = "just"
-    assets {
-      ["linux-amd64"] { name = "just-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
-      ["linux-arm64"] { name = "just-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
-      ["linux-amd64-musl"] { name = "just-{version}-x86_64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
-      ["linux-arm64-musl"] { name = "just-{version}-aarch64-unknown-linux-musl.tar.gz"; format = "tar.gz"; file = "just" }
-      ["darwin-arm64"] { name = "just-{version}-aarch64-apple-darwin.tar.gz"; format = "tar.gz"; file = "just" }
+  packages.retireRelease("just", "casey/just")
+  new fam.Package {
+    package = new fam.PackageRef {
+      package = "just"
+      manager = "system"
+      names {
+        ["apt"] = "just"
+        ["dnf"] = "just"
+        ["pacman"] = "just"
+        ["apk"] = "just"
+        ["brew"] = "just"
+      }
     }
+    binary = "just"
   }
   new fam.GitHubSkill {
     repo = "casey/just"
@@ -30,3 +34,5 @@ tasks {
 verify {
   new { name = "version"; script = "just --version" }
 }
+
+uninstall { packages.retireRelease("just", "casey/just") }

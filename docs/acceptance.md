@@ -39,13 +39,13 @@ go run ./acceptance clean                   # delete base images and runtime fil
 - The test project, its secrets file, and the run logs of each scenario are in `~/.cache/fam-acceptance/run/`. Results go to `acceptance/results/<target>.json`.
 
 Scenario 16 installs Node.js and npm inside the VM of the current run.
-It puts `std.languages.uv` before the selected bundles, even with a group filter.
+It puts Go, Rustup, build prerequisites, and uv before the selected bundles, even with a group filter.
 FAM manages this one uv binary for both the prerequisite and the standard bundle.
 The system package manager is also available.
-The prerequisites include no Go, Rust, or C compiler. The `go` bundle installs its own toolchain.
-The shared base images stay unchanged.
+The Go and Rustup bundles use the system package manager. The scenario selects a stable Rust toolchain and installs C build prerequisites with `fam.Package`. These prerequisites support official Go and Cargo packages. The command timeout is 90 minutes for source builds.
+Linux scenario 16 uses at least 8 GiB of RAM for large source builds. The scenario expands only the temporary snapshot to 80 GiB, then grows its root filesystem for build caches. `TMPDIR=/var/tmp` keeps temporary builds off small tmpfs mounts. Cargo shares a target directory on the VM disk. The shared base images stay unchanged.
 
-Scenario 16 must not install unzip, OpenSSL, or other extra tools to make standard bundles pass. Bundle install scripts must use baseline tools or the documented fallback commands.
+Bundles must declare extra installation dependencies with `fam.Package`. Release download scripts must use baseline tools, declared packages, or documented fallback commands.
 
 Scenario 16 discovers all standard bundles from the package. `-std-groups cloud,data` or `FAM_STD_GROUPS=cloud,data` limits it to those groups. Bundles with `supported = false` for the target facts are omitted. The scenario reads expected skills from the first plan, requires every verify to pass, and requires a satisfied second plan.
 

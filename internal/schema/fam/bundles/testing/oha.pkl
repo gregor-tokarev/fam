@@ -1,28 +1,26 @@
 /// oha: HTTP load generator with JSON output and a noninteractive mode (https://github.com/hatoo/oha).
 ///
-/// FAM installs the CLI from the latest GitHub release.
-/// Uses static musl binaries on Linux. No runtime or login is required.
-/// Use --no-tui or JSON output on workers.
+/// FAM uses the system package manager where this tool is packaged.
+/// Other platforms use the Cargo package oha.
+/// A current Rust toolchain and a C compiler must exist. FAM builds the CLI into ~/.local/bin.
 amends "../../Bundle.pkl"
 
-import "../../tasks.pkl" as fam
+import "../packages.pkl" as packages
+
+local systemPackage = packages.system(new Mapping {
+  ["pacman"] = "oha"
+  ["brew"] = "oha"
+})
 
 name = "oha"
 version = "@FAM_VERSION@"
 tasks {
-  new fam.GitHubRelease {
-    repo = "hatoo/oha"
-    binary = "oha"
-    assets {
-      ["linux-amd64"] { name = "oha-linux-amd64" }
-      ["linux-arm64"] { name = "oha-linux-arm64" }
-      ["linux-amd64-musl"] { name = "oha-linux-amd64" }
-      ["linux-arm64-musl"] { name = "oha-linux-arm64" }
-      ["darwin-arm64"] { name = "oha-macos-arm64" }
-    }
-  }
+  packages.retireRelease("oha", "hatoo/oha")
+  packages.cargo("oha", "oha", systemPackage)
 }
 
 verify {
   new { name = "oha runs"; script = "oha --version" }
 }
+
+uninstall { packages.retireRelease("oha", "hatoo/oha") }
