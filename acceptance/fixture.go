@@ -113,30 +113,9 @@ import "@fam/std.pkl"
 
 bundles {
   import("bundles/node.pkl")
-  std.computer.agentBrowser
+  std.computer.agentBrowser()
 }
 `,
-		// Scenario 16 discovers group modules and their bundles from the package.
-		"config-std-all.pkl": fmt.Sprintf(`amends "config.pkl"
-import "@fam/std.pkl"
-
-local selectedGroups = %q.split(",").map((name) -> name.trim())
-
-bundles {
-  import("bundles/node.pkl")
-  std.languages.go
-  std.languages.rustup
-  import("bundles/build-tools.pkl")
-  std.languages.uv
-  for (group, tools in std.toDynamic().toMap()) {
-    when (selectedGroups == List("") || selectedGroups.contains(group)) {
-      for (_, bundle in tools.toDynamic().toMap()) {
-        when (bundle.supported && !List("uv", "go", "rustup").contains(bundle.name)) { bundle }
-      }
-    }
-  }
-}
-`, stdGroups),
 		"bundles/tool/bundle.pkl": `amends "@fam/Bundle.pkl"
 import "@fam/tasks.pkl" as fam
 

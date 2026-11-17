@@ -729,7 +729,11 @@ func s16StdAll(c *Ctx) error {
 	if err != nil {
 		return err
 	}
-	if _, err := stdlib.Select(groups, stdGroups); err != nil {
+	selected, err := stdlib.Select(groups, stdGroups)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(c.dir, "config-std-all.pkl"), []byte(stdAllConfig(selected)), 0o644); err != nil {
 		return err
 	}
 	first, err := c.famJSON("plan", "--config", "config-std-all.pkl")
@@ -795,6 +799,35 @@ func s16StdAll(c *Ctx) error {
 	}
 	c.notes = append(c.notes, fmt.Sprintf("%d changed, %d skills; apply %s, plan %s", m.Counts.Changed, len(want), applied.Round(time.Second), planned.Round(time.Second)))
 	return nil
+}
+
+// stdAllConfig calls every bundle function of the selected groups. The prerequisites come
+// first: Node.js, the languages that some bundles build with, and uv.
+func stdAllConfig(groups []stdlib.Group) string {
+	var calls []string
+	for _, g := range groups {
+		for _, e := range g.Bundles {
+			calls = append(calls, fmt.Sprintf("  std.%s.%s()", g.Name, e.Name))
+		}
+	}
+	return `amends "config.pkl"
+import "@fam/std.pkl"
+
+local selected = List(
+` + strings.Join(calls, ",\n") + `
+)
+
+bundles {
+  import("bundles/node.pkl")
+  std.languages.go()
+  std.languages.rustup()
+  import("bundles/build-tools.pkl")
+  std.languages.uv()
+  for (bundle in selected) {
+    when (bundle.supported && !List("uv", "go", "rustup").contains(bundle.name)) { bundle }
+  }
+}
+`
 }
 
 func s17Packages(c *Ctx) error {

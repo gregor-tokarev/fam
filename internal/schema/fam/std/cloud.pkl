@@ -4,70 +4,70 @@ module fam.std.cloud
 import "../Bundle.pkl"
 
 /// aws-cli: manage AWS services with AWS CLI v2.
-awsCli: Bundle = import("../bundles/cloud/aws-cli.pkl")
+function awsCli(): Bundle = import("../bundles/cloud/aws-cli.pkl")
 
 /// azure-cli: manage Azure resources and deployments.
-azureCli: Bundle = import("../bundles/cloud/azure-cli.pkl")
+function azureCli(): Bundle = import("../bundles/cloud/azure-cli.pkl")
 
 /// cf: official Cloudflare CLI for its complete API.
-cloudflareCf: Bundle = import("../bundles/cloud/cf.pkl")
+function cloudflareCf(): Bundle = import("../bundles/cloud/cf.pkl")
 
 /// crane: inspect, copy, and modify container images in registries.
-crane: Bundle = import("../bundles/cloud/crane.pkl")
+function crane(): Bundle = import("../bundles/cloud/crane.pkl")
 
 /// docker: build images and control local or remote Docker engines.
-docker: Bundle = import("../bundles/cloud/docker.pkl")
+function docker(): Bundle = import("../bundles/cloud/docker.pkl")
 
 /// doctl: manage DigitalOcean compute, Kubernetes, and platform resources.
-doctl: Bundle = import("../bundles/cloud/doctl.pkl")
+function doctl(): Bundle = import("../bundles/cloud/doctl.pkl")
 
 /// firebase: deploy Firebase applications and manage project resources.
-firebase: Bundle = import("../bundles/cloud/firebase.pkl")
+function firebase(): Bundle = import("../bundles/cloud/firebase.pkl")
 
 /// flyctl: deploy applications and manage Fly.io machines.
-flyctl: Bundle = import("../bundles/cloud/flyctl.pkl")
+function flyctl(): Bundle = import("../bundles/cloud/flyctl.pkl")
 
 /// google-agents-cli: create, evaluate, and deploy applications on Google Cloud.
-googleAgentsCli: Bundle = import("../bundles/cloud/google-agents-cli.pkl")
+function googleAgentsCli(): Bundle = import("../bundles/cloud/google-agents-cli.pkl")
 
 /// hcloud: manage Hetzner Cloud servers, networks, and storage.
-hcloud: Bundle = import("../bundles/cloud/hcloud.pkl")
+function hcloud(): Bundle = import("../bundles/cloud/hcloud.pkl")
 
 /// helm: package and deploy applications on Kubernetes.
-helm: Bundle = import("../bundles/cloud/helm.pkl")
+function helm(): Bundle = import("../bundles/cloud/helm.pkl")
 
 /// kind: run local Kubernetes clusters in containers.
-kind: Bundle = import("../bundles/cloud/kind.pkl")
+function kind(): Bundle = import("../bundles/cloud/kind.pkl")
 
 /// kubectl: manage Kubernetes resources and clusters.
-kubectl: Bundle = import("../bundles/cloud/kubectl.pkl")
+function kubectl(): Bundle = import("../bundles/cloud/kubectl.pkl")
 
 /// kustomize: customize Kubernetes manifests without templates.
-kustomize: Bundle = import("../bundles/cloud/kustomize.pkl")
+function kustomize(): Bundle = import("../bundles/cloud/kustomize.pkl")
 
 /// netlify: deploy and manage Netlify sites.
-netlify: Bundle = import("../bundles/cloud/netlify.pkl")
+function netlify(): Bundle = import("../bundles/cloud/netlify.pkl")
 
 /// opentofu: plan and apply infrastructure changes with OpenTofu.
-openTofu: Bundle = import("../bundles/cloud/opentofu.pkl")
+function openTofu(): Bundle = import("../bundles/cloud/opentofu.pkl")
 
 /// podman: control containers through a Podman service.
-podman: Bundle = import("../bundles/cloud/podman.pkl")
+function podman(): Bundle = import("../bundles/cloud/podman.pkl")
 
 /// pulumi: manage cloud infrastructure through Pulumi programs.
-pulumi: Bundle = import("../bundles/cloud/pulumi.pkl")
+function pulumi(): Bundle = import("../bundles/cloud/pulumi.pkl")
 
 /// railway: deploy and manage Railway services and projects.
-railway: Bundle = import("../bundles/cloud/railway.pkl")
+function railway(): Bundle = import("../bundles/cloud/railway.pkl")
 
 /// render: deploy and manage Render services.
-render: Bundle = import("../bundles/cloud/render.pkl")
+function render(): Bundle = import("../bundles/cloud/render.pkl")
 
 /// terraform: plan and apply infrastructure changes with Terraform.
-terraform: Bundle = import("../bundles/cloud/terraform.pkl")
+function terraform(): Bundle = import("../bundles/cloud/terraform.pkl")
 
 /// vercel: deploy and manage Vercel projects.
-vercel: Bundle = import("../bundles/cloud/vercel.pkl")
+function vercel(): Bundle = import("../bundles/cloud/vercel.pkl")
 
 /// wrangler: develop and deploy Cloudflare Workers and related resources.
-wrangler: Bundle = import("../bundles/cloud/wrangler.pkl")
+function wrangler(): Bundle = import("../bundles/cloud/wrangler.pkl")

@@ -3,7 +3,7 @@
 /// ```
 /// import "@fam/std.pkl"
 ///
-/// bundles { std.computer.agentBrowser; std.networking.portless }
+/// bundles { std.computer.agentBrowser(); std.networking.portless() }
 /// ```
 module fam.std
 
