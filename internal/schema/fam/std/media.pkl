@@ -4,55 +4,55 @@ module fam.std.media
 import "../Bundle.pkl"
 
 /// ai-cli: generate text, images, and more from the terminal, with its skill.
-aiCli: Bundle = import("../bundles/media/ai-cli.pkl")
+function aiCli(): Bundle = import("../bundles/media/ai-cli.pkl")
 
 /// HyperFrames: HTML to video, with the core skills.
-hyperframes: Bundle = import("../bundles/media/hyperframes.pkl")
+function hyperframes(): Bundle = import("../bundles/media/hyperframes.pkl")
 
 /// webreel: scripted browser demos as video, with its skill.
-webreel: Bundle = import("../bundles/media/webreel.pkl")
+function webreel(): Bundle = import("../bundles/media/webreel.pkl")
 
 /// agg: Official renderer that converts asciinema recordings to GIF files.
-agg: Bundle = import("../bundles/media/agg.pkl")
+function agg(): Bundle = import("../bundles/media/agg.pkl")
 
 /// asciinema: Terminal recording CLI with a headless mode for scripts and CI.
-asciinema: Bundle = import("../bundles/media/asciinema.pkl")
+function asciinema(): Bundle = import("../bundles/media/asciinema.pkl")
 
 /// d2: Official text to diagram CLI for architecture and system designs.
-d2: Bundle = import("../bundles/media/d2.pkl")
+function d2(): Bundle = import("../bundles/media/d2.pkl")
 
 /// elevenlabs: Official ElevenLabs CLI for speech, audio, media generation, and API access.
-elevenlabs: Bundle = import("../bundles/media/elevenlabs.pkl")
+function elevenlabs(): Bundle = import("../bundles/media/elevenlabs.pkl")
 
 /// fal: Official fal CLI for model API calls, generation queues, and deployments.
-fal: Bundle = import("../bundles/media/fal.pkl")
+function fal(): Bundle = import("../bundles/media/fal.pkl")
 
 /// ffmpeg: Official command line tools for video, audio, and media conversion.
-ffmpeg: Bundle = import("../bundles/media/ffmpeg.pkl")
+function ffmpeg(): Bundle = import("../bundles/media/ffmpeg.pkl")
 
 /// imagemagick: Official CLI for image conversion, resizing, comparison, and composition.
-imageMagick: Bundle = import("../bundles/media/imagemagick.pkl")
+function imageMagick(): Bundle = import("../bundles/media/imagemagick.pkl")
 
 /// mermaid-cli: Official CLI that renders Mermaid diagrams to SVG, PNG, and PDF.
-mermaidCli: Bundle = import("../bundles/media/mermaid-cli.pkl")
+function mermaidCli(): Bundle = import("../bundles/media/mermaid-cli.pkl")
 
 /// oxipng: Lossless PNG optimization CLI with parallel processing.
-oxipng: Bundle = import("../bundles/media/oxipng.pkl")
+function oxipng(): Bundle = import("../bundles/media/oxipng.pkl")
 
 /// remotion-cli: Official Remotion CLI for headless video and still image rendering.
-remotionCli: Bundle = import("../bundles/media/remotion-cli.pkl")
+function remotionCli(): Bundle = import("../bundles/media/remotion-cli.pkl")
 
 /// resvg: Official standalone SVG renderer CLI with PNG output.
-resvg: Bundle = import("../bundles/media/resvg.pkl")
+function resvg(): Bundle = import("../bundles/media/resvg.pkl")
 
 /// svgo: Official SVG optimizer CLI for compact vector assets.
-svgo: Bundle = import("../bundles/media/svgo.pkl")
+function svgo(): Bundle = import("../bundles/media/svgo.pkl")
 
 /// vhs: Scripted terminal recording CLI that creates videos and GIFs.
-vhs: Bundle = import("../bundles/media/vhs.pkl")
+function vhs(): Bundle = import("../bundles/media/vhs.pkl")
 
 /// vips: Official image processing CLI for large images and batch operations.
-vips: Bundle = import("../bundles/media/vips.pkl")
+function vips(): Bundle = import("../bundles/media/vips.pkl")
 
 /// yt-dlp: Command line downloader for video, audio, subtitles, and metadata.
-ytDlp: Bundle = import("../bundles/media/yt-dlp.pkl")
+function ytDlp(): Bundle = import("../bundles/media/yt-dlp.pkl")

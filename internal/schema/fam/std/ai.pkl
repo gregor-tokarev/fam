@@ -4,16 +4,16 @@ module fam.std.ai
 import "../Bundle.pkl"
 
 /// ant: Call the Claude Platform API for messages, files, batches, and platform resources.
-anthropicCli: Bundle = import("../bundles/ai/ant.pkl")
+function anthropicCli(): Bundle = import("../bundles/ai/ant.pkl")
 
 /// hf: Download and publish Hugging Face models, datasets, and repository files.
-huggingFace: Bundle = import("../bundles/ai/hf.pkl")
+function huggingFace(): Bundle = import("../bundles/ai/hf.pkl")
 
 /// llm: Send model prompts, use tools, and store prompt and response logs.
-llm: Bundle = import("../bundles/ai/llm.pkl")
+function llm(): Bundle = import("../bundles/ai/llm.pkl")
 
 /// openai-cli: Call OpenAI APIs for responses, files, batches, images, audio, and administration.
-openaiCli: Bundle = import("../bundles/ai/openai-cli.pkl")
+function openaiCli(): Bundle = import("../bundles/ai/openai-cli.pkl")
 
 /// wandb: Inspect and synchronize Weights & Biases runs, artifacts, and experiment data.
-wandb: Bundle = import("../bundles/ai/wandb.pkl")
+function wandb(): Bundle = import("../bundles/ai/wandb.pkl")
