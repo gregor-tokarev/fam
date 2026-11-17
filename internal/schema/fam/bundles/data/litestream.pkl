@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "litestream"
-description = "Replicate SQLite databases to external storage"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

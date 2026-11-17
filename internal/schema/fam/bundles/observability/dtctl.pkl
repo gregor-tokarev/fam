@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "dtctl"
-description = "Query Dynatrace telemetry and manage dashboards, workflows, and SLOs"
 version = "@FAM_VERSION@"
 requiredSecrets { "DT_API_TOKEN" }
 tasks {

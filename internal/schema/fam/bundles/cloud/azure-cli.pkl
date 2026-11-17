@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "azure-cli"
-description = "Manage Azure resources and deployments"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

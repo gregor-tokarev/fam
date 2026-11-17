@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "playwright-cli"
-description = "Browser automation CLI for coding agents, from Microsoft"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

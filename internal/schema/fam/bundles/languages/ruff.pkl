@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "ruff"
-description = "Lint and format Python code from a standalone command-line tool"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "langsmith"
-description = "Inspect LangSmith traces, runs, datasets, and evaluations"
 version = "@FAM_VERSION@"
 requiredSecrets { "LANGSMITH_API_KEY" }
 tasks {

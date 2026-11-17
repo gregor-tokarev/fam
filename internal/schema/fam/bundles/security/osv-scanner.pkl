@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "osv-scanner"
-description = "Find vulnerable dependencies in source trees, lockfiles, and container images"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "cf"
-description = "Official Cloudflare CLI for its complete API"
 version = "@FAM_VERSION@"
 requiredSecrets { "CLOUDFLARE_API_TOKEN" }
 tasks {

@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "prism"
-description = "OpenAPI mock server and validation proxy CLI from Stoplight"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

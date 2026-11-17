@@ -12,7 +12,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "mise"
-description = "Manage developer tools, project environments, and task execution"
 version = "@FAM_VERSION@"
 tasks {
   when (facts.os == "linux" && facts.libc == "musl") {

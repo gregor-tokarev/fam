@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "pact"
-description = "Official CLI for API contract verification and mock servers"
 version = "@FAM_VERSION@"
 
 tasks {

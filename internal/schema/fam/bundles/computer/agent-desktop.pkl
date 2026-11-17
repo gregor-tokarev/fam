@@ -12,7 +12,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "agent-desktop"
-description = "Computer use CLI for AI agents"
 version = "@FAM_VERSION@"
 supported = facts.distro != "alpine"
 unsupportedReason = "On Linux, agent-desktop needs glibc. Alpine is not supported."

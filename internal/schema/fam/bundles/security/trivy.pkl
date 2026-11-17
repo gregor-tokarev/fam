@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "trivy"
-description = "Scan files, images, dependencies, secrets, and infrastructure configuration"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

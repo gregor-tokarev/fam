@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "glow"
-description = "Render Markdown files and standard input in a terminal"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

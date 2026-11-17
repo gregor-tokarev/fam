@@ -24,6 +24,8 @@ type Group struct {
 type Entry struct {
 	Name   string
 	Bundle bundle.Bundle
+	// Doc is the doc comment of the bundle property in its group module.
+	Doc string
 }
 
 // LinuxFacts fixes the inputs of the generated documentation.
@@ -63,11 +65,15 @@ func Read(ctx context.Context, f facts.Facts) ([]Group, error) {
 	if err := ev.EvaluateExpression(ctx, pkl.UriSource(schema.URI(pkg.Version)+"#/std.pkl"), `toDynamic().toMap().mapValues((_, group) -> group.toDynamic().toMap())`, &groups); err != nil {
 		return nil, fmt.Errorf("read standard bundles: %w", err)
 	}
+	var docs map[string]map[string]string
+	if err := ev.EvaluateExpression(ctx, pkl.UriSource(schema.URI(pkg.Version)+"#/std.pkl"), `toDynamic().toMap().mapValues((_, group) -> import("pkl:reflect").Module(group).moduleClass.properties.mapValues((_, p) -> p.docComment ?? ""))`, &docs); err != nil {
+		return nil, fmt.Errorf("read the doc comments of the standard bundles: %w", err)
+	}
 	var out []Group
 	for name, bs := range groups {
 		g := Group{Name: name}
 		for n, b := range bs {
-			g.Bundles = append(g.Bundles, Entry{Name: n, Bundle: b})
+			g.Bundles = append(g.Bundles, Entry{Name: n, Bundle: b, Doc: docs[name][n]})
 		}
 		sort.Slice(g.Bundles, func(i, j int) bool { return g.Bundles[i].Name < g.Bundles[j].Name })
 		out = append(out, g)

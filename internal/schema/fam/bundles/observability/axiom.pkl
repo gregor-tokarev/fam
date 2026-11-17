@@ -10,7 +10,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "axiom"
-description = "Query Axiom datasets, logs, and traces from the command line"
 version = "@FAM_VERSION@"
 supported = facts.libc != "musl"
 unsupportedReason = "Linux binaries require glibc. Musl is not supported."

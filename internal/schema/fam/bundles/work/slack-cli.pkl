@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "slack-cli"
-description = "Call Slack APIs and develop, run, and deploy Slack applications"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

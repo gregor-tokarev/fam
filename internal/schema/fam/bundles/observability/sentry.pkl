@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "sentry"
-description = "Inspect Sentry issues, events, and projects from an agent shell"
 version = "@FAM_VERSION@"
 requiredSecrets { "SENTRY_AUTH_TOKEN"; "SENTRY_TOKEN" }
 tasks {

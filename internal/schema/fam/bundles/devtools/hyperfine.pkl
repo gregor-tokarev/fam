@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "hyperfine"
-description = "Benchmark shell commands and export machine-readable timing results"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

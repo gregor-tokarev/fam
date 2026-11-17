@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "turborepo"
-description = "Execute monorepo tasks with dependency ordering and build caching"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

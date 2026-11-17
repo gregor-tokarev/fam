@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "tokei"
-description = "Count source lines, comments, and language totals across a repository"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

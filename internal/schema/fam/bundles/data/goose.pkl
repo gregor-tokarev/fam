@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "goose"
-description = "Apply and track database schema migrations"
 version = "@FAM_VERSION@"
 requiredSecrets { "GOOSE_DBSTRING" }
 tasks {

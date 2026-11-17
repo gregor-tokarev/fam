@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "ggshield"
-description = "Scan source changes and repositories for secrets through GitGuardian"
 version = "@FAM_VERSION@"
 requiredSecrets { "GITGUARDIAN_API_KEY" }
 tasks {

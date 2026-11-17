@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "scc"
-description = "Count source lines and estimate code complexity with structured output"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

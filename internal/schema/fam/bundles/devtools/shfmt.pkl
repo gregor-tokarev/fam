@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "shfmt"
-description = "Format shell scripts and validate their syntax"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

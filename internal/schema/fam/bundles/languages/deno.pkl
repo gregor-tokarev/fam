@@ -11,7 +11,6 @@ supported = !(facts.os == "linux" && facts.libc == "musl")
 unsupportedReason = "The vendor supplies no musl build."
 
 name = "deno"
-description = "Run JavaScript and TypeScript with the Deno toolchain"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

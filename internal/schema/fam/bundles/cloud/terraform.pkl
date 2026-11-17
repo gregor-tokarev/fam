@@ -54,7 +54,6 @@ local installTerraform = #"""
   """#
 
 name = "terraform"
-description = "Plan and apply infrastructure changes with Terraform"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

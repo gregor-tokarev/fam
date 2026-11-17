@@ -9,7 +9,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "steel"
-description = "Official Steel CLI for browser sessions, scraping, and screenshots"
 version = "@FAM_VERSION@"
 supported = facts.os != "linux" || facts.libc != "musl"
 unsupportedReason = "No musl build is available."

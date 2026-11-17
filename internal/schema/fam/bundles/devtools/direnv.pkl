@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "direnv"
-description = "Load project environment variables through explicit shell or exec integration"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "pnpm"
-description = "Install JavaScript packages and run workspace commands with a shared package store"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

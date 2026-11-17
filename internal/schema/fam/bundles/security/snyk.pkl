@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "snyk"
-description = "Scan dependencies, source code, containers, and infrastructure with Snyk"
 version = "@FAM_VERSION@"
 requiredSecrets { "SNYK_TOKEN" }
 tasks {

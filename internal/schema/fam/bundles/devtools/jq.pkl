@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "jq"
-description = "Read, transform, and query JSON in shell workflows"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

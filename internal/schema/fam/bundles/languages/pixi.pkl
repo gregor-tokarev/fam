@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "pixi"
-description = "Manage reproducible environments and command-line tools across language ecosystems"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

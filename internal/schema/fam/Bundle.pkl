@@ -27,9 +27,6 @@ import "tasks.pkl" as t
 /// Two different files with the same name are an error.
 name: String(matches(Regex("[a-z0-9][a-z0-9._-]*")))
 
-/// A short description for output.
-description: String?
-
 /// Whether the tool supports the current machine facts.
 /// When false, FAM skips a present bundle and its verify scripts without an error.
 /// A skipped bundle adds no variables or PATH entries to ~/.config/fam/env.sh.

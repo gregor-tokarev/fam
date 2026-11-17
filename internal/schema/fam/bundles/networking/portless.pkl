@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "portless"
-description = "Named local URLs instead of port numbers"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "crane"
-description = "Inspect, copy, and modify container images in registries"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

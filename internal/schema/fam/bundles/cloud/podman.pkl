@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "podman"
-description = "Control containers through a Podman service"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

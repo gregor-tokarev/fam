@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "render"
-description = "Deploy and manage Render services"
 version = "@FAM_VERSION@"
 requiredSecrets { "RENDER_API_KEY" }
 tasks {

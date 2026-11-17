@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "hyperframes"
-description = "HTML to video for agents"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "context7"
-description = "Retrieve current library documentation and code examples from Upstash Context7."
 version = "@FAM_VERSION@"
 requiredSecrets { "CONTEXT7_API_KEY" }
 tasks {

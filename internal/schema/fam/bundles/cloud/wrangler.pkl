@@ -9,7 +9,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "wrangler"
-description = "Develop and deploy Cloudflare Workers and related resources"
 version = "@FAM_VERSION@"
 supported = facts.libc != "musl"
 unsupportedReason = "The workerd runtime does not support musl."

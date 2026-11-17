@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "railway"
-description = "Deploy and manage Railway services and projects"
 version = "@FAM_VERSION@"
 requiredSecrets { "RAILWAY_TOKEN"; "RAILWAY_API_TOKEN" }
 tasks {

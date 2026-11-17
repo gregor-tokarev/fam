@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "pulumi"
-description = "Manage cloud infrastructure through Pulumi programs"
 version = "@FAM_VERSION@"
 requiredSecrets { "PULUMI_ACCESS_TOKEN" }
 tasks {

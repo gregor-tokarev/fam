@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "git-lfs"
-description = "Store and transfer large files through Git LFS"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

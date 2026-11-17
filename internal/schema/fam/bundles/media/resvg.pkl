@@ -9,7 +9,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "resvg"
-description = "Official standalone SVG renderer CLI with PNG output"
 version = "@FAM_VERSION@"
 supported = facts.os != "linux" || facts.libc != "musl"
 unsupportedReason = "Linux needs glibc. No musl build is available."

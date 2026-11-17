@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "bun"
-description = "Run JavaScript and TypeScript with the Bun toolchain"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

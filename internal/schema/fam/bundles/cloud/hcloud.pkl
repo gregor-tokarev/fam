@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "hcloud"
-description = "Manage Hetzner Cloud servers, networks, and storage"
 version = "@FAM_VERSION@"
 requiredSecrets { "HCLOUD_TOKEN" }
 tasks {

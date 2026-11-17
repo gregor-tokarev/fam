@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "vercel"
-description = "Deploy and manage Vercel projects"
 version = "@FAM_VERSION@"
 requiredSecrets { "VERCEL_TOKEN" }
 tasks {

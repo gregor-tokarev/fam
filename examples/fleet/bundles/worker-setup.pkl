@@ -4,7 +4,6 @@ import "@fam/tasks.pkl" as fam
 import "@fam/facts.pkl"
 
 name = "worker-setup"
-description = "Worker setup: SSH access, background jobs, no sleep, build limits"
 
 tasks {
   when (facts.init == "systemd") {

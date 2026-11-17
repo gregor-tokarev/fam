@@ -10,7 +10,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "hurl"
-description = "HTTP request runner and API test CLI with plain text input"
 version = "@FAM_VERSION@"
 supported = (facts.os != "linux" || facts.libc != "musl")
   && (facts.distro != "ubuntu" || facts.distroVersion.split(".")[0].toInt() < 26)

@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "go"
-description = "Build and format Go programs with the official toolchain"
 version = "@FAM_VERSION@"
 local installScript = #"""
   set -eu

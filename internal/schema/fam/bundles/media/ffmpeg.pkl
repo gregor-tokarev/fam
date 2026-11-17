@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "ffmpeg"
-description = "Official command line tools for video, audio, and media conversion"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "fzf"
-description = "Filter and rank text candidates through fuzzy matching"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

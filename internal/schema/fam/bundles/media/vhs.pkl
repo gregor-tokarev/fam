@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "vhs"
-description = "Scripted terminal recording CLI that creates videos and GIFs"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

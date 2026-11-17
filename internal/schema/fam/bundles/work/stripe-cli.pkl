@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "stripe-cli"
-description = "Manage Stripe API resources, webhooks, and local payment integration workflows"
 version = "@FAM_VERSION@"
 requiredSecrets { "STRIPE_API_KEY" }
 tasks {

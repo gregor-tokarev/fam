@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "bruno-cli"
-description = "Official Bruno CLI for API collections and test reports"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "hf"
-description = "Download and publish Hugging Face models, datasets, and repository files"
 version = "@FAM_VERSION@"
 requiredSecrets { "HF_TOKEN" }
 tasks {

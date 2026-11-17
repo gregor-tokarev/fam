@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "yq"
-description = "Read and transform YAML, JSON, XML, and other structured data"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {

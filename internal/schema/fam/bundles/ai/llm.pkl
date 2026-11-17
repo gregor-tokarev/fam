@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "llm"
-description = "Send model prompts, use tools, and store prompt and response logs"
 version = "@FAM_VERSION@"
 requiredSecrets { "OPENAI_API_KEY" }
 tasks {

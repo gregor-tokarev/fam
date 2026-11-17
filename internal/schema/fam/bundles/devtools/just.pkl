@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "just"
-description = "Run project commands and recipes from a justfile"
 version = "@FAM_VERSION@"
 tasks {
   new fam.GitHubRelease {
