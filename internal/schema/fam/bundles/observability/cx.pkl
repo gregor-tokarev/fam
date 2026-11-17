@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "cx"
-description = "Query Coralogix telemetry and manage observability resources"
 version = "@FAM_VERSION@"
 requiredSecrets { "CX_API_KEY" }
 tasks {

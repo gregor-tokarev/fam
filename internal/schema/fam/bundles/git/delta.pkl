@@ -10,7 +10,6 @@ import "../packages.pkl" as packages
 import "../../facts.pkl"
 
 name = "delta"
-description = "Display Git and diff output with syntax and line highlights"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("delta", "dandavison/delta")

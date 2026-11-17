@@ -9,7 +9,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "honeymarker"
-description = "Manage Honeycomb deployment markers and annotations"
 version = "@FAM_VERSION@"
 requiredSecrets { "HONEYCOMB_API_KEY" }
 tasks {

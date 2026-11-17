@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "goose"
-description = "Apply and track database schema migrations"
 version = "@FAM_VERSION@"
 requiredSecrets { "GOOSE_DBSTRING" }
 tasks {

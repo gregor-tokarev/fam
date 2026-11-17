@@ -17,7 +17,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "podman"
-description = "Control containers through a Podman service"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage != null) {

@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "svgo"
-description = "Official SVG optimizer CLI for compact vector assets"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

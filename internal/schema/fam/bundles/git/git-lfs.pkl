@@ -8,7 +8,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "git-lfs"
-description = "Store and transfer large files through Git LFS"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("git-lfs", "git-lfs/git-lfs")

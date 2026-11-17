@@ -9,7 +9,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "github"
-description = "Manage GitHub repositories, issues, pull requests, releases, and workflows"
 version = "@FAM_VERSION@"
 requiredSecrets { "GH_TOKEN"; "GITHUB_TOKEN"; "GH_ENTERPRISE_TOKEN"; "GITHUB_ENTERPRISE_TOKEN" }
 tasks {

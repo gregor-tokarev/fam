@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "trufflehog"
-description = "Find and verify leaked credentials in files, Git repositories, and remote sources"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage != null) {

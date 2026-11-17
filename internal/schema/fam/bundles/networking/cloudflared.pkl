@@ -13,7 +13,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "cloudflared"
-description = "Expose local services through Cloudflare Tunnel"
 version = "@FAM_VERSION@"
 requiredSecrets { "TUNNEL_TOKEN" }
 tasks {

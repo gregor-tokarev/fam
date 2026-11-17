@@ -51,7 +51,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "docker"
-description = "Build images and control local or remote Docker engines"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage != null) {

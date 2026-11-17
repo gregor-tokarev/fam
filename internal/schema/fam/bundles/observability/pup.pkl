@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "pup"
-description = "Query Datadog logs, traces, monitors, and service metadata"
 version = "@FAM_VERSION@"
 requiredSecrets { "DD_API_KEY"; "DD_APP_KEY"; "DD_ACCESS_TOKEN" }
 tasks {

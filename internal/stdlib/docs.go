@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/gregor-tokarev/fam/internal/engine"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
@@ -60,10 +62,7 @@ func Docs(ctx context.Context) ([]byte, error) {
 					skills = append(skills, name)
 				}
 			}
-			desc := ""
-			if b.Description != nil {
-				desc = *b.Description
-			}
+			desc := summary(entry.Doc)
 			list := func(values []string) string {
 				if len(values) == 0 {
 					return "—"
@@ -78,4 +77,18 @@ func Docs(ctx context.Context) ([]byte, error) {
 		}
 	}
 	return []byte(out.String()), nil
+}
+
+// summary returns the first line of a doc comment without its "<tool>: " prefix, for example
+// "Browser automation CLI for agents" from "playwright-cli: browser automation CLI for agents".
+func summary(doc string) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(doc), "\n")
+	if tool, rest, ok := strings.Cut(line, ": "); ok && !strings.ContainsAny(tool, " \t") {
+		line = rest
+	}
+	if line == "" {
+		return line
+	}
+	r, size := utf8.DecodeRuneInString(line)
+	return string(unicode.ToUpper(r)) + line[size:]
 }

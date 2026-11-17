@@ -8,7 +8,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "hyperfine"
-description = "Benchmark shell commands and export machine-readable timing results"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("hyperfine", "sharkdp/hyperfine")

@@ -2,7 +2,6 @@ amends "@fam/Bundle.pkl"
 import "@fam/tasks.pkl" as fam
 
 name = "opencode"
-description = "OpenCode"
 path { "~/.opencode/bin" }
 
 tasks {

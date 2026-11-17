@@ -18,7 +18,6 @@ local cliPackage = systemPackage ?? if (facts.os == "linux" && facts.libc == "mu
   else new fam.PackageRef { package = "duckdb-cli"; manager = "uv" }
 
 name = "duckdb"
-description = "Query local files and analytical datasets with SQL"
 version = "@FAM_VERSION@"
 tasks {
   when (cliPackage != null) {

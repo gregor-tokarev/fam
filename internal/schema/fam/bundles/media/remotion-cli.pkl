@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "remotion-cli"
-description = "Official Remotion CLI for headless video and still image rendering"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

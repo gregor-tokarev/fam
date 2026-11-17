@@ -11,60 +11,60 @@ FAM skips unsupported bundles. The last column gives the reason when a bundle do
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.agents.daytona` | Create and manage Daytona sandboxes, snapshots, and remote command execution | GitHub release: `daytonaio/daytona` (latest) | — | DAYTONA_API_KEY | The Linux release requires glibc. Alpine is not supported. |
-| `std.agents.e2b` | Manage E2B cloud sandboxes and build sandbox templates | npm: `@e2b/cli` | — | E2B_API_KEY | — |
-| `std.agents.modal` | Deploy serverless jobs and manage Modal functions, sandboxes, volumes, and secrets | uv: `modal` | modal | MODAL_TOKEN_ID, MODAL_TOKEN_SECRET | — |
-| `std.agents.promptfoo` | Evaluate model prompts and agents, and run adversarial evaluations | npm: `promptfoo` | promptfoo-evals, promptfoo-provider-setup, promptfoo-redteam-run, promptfoo-redteam-setup | OPENAI_API_KEY | — |
-| `std.agents.skills` | The agent skills tool and its find-skills skill | npm: `skills` | find-skills | — | — |
+| `std.agents.daytona` | Create and manage Daytona sandboxes, snapshots, and remote command execution. | GitHub release: `daytonaio/daytona` (latest) | — | DAYTONA_API_KEY | The Linux release requires glibc. Alpine is not supported. |
+| `std.agents.e2b` | Manage E2B cloud sandboxes and build sandbox templates. | npm: `@e2b/cli` | — | E2B_API_KEY | — |
+| `std.agents.modal` | Deploy serverless jobs and manage Modal functions, sandboxes, volumes, and secrets. | uv: `modal` | modal | MODAL_TOKEN_ID, MODAL_TOKEN_SECRET | — |
+| `std.agents.promptfoo` | Evaluate model prompts and agents, and run adversarial evaluations. | npm: `promptfoo` | promptfoo-evals, promptfoo-provider-setup, promptfoo-redteam-run, promptfoo-redteam-setup | OPENAI_API_KEY | — |
+| `std.agents.skills` | The agent skills tool, with the find-skills skill. | npm: `skills` | find-skills | — | — |
 
 ## ai
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.ai.anthropicCli` | Call the Claude Platform API for messages, files, batches, and platform resources | go: `github.com/anthropics/anthropic-cli/v2/cmd/ant` | — | ANTHROPIC_API_KEY | — |
-| `std.ai.huggingFace` | Download and publish Hugging Face models, datasets, and repository files | uv: `huggingface-hub` | — | HF_TOKEN | — |
-| `std.ai.llm` | Send model prompts, use tools, and store prompt and response logs | uv: `llm` | — | OPENAI_API_KEY | — |
-| `std.ai.openaiCli` | Call OpenAI APIs for responses, files, batches, images, audio, and administration | go: `github.com/openai/openai-cli/cmd/openai` | openai-cli | OPENAI_API_KEY, OPENAI_ADMIN_KEY | — |
-| `std.ai.wandb` | Inspect and synchronize Weights & Biases runs, artifacts, and experiment data | uv: `wandb` | — | WANDB_API_KEY | — |
+| `std.ai.anthropicCli` | Call the Claude Platform API for messages, files, batches, and platform resources. | go: `github.com/anthropics/anthropic-cli/v2/cmd/ant` | — | ANTHROPIC_API_KEY | — |
+| `std.ai.huggingFace` | Download and publish Hugging Face models, datasets, and repository files. | uv: `huggingface-hub` | — | HF_TOKEN | — |
+| `std.ai.llm` | Send model prompts, use tools, and store prompt and response logs. | uv: `llm` | — | OPENAI_API_KEY | — |
+| `std.ai.openaiCli` | Call OpenAI APIs for responses, files, batches, images, audio, and administration. | go: `github.com/openai/openai-cli/cmd/openai` | openai-cli | OPENAI_API_KEY, OPENAI_ADMIN_KEY | — |
+| `std.ai.wandb` | Inspect and synchronize Weights & Biases runs, artifacts, and experiment data. | uv: `wandb` | — | WANDB_API_KEY | — |
 
 ## cloud
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.cloud.awsCli` | Manage AWS services with AWS CLI v2 | apt: `awscli` | — | AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN | — |
-| `std.cloud.azureCli` | Manage Azure resources and deployments | uv: `azure-cli` | — | — | — |
-| `std.cloud.cloudflareCf` | Official Cloudflare CLI for its complete API | npm: `cf` | — | CLOUDFLARE_API_TOKEN | — |
-| `std.cloud.crane` | Inspect, copy, and modify container images in registries | go: `github.com/google/go-containerregistry/cmd/crane` | — | — | — |
-| `std.cloud.docker` | Build images and control local or remote Docker engines | custom installer | — | — | — |
-| `std.cloud.doctl` | Manage DigitalOcean compute, Kubernetes, and platform resources | go: `github.com/digitalocean/doctl/cmd/doctl` | — | DIGITALOCEAN_ACCESS_TOKEN | — |
-| `std.cloud.firebase` | Deploy Firebase applications and manage project resources | npm: `firebase-tools` | — | GOOGLE_APPLICATION_CREDENTIALS, FIREBASE_TOKEN | — |
-| `std.cloud.flyctl` | Deploy applications and manage Fly.io machines | go: `github.com/superfly/flyctl` | — | FLY_API_TOKEN | — |
-| `std.cloud.googleAgentsCli` | Create, evaluate, and deploy applications on Google Cloud | uv: `google-agents-cli` | google-agents-cli-adk-code, google-agents-cli-deploy, google-agents-cli-eval, google-agents-cli-observability, google-agents-cli-publish, google-agents-cli-scaffold, google-agents-cli-workflow | GOOGLE_APPLICATION_CREDENTIALS, GEMINI_API_KEY, GOOGLE_API_KEY | — |
-| `std.cloud.hcloud` | Manage Hetzner Cloud servers, networks, and storage | go: `github.com/hetznercloud/cli/cmd/hcloud` | — | HCLOUD_TOKEN | — |
-| `std.cloud.helm` | Package and deploy applications on Kubernetes | go: `helm.sh/helm/v4/cmd/helm` | — | — | — |
-| `std.cloud.kind` | Run local Kubernetes clusters in containers | go: `sigs.k8s.io/kind` | — | — | — |
-| `std.cloud.kubectl` | Manage Kubernetes resources and clusters | custom installer | — | — | — |
-| `std.cloud.kustomize` | Customize Kubernetes manifests without templates | go: `sigs.k8s.io/kustomize/kustomize/v5` | — | — | — |
-| `std.cloud.netlify` | Deploy and manage Netlify sites | npm: `netlify-cli` | — | NETLIFY_AUTH_TOKEN | — |
-| `std.cloud.openTofu` | Plan and apply infrastructure changes with OpenTofu | GitHub release: `opentofu/opentofu` (latest) | — | — | — |
-| `std.cloud.podman` | Control containers through a Podman service | apt: `podman-remote` | — | — | — |
-| `std.cloud.pulumi` | Manage cloud infrastructure through Pulumi programs | GitHub release: `pulumi/pulumi` (latest) | — | PULUMI_ACCESS_TOKEN | — |
-| `std.cloud.railway` | Deploy and manage Railway services and projects | npm: `@railway/cli` | — | RAILWAY_TOKEN, RAILWAY_API_TOKEN | — |
-| `std.cloud.render` | Deploy and manage Render services | GitHub release: `render-oss/cli` (latest) | — | RENDER_API_KEY | — |
-| `std.cloud.terraform` | Plan and apply infrastructure changes with Terraform | custom installer | — | — | — |
-| `std.cloud.vercel` | Deploy and manage Vercel projects | npm: `vercel` | vercel-cli | VERCEL_TOKEN | — |
-| `std.cloud.wrangler` | Develop and deploy Cloudflare Workers and related resources | npm: `wrangler` | — | CLOUDFLARE_API_TOKEN | The workerd runtime does not support musl. |
+| `std.cloud.awsCli` | Manage AWS services with AWS CLI v2. | apt: `awscli` | — | AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN | — |
+| `std.cloud.azureCli` | Manage Azure resources and deployments. | uv: `azure-cli` | — | — | — |
+| `std.cloud.cloudflareCf` | Official Cloudflare CLI for its complete API. | npm: `cf` | — | CLOUDFLARE_API_TOKEN | — |
+| `std.cloud.crane` | Inspect, copy, and modify container images in registries. | go: `github.com/google/go-containerregistry/cmd/crane` | — | — | — |
+| `std.cloud.docker` | Build images and control local or remote Docker engines. | custom installer | — | — | — |
+| `std.cloud.doctl` | Manage DigitalOcean compute, Kubernetes, and platform resources. | go: `github.com/digitalocean/doctl/cmd/doctl` | — | DIGITALOCEAN_ACCESS_TOKEN | — |
+| `std.cloud.firebase` | Deploy Firebase applications and manage project resources. | npm: `firebase-tools` | — | GOOGLE_APPLICATION_CREDENTIALS, FIREBASE_TOKEN | — |
+| `std.cloud.flyctl` | Deploy applications and manage Fly.io machines. | go: `github.com/superfly/flyctl` | — | FLY_API_TOKEN | — |
+| `std.cloud.googleAgentsCli` | Create, evaluate, and deploy applications on Google Cloud. | uv: `google-agents-cli` | google-agents-cli-adk-code, google-agents-cli-deploy, google-agents-cli-eval, google-agents-cli-observability, google-agents-cli-publish, google-agents-cli-scaffold, google-agents-cli-workflow | GOOGLE_APPLICATION_CREDENTIALS, GEMINI_API_KEY, GOOGLE_API_KEY | — |
+| `std.cloud.hcloud` | Manage Hetzner Cloud servers, networks, and storage. | go: `github.com/hetznercloud/cli/cmd/hcloud` | — | HCLOUD_TOKEN | — |
+| `std.cloud.helm` | Package and deploy applications on Kubernetes. | go: `helm.sh/helm/v4/cmd/helm` | — | — | — |
+| `std.cloud.kind` | Run local Kubernetes clusters in containers. | go: `sigs.k8s.io/kind` | — | — | — |
+| `std.cloud.kubectl` | Manage Kubernetes resources and clusters. | custom installer | — | — | — |
+| `std.cloud.kustomize` | Customize Kubernetes manifests without templates. | go: `sigs.k8s.io/kustomize/kustomize/v5` | — | — | — |
+| `std.cloud.netlify` | Deploy and manage Netlify sites. | npm: `netlify-cli` | — | NETLIFY_AUTH_TOKEN | — |
+| `std.cloud.openTofu` | Plan and apply infrastructure changes with OpenTofu. | GitHub release: `opentofu/opentofu` (latest) | — | — | — |
+| `std.cloud.podman` | Control containers through a Podman service. | apt: `podman-remote` | — | — | — |
+| `std.cloud.pulumi` | Manage cloud infrastructure through Pulumi programs. | GitHub release: `pulumi/pulumi` (latest) | — | PULUMI_ACCESS_TOKEN | — |
+| `std.cloud.railway` | Deploy and manage Railway services and projects. | npm: `@railway/cli` | — | RAILWAY_TOKEN, RAILWAY_API_TOKEN | — |
+| `std.cloud.render` | Deploy and manage Render services. | GitHub release: `render-oss/cli` (latest) | — | RENDER_API_KEY | — |
+| `std.cloud.terraform` | Plan and apply infrastructure changes with Terraform. | custom installer | — | — | — |
+| `std.cloud.vercel` | Deploy and manage Vercel projects. | npm: `vercel` | vercel-cli | VERCEL_TOKEN | — |
+| `std.cloud.wrangler` | Develop and deploy Cloudflare Workers and related resources. | npm: `wrangler` | — | CLOUDFLARE_API_TOKEN | The workerd runtime does not support musl. |
 
 ## computer
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.computer.agentBrowser` | Browser automation CLI for AI agents | npm: `agent-browser` | agent-browser | — | — |
-| `std.computer.agentDesktop` | Computer use CLI for AI agents | npm: `agent-desktop` | agent-desktop, agent-desktop-linux | — | On Linux, agent-desktop needs glibc. Alpine is not supported. |
-| `std.computer.browserUse` | Browser control CLI with local and hosted browser sessions | uv: `browser-use` | browser-use, remote-browser, qa, cloud, open-source, x402 | BROWSER_USE_API_KEY | — |
-| `std.computer.browserbaseBrowse` | Official Browserbase CLI for browser control and hosted browser APIs | npm: `browse` | — | BROWSERBASE_API_KEY | — |
-| `std.computer.playwrightCli` | Browser automation CLI for coding agents, from Microsoft | npm: `@playwright/cli` | playwright-cli | — | — |
-| `std.computer.steel` | Official Steel CLI for browser sessions, scraping, and screenshots | GitHub release: `steel-dev/cli` (latest) | — | STEEL_API_KEY | No musl build is available. |
+| `std.computer.agentBrowser` | A browser automation CLI for agents, with its skill. | npm: `agent-browser` | agent-browser | — | — |
+| `std.computer.agentDesktop` | Computer use for agents through the accessibility tree, with its skills. | npm: `agent-desktop` | agent-desktop, agent-desktop-linux | — | On Linux, agent-desktop needs glibc. Alpine is not supported. |
+| `std.computer.browserUse` | Browser control CLI with local and hosted browser sessions. | uv: `browser-use` | browser-use, remote-browser, qa, cloud, open-source, x402 | BROWSER_USE_API_KEY | — |
+| `std.computer.browserbaseBrowse` | Official Browserbase CLI for browser control and hosted browser APIs. | npm: `browse` | — | BROWSERBASE_API_KEY | — |
+| `std.computer.playwrightCli` | Browser automation CLI for coding agents, from Microsoft. | npm: `@playwright/cli` | playwright-cli | — | — |
+| `std.computer.steel` | Official Steel CLI for browser sessions, scraping, and screenshots. | GitHub release: `steel-dev/cli` (latest) | — | STEEL_API_KEY | No musl build is available. |
 
 ## context
 
@@ -72,156 +72,156 @@ FAM skips unsupported bundles. The last column gives the reason when a bundle do
 |---|---|---|---|---|---|
 | `std.context.astGrep` | Search and rewrite source code with syntax-tree patterns. | npm: `@ast-grep/cli` | — | — | — |
 | `std.context.context7` | Retrieve current library documentation and code examples from Upstash Context7. | npm: `ctx7` | context7-cli, find-docs | CONTEXT7_API_KEY | — |
-| `std.context.fd` | Find files and directories through a concise headless CLI | apt: `fd-find` | — | — | — |
+| `std.context.fd` | Find files and directories through a concise headless CLI. | apt: `fd-find` | — | — | — |
 | `std.context.firecrawl` | Search, scrape, crawl, and extract web content with the official Firecrawl CLI. | npm: `firecrawl-cli` | firecrawl-agent, firecrawl-alexandria, firecrawl-crawl, firecrawl-developer-index, firecrawl-download, firecrawl-interact, firecrawl-map, firecrawl-monitor, firecrawl-parse, firecrawl-research-index, firecrawl-scrape, firecrawl-search, firecrawl | FIRECRAWL_API_KEY | — |
-| `std.context.issueGraph` | Related issues and changes before you start work | npm: `issue-graph` | issue-graph | — | — |
-| `std.context.latMd` | Markdown knowledge graph of a codebase | npm: `lat.md` | lat-md | — | The database module has no build for musl (Alpine). |
-| `std.context.opensrc` | Source code of npm packages for agents | npm: `opensrc` | opensrc | — | — |
+| `std.context.issueGraph` | Related issues and changes before work starts, with its skill. | npm: `issue-graph` | issue-graph | — | — |
+| `std.context.latMd` | A Markdown knowledge graph of a codebase, with its skill. | npm: `lat.md` | lat-md | — | The database module has no build for musl (Alpine). |
+| `std.context.opensrc` | The source code of npm packages for agents, with its skill. | npm: `opensrc` | opensrc | — | — |
 | `std.context.repomix` | Pack local or remote source repositories into context for coding agents. | npm: `repomix` | repomix-explorer | — | — |
-| `std.context.ripgrep` | Search source trees with fast regular expressions and ignore-file support | apt: `ripgrep` | — | — | — |
-| `std.context.scc` | Count source lines and estimate code complexity with structured output | go: `github.com/boyter/scc/v4` | — | — | — |
+| `std.context.ripgrep` | Search source trees with fast regular expressions and ignore-file support. | apt: `ripgrep` | — | — | — |
+| `std.context.scc` | Count source lines and estimate code complexity with structured output. | go: `github.com/boyter/scc/v4` | — | — | — |
 | `std.context.tavily` | Search the web and extract content with the official Tavily CLI. | npm: `@tavily/cli` | — | TAVILY_API_KEY | — |
-| `std.context.tokei` | Count source lines, comments, and language totals across a repository | apt: `tokei` | — | — | — |
+| `std.context.tokei` | Count source lines, comments, and language totals across a repository. | apt: `tokei` | — | — | — |
 
 ## data
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.data.drizzleKit` | Generate and apply Drizzle database migrations | npm: `drizzle-kit` | — | — | — |
-| `std.data.duckdb` | Query local files and analytical datasets with SQL | uv: `duckdb-cli` | — | — | — |
-| `std.data.goose` | Apply and track database schema migrations | go: `github.com/pressly/goose/v3/cmd/goose` | — | GOOSE_DBSTRING | — |
-| `std.data.litestream` | Replicate SQLite databases to external storage | go: `github.com/benbjohnson/litestream/cmd/litestream` | — | — | — |
-| `std.data.migrate` | Run versioned database migrations | GitHub release: `golang-migrate/migrate` (latest) | — | — | — |
-| `std.data.neonctl` | Manage Neon PostgreSQL projects, branches, and database resources | npm: `neonctl` | — | NEON_API_KEY | — |
-| `std.data.pscale` | Manage PlanetScale databases, branches, and schema changes | GitHub release: `planetscale/cli` (latest) | — | PLANETSCALE_SERVICE_TOKEN_ID, PLANETSCALE_SERVICE_TOKEN | — |
-| `std.data.rclone` | Copy and synchronize files across cloud storage services | apt: `rclone` | — | — | — |
-| `std.data.sqliteUtils` | Import, transform, and query SQLite databases from the CLI | uv: `sqlite-utils` | — | — | — |
-| `std.data.supabase` | Manage Supabase projects, migrations, functions, and local databases | npm: `supabase` | — | SUPABASE_ACCESS_TOKEN | — |
-| `std.data.turso` | Manage Turso databases, branches, and access tokens | go: `github.com/tursodatabase/turso-cli/cmd/turso` | — | TURSO_API_TOKEN | — |
-| `std.data.usql` | Query many database systems through a common CLI | go: `github.com/xo/usql` | — | — | — |
+| `std.data.drizzleKit` | Generate and apply Drizzle database migrations. | npm: `drizzle-kit` | — | — | — |
+| `std.data.duckdb` | Query local files and analytical datasets with SQL. | uv: `duckdb-cli` | — | — | — |
+| `std.data.goose` | Apply and track database schema migrations. | go: `github.com/pressly/goose/v3/cmd/goose` | — | GOOSE_DBSTRING | — |
+| `std.data.litestream` | Replicate SQLite databases to external storage. | go: `github.com/benbjohnson/litestream/cmd/litestream` | — | — | — |
+| `std.data.migrate` | Run versioned database migrations. | GitHub release: `golang-migrate/migrate` (latest) | — | — | — |
+| `std.data.neonctl` | Manage Neon PostgreSQL projects, branches, and database resources. | npm: `neonctl` | — | NEON_API_KEY | — |
+| `std.data.pscale` | Manage PlanetScale databases, branches, and schema changes. | GitHub release: `planetscale/cli` (latest) | — | PLANETSCALE_SERVICE_TOKEN_ID, PLANETSCALE_SERVICE_TOKEN | — |
+| `std.data.rclone` | Copy and synchronize files across cloud storage services. | apt: `rclone` | — | — | — |
+| `std.data.sqliteUtils` | Import, transform, and query SQLite databases from the CLI. | uv: `sqlite-utils` | — | — | — |
+| `std.data.supabase` | Manage Supabase projects, migrations, functions, and local databases. | npm: `supabase` | — | SUPABASE_ACCESS_TOKEN | — |
+| `std.data.turso` | Manage Turso databases, branches, and access tokens. | go: `github.com/tursodatabase/turso-cli/cmd/turso` | — | TURSO_API_TOKEN | — |
+| `std.data.usql` | Query many database systems through a common CLI. | go: `github.com/xo/usql` | — | — | — |
 
 ## devtools
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.devtools.direnv` | Load project environment variables through explicit shell or exec integration | apt: `direnv` | — | — | — |
-| `std.devtools.fzf` | Filter and rank text candidates through fuzzy matching | apt: `fzf` | — | — | — |
-| `std.devtools.glow` | Render Markdown files and standard input in a terminal | go: `charm.land/glow/v3` | — | — | — |
-| `std.devtools.hyperfine` | Benchmark shell commands and export machine-readable timing results | apt: `hyperfine` | — | — | — |
-| `std.devtools.jq` | Read, transform, and query JSON in shell workflows | apt: `jq` | — | — | — |
-| `std.devtools.just` | Run project commands and recipes from a justfile | apt: `just` | just | — | — |
-| `std.devtools.mise` | Manage developer tools, project environments, and task execution | npm: `mise` | — | — | — |
-| `std.devtools.nx` | Inspect monorepos, generate projects, and execute dependency-aware build tasks | npm: `nx` | link-workspace-packages, monitor-ci, nx-generate, nx-import, nx-plugins, nx-run-tasks, nx-workspace | — | — |
-| `std.devtools.pitchfork` | Start, inspect, and stop project services with readiness and dependency checks | cargo: `pitchfork-cli` | pitchfork | — | — |
-| `std.devtools.shfmt` | Format shell scripts and validate their syntax | apt: `shfmt` | — | — | — |
-| `std.devtools.turborepo` | Execute monorepo tasks with dependency ordering and build caching | npm: `turbo` | turborepo | — | — |
-| `std.devtools.usage` | Validate CLI specifications and generate command help, documentation, and completions | cargo: `usage-cli` | usage | — | — |
-| `std.devtools.watchexec` | Run commands after files change, with debounce and process control | cargo: `watchexec-cli` | — | — | — |
-| `std.devtools.yq` | Read and transform YAML, JSON, XML, and other structured data | go: `github.com/mikefarah/yq/v4` | — | — | — |
+| `std.devtools.direnv` | Load project environment variables through explicit shell or exec integration. | apt: `direnv` | — | — | — |
+| `std.devtools.fzf` | Filter and rank text candidates through fuzzy matching. | apt: `fzf` | — | — | — |
+| `std.devtools.glow` | Render Markdown files and standard input in a terminal. | go: `charm.land/glow/v3` | — | — | — |
+| `std.devtools.hyperfine` | Benchmark shell commands and export machine-readable timing results. | apt: `hyperfine` | — | — | — |
+| `std.devtools.jq` | Read, transform, and query JSON in shell workflows. | apt: `jq` | — | — | — |
+| `std.devtools.just` | Run project commands and recipes from a justfile. | apt: `just` | just | — | — |
+| `std.devtools.mise` | Manage developer tools, project environments, and task execution. | npm: `mise` | — | — | — |
+| `std.devtools.nx` | Inspect monorepos, generate projects, and execute dependency-aware build tasks. | npm: `nx` | link-workspace-packages, monitor-ci, nx-generate, nx-import, nx-plugins, nx-run-tasks, nx-workspace | — | — |
+| `std.devtools.pitchfork` | Start, inspect, and stop project services with readiness and dependency checks. | cargo: `pitchfork-cli` | pitchfork | — | — |
+| `std.devtools.shfmt` | Format shell scripts and validate their syntax. | apt: `shfmt` | — | — | — |
+| `std.devtools.turborepo` | Execute monorepo tasks with dependency ordering and build caching. | npm: `turbo` | turborepo | — | — |
+| `std.devtools.usage` | Validate CLI specifications and generate command help, documentation, and completions. | cargo: `usage-cli` | usage | — | — |
+| `std.devtools.watchexec` | Run commands after files change, with debounce and process control. | cargo: `watchexec-cli` | — | — | — |
+| `std.devtools.yq` | Read and transform YAML, JSON, XML, and other structured data. | go: `github.com/mikefarah/yq/v4` | — | — | — |
 
 ## git
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.git.delta` | Display Git and diff output with syntax and line highlights | apt: `git-delta` | — | — | — |
-| `std.git.difftastic` | Compare source files through syntax-aware diffs | cargo: `difftastic` | — | — | — |
-| `std.git.ghStack` | Manage stacked branches and pull requests with GitHub’s official gh extension | go: `github.com/github/gh-stack` | gh-stack | GH_TOKEN, GITHUB_TOKEN | — |
-| `std.git.gitLfs` | Store and transfer large files through Git LFS | apt: `git-lfs` | — | — | — |
-| `std.git.github` | Manage GitHub repositories, issues, pull requests, releases, and workflows | apt: `gh` | gh, gh-skill | GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN | — |
+| `std.git.delta` | Display Git and diff output with syntax and line highlights. | apt: `git-delta` | — | — | — |
+| `std.git.difftastic` | Compare source files through syntax-aware diffs. | cargo: `difftastic` | — | — | — |
+| `std.git.ghStack` | Manage stacked branches and pull requests with GitHub’s official gh extension. | go: `github.com/github/gh-stack` | gh-stack | GH_TOKEN, GITHUB_TOKEN | — |
+| `std.git.gitLfs` | Store and transfer large files through Git LFS. | apt: `git-lfs` | — | — | — |
+| `std.git.github` | Manage GitHub repositories, issues, pull requests, releases, and workflows. | apt: `gh` | gh, gh-skill | GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN | — |
 
 ## languages
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.languages.bun` | Run JavaScript and TypeScript with the Bun toolchain | npm: `bun` | — | — | — |
-| `std.languages.deno` | Run JavaScript and TypeScript with the Deno toolchain | npm: `deno` | — | — | The vendor supplies no musl build. |
-| `std.languages.go` | Build and format Go programs with the Go toolchain | apt: `golang-go` | — | — | — |
-| `std.languages.pixi` | Manage reproducible environments and command-line tools across language ecosystems | GitHub release: `prefix-dev/pixi` (latest) | — | — | — |
-| `std.languages.pnpm` | Install JavaScript packages and run workspace commands with a shared package store | npm: `pnpm` | — | — | — |
-| `std.languages.ruff` | Lint and format Python code from a standalone command-line tool | uv: `ruff` | — | — | — |
-| `std.languages.rustup` | Manage Rust toolchains with Rustup | apt: `rustup` | — | — | — |
-| `std.languages.uv` | Manage Python interpreters, packages, environments, and command-line tools | cargo: `uv` | — | — | — |
-| `std.languages.zero` | The Zero programming language for agents | GitHub release: `vercel-labs/zerolang` (latest) | zero | — | — |
+| `std.languages.bun` | Run JavaScript and TypeScript with the Bun toolchain. | npm: `bun` | — | — | — |
+| `std.languages.deno` | Run JavaScript and TypeScript with the Deno toolchain. | npm: `deno` | — | — | The vendor supplies no musl build. |
+| `std.languages.go` | Build and format Go programs with the Go toolchain. | apt: `golang-go` | — | — | — |
+| `std.languages.pixi` | Manage reproducible environments and command-line tools across language ecosystems. | GitHub release: `prefix-dev/pixi` (latest) | — | — | — |
+| `std.languages.pnpm` | Install JavaScript packages and run workspace commands with a shared package store. | npm: `pnpm` | — | — | — |
+| `std.languages.ruff` | Lint and format Python code from a standalone command-line tool. | uv: `ruff` | — | — | — |
+| `std.languages.rustup` | Manage Rust toolchains without a default compiler. | apt: `rustup` | — | — | — |
+| `std.languages.uv` | Manage Python interpreters, packages, environments, and command-line tools. | cargo: `uv` | — | — | — |
+| `std.languages.zero` | The programming language for agents, with its skill. | GitHub release: `vercel-labs/zerolang` (latest) | zero | — | — |
 
 ## media
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.media.agg` | Official renderer that converts asciinema recordings to GIF files | GitHub release: `asciinema/agg` (latest) | — | — | Linux arm64 has no musl build. |
-| `std.media.aiCli` | Generate anything from the terminal | npm: `ai-cli` | ai-cli | — | — |
-| `std.media.asciinema` | Terminal recording CLI with a headless mode for scripts and CI | apt: `asciinema` | — | — | — |
-| `std.media.d2` | Official text to diagram CLI for architecture and system designs | go: `github.com/d2lang/d2` | — | — | — |
-| `std.media.elevenlabs` | Official ElevenLabs CLI for speech, audio, media generation, and API access | npm: `@elevenlabs/cli` | elevenlabs-custom-commands | ELEVENLABS_API_KEY | — |
-| `std.media.fal` | Official fal CLI for model API calls, generation queues, and deployments | uv: `fal` | — | FAL_KEY | — |
-| `std.media.ffmpeg` | Official command line tools for video, audio, and media conversion | apt: `ffmpeg` | — | — | — |
-| `std.media.hyperframes` | HTML to video for agents | npm: `hyperframes` | hyperframes, hyperframes-cli, hyperframes-registry, media-use, reverse-any-video, style-sampling | — | — |
-| `std.media.imageMagick` | Official CLI for image conversion, resizing, comparison, and composition | apt: `imagemagick` | — | — | — |
-| `std.media.mermaidCli` | Official CLI that renders Mermaid diagrams to SVG, PNG, and PDF | npm: `@mermaid-js/mermaid-cli` | — | — | — |
-| `std.media.oxipng` | Lossless PNG optimization CLI with parallel processing | cargo: `oxipng` | — | — | — |
-| `std.media.remotionCli` | Official Remotion CLI for headless video and still image rendering | npm: `@remotion/cli` | remotion-best-practices, remotion-captions, remotion-create, remotion-docs, remotion-interactivity, remotion-license, remotion-maps, remotion-markup, remotion-multimedia, remotion-render, remotion-saas, remotion-studio, remotion-upgrade | — | — |
-| `std.media.resvg` | Official standalone SVG renderer CLI with PNG output | cargo: `resvg` | — | — | — |
-| `std.media.svgo` | Official SVG optimizer CLI for compact vector assets | npm: `svgo` | — | — | — |
-| `std.media.vhs` | Scripted terminal recording CLI that creates videos and GIFs | go: `github.com/charmbracelet/vhs` | — | — | — |
-| `std.media.vips` | Official image processing CLI for large images and batch operations | apt: `libvips-tools` | — | — | — |
-| `std.media.webreel` | Scripted browser demos as video | npm: `webreel` | webreel | — | — |
-| `std.media.ytDlp` | Command line downloader for video, audio, subtitles, and metadata | uv: `yt-dlp` | — | — | — |
+| `std.media.agg` | Official renderer that converts asciinema recordings to GIF files. | GitHub release: `asciinema/agg` (latest) | — | — | Linux arm64 has no musl build. |
+| `std.media.aiCli` | Generate text, images, and more from the terminal, with its skill. | npm: `ai-cli` | ai-cli | — | — |
+| `std.media.asciinema` | Terminal recording CLI with a headless mode for scripts and CI. | apt: `asciinema` | — | — | — |
+| `std.media.d2` | Official text to diagram CLI for architecture and system designs. | go: `github.com/d2lang/d2` | — | — | — |
+| `std.media.elevenlabs` | Official ElevenLabs CLI for speech, audio, media generation, and API access. | npm: `@elevenlabs/cli` | elevenlabs-custom-commands | ELEVENLABS_API_KEY | — |
+| `std.media.fal` | Official fal CLI for model API calls, generation queues, and deployments. | uv: `fal` | — | FAL_KEY | — |
+| `std.media.ffmpeg` | Official command line tools for video, audio, and media conversion. | apt: `ffmpeg` | — | — | — |
+| `std.media.hyperframes` | HTML to video, with the core skills. | npm: `hyperframes` | hyperframes, hyperframes-cli, hyperframes-registry, media-use, reverse-any-video, style-sampling | — | — |
+| `std.media.imageMagick` | Official CLI for image conversion, resizing, comparison, and composition. | apt: `imagemagick` | — | — | — |
+| `std.media.mermaidCli` | Official CLI that renders Mermaid diagrams to SVG, PNG, and PDF. | npm: `@mermaid-js/mermaid-cli` | — | — | — |
+| `std.media.oxipng` | Lossless PNG optimization CLI with parallel processing. | cargo: `oxipng` | — | — | — |
+| `std.media.remotionCli` | Official Remotion CLI for headless video and still image rendering. | npm: `@remotion/cli` | remotion-best-practices, remotion-captions, remotion-create, remotion-docs, remotion-interactivity, remotion-license, remotion-maps, remotion-markup, remotion-multimedia, remotion-render, remotion-saas, remotion-studio, remotion-upgrade | — | — |
+| `std.media.resvg` | Official standalone SVG renderer CLI with PNG output. | cargo: `resvg` | — | — | — |
+| `std.media.svgo` | Official SVG optimizer CLI for compact vector assets. | npm: `svgo` | — | — | — |
+| `std.media.vhs` | Scripted terminal recording CLI that creates videos and GIFs. | go: `github.com/charmbracelet/vhs` | — | — | — |
+| `std.media.vips` | Official image processing CLI for large images and batch operations. | apt: `libvips-tools` | — | — | — |
+| `std.media.webreel` | Scripted browser demos as video, with its skill. | npm: `webreel` | webreel | — | — |
+| `std.media.ytDlp` | Command line downloader for video, audio, subtitles, and metadata. | uv: `yt-dlp` | — | — | — |
 
 ## networking
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.networking.cloudflared` | Expose local services through Cloudflare Tunnel | GitHub release: `cloudflare/cloudflared` (latest) | — | TUNNEL_TOKEN | — |
-| `std.networking.portless` | Named local URLs instead of port numbers | npm: `portless` | portless | — | — |
-| `std.networking.tailscale` | Connect worker machines through the Tailscale private network | go: `tailscale.com/cmd/tailscale` | — | — | — |
+| `std.networking.cloudflared` | Expose local services through Cloudflare Tunnel. | GitHub release: `cloudflare/cloudflared` (latest) | — | TUNNEL_TOKEN | — |
+| `std.networking.portless` | Named local URLs instead of port numbers, with its skill. | npm: `portless` | portless | — | — |
+| `std.networking.tailscale` | Connect worker machines through the Tailscale private network. | go: `tailscale.com/cmd/tailscale` | — | — | — |
 
 ## observability
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.observability.axiom` | Query Axiom datasets, logs, and traces from the command line | go: `github.com/axiomhq/cli/cmd/axiom` | axiom-apl, detect-anomalies, explore-dataset, find-traces | AXIOM_TOKEN | — |
-| `std.observability.cx` | Query Coralogix telemetry and manage observability resources | apt: `libdbus-1-dev`, cargo: `coralogix-cli` | coralogix-docs, cx-ai-center, cx-alerts, cx-cases, cx-cli, cx-cost-optimization, cx-dashboards, cx-data-pipeline, cx-infra, cx-observability-setup, cx-olly, cx-platform-admin, cx-profiling, cx-rum-setup, cx-search-dashboard, cx-service-catalog, cx-slos, cx-telemetry-querying, cx-coding-agents | CX_API_KEY | — |
-| `std.observability.dtctl` | Query Dynatrace telemetry and manage dashboards, workflows, and SLOs | GitHub release: `Dynatrace/dtctl` (latest) | dtctl | DT_API_TOKEN | — |
-| `std.observability.honeymarker` | Manage Honeycomb deployment markers and annotations | go: `github.com/honeycombio/honeymarker` | — | HONEYCOMB_API_KEY | — |
-| `std.observability.langsmith` | Inspect LangSmith traces, runs, datasets, and evaluations | go: `github.com/langchain-ai/langsmith-cli/cmd/langsmith` | — | LANGSMITH_API_KEY | — |
-| `std.observability.newrelic` | Query New Relic data and manage observability resources | GitHub release: `newrelic/newrelic-cli` (latest) | — | NEW_RELIC_API_KEY | — |
-| `std.observability.pup` | Query Datadog logs, traces, monitors, and service metadata | npm: `@datadog/pup` | dd-apm, dd-debugger, dd-docs, dd-idp, dd-logs, dd-monitors, dd-pup, dd-symdb, dd-triage-flaky-test, dd-unblock-pr | DD_API_KEY, DD_APP_KEY, DD_ACCESS_TOKEN | — |
-| `std.observability.sentry` | Inspect Sentry issues, events, and projects from an agent shell | npm: `sentry` | sentry-cli | SENTRY_AUTH_TOKEN, SENTRY_TOKEN | — |
-| `std.observability.sentryCli` | Upload Sentry source maps, debug symbols, and release artifacts | npm: `@sentry/cli` | — | SENTRY_AUTH_TOKEN | — |
+| `std.observability.axiom` | Query Axiom datasets, logs, and traces from the command line. | go: `github.com/axiomhq/cli/cmd/axiom` | axiom-apl, detect-anomalies, explore-dataset, find-traces | AXIOM_TOKEN | — |
+| `std.observability.cx` | Query Coralogix telemetry and manage observability resources. | apt: `libdbus-1-dev`, cargo: `coralogix-cli` | coralogix-docs, cx-ai-center, cx-alerts, cx-cases, cx-cli, cx-cost-optimization, cx-dashboards, cx-data-pipeline, cx-infra, cx-observability-setup, cx-olly, cx-platform-admin, cx-profiling, cx-rum-setup, cx-search-dashboard, cx-service-catalog, cx-slos, cx-telemetry-querying, cx-coding-agents | CX_API_KEY | — |
+| `std.observability.dtctl` | Query Dynatrace telemetry and manage dashboards, workflows, and SLOs. | GitHub release: `Dynatrace/dtctl` (latest) | dtctl | DT_API_TOKEN | — |
+| `std.observability.honeymarker` | Manage Honeycomb deployment markers and annotations. | go: `github.com/honeycombio/honeymarker` | — | HONEYCOMB_API_KEY | — |
+| `std.observability.langsmith` | Inspect LangSmith traces, runs, datasets, and evaluations. | go: `github.com/langchain-ai/langsmith-cli/cmd/langsmith` | — | LANGSMITH_API_KEY | — |
+| `std.observability.newrelic` | Query New Relic data and manage observability resources. | GitHub release: `newrelic/newrelic-cli` (latest) | — | NEW_RELIC_API_KEY | — |
+| `std.observability.pup` | Query Datadog logs, traces, monitors, and service metadata. | npm: `@datadog/pup` | dd-apm, dd-debugger, dd-docs, dd-idp, dd-logs, dd-monitors, dd-pup, dd-symdb, dd-triage-flaky-test, dd-unblock-pr | DD_API_KEY, DD_APP_KEY, DD_ACCESS_TOKEN | — |
+| `std.observability.sentry` | Inspect Sentry issues, events, and projects from an agent shell. | npm: `sentry` | sentry-cli | SENTRY_AUTH_TOKEN, SENTRY_TOKEN | — |
+| `std.observability.sentryCli` | Upload Sentry source maps, debug symbols, and release artifacts. | npm: `@sentry/cli` | — | SENTRY_AUTH_TOKEN | — |
 
 ## security
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.security.ggshield` | Scan source changes and repositories for secrets through GitGuardian | uv: `ggshield` | — | GITGUARDIAN_API_KEY | — |
-| `std.security.osvScanner` | Find vulnerable dependencies in source trees, lockfiles, and container images | go: `github.com/google/osv-scanner/v2/cmd/osv-scanner` | — | — | — |
-| `std.security.semgrep` | Scan source code for security issues through Semgrep rules | uv: `semgrep` | — | — | — |
-| `std.security.snyk` | Scan dependencies, source code, containers, and infrastructure with Snyk | npm: `snyk` | — | SNYK_TOKEN | — |
-| `std.security.trivy` | Scan files, images, dependencies, secrets, and infrastructure configuration | go: `github.com/aquasecurity/trivy/cmd/trivy` | — | — | — |
-| `std.security.trufflehog` | Find and verify leaked credentials in files, Git repositories, and remote sources | GitHub release: `trufflesecurity/trufflehog` (latest) | — | — | — |
+| `std.security.ggshield` | Scan source changes and repositories for secrets through GitGuardian. | uv: `ggshield` | — | GITGUARDIAN_API_KEY | — |
+| `std.security.osvScanner` | Find vulnerable dependencies in source trees, lockfiles, and container images. | go: `github.com/google/osv-scanner/v2/cmd/osv-scanner` | — | — | — |
+| `std.security.semgrep` | Scan source code for security issues through Semgrep rules. | uv: `semgrep` | — | — | — |
+| `std.security.snyk` | Scan dependencies, source code, containers, and infrastructure with Snyk. | npm: `snyk` | — | SNYK_TOKEN | — |
+| `std.security.trivy` | Scan files, images, dependencies, secrets, and infrastructure configuration. | go: `github.com/aquasecurity/trivy/cmd/trivy` | — | — | — |
+| `std.security.trufflehog` | Find and verify leaked credentials in files, Git repositories, and remote sources. | GitHub release: `trufflesecurity/trufflehog` (latest) | — | — | — |
 
 ## testing
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.testing.artillery` | Load testing CLI for HTTP, WebSocket, and browser workloads | npm: `artillery` | — | — | — |
-| `std.testing.brunoCli` | Official Bruno CLI for API collections and test reports | npm: `@usebruno/cli` | — | — | — |
-| `std.testing.emulate` | Local API emulation | npm: `emulate` | emulate | — | — |
-| `std.testing.hoverfly` | HTTP service simulation and API mock proxy CLI | go: `github.com/SpectoLabs/hoverfly/core/cmd/hoverfly` | — | — | — |
-| `std.testing.hurl` | HTTP request runner and API test CLI with plain text input | apt: `libcurl4-openssl-dev`, apt: `libxml2-dev`, apt: `libclang-dev`, cargo: `hurl` | — | — | — |
-| `std.testing.k6` | Scriptable HTTP and browser load testing CLI from Grafana | go: `go.k6.io/k6/v2` | — | — | — |
-| `std.testing.mockoonCli` | Official Mockoon CLI for headless API mock servers | npm: `@mockoon/cli` | — | — | — |
-| `std.testing.oha` | HTTP load generator with JSON output and a noninteractive mode | cargo: `oha` | — | — | — |
-| `std.testing.pact` | Official CLI for API contract verification and mock servers | npm: `@pact-foundation/pact-cli` | — | — | — |
-| `std.testing.prism` | OpenAPI mock server and validation proxy CLI from Stoplight | npm: `@stoplight/prism-cli` | — | — | — |
-| `std.testing.schemathesis` | CLI for property based API tests from OpenAPI and GraphQL schemas | uv: `schemathesis` | — | — | — |
-| `std.testing.uiVerify` | Official UI Verify CLI for visual checks and screenshot uploads | npm: `uiverify` | check-visual-changes, economical-visual-tests, setup-visual-testing, triage-visual-changes, playwright-visual-testing, vitest-visual-testing, bun-visual-testing, storybook-visual-testing, implement-figma-design, making-ui-changes | UIVERIFY_API_KEY | — |
+| `std.testing.artillery` | Load testing CLI for HTTP, WebSocket, and browser workloads. | npm: `artillery` | — | — | — |
+| `std.testing.brunoCli` | Official Bruno CLI for API collections and test reports. | npm: `@usebruno/cli` | — | — | — |
+| `std.testing.emulate` | Local API emulation for CI and sandboxes, with its skill. | npm: `emulate` | emulate | — | — |
+| `std.testing.hoverfly` | HTTP service simulation and API mock proxy CLI. | go: `github.com/SpectoLabs/hoverfly/core/cmd/hoverfly` | — | — | — |
+| `std.testing.hurl` | HTTP request runner and API test CLI with plain text input. | apt: `libcurl4-openssl-dev`, apt: `libxml2-dev`, apt: `libclang-dev`, cargo: `hurl` | — | — | — |
+| `std.testing.k6` | Scriptable HTTP and browser load testing CLI from Grafana. | go: `go.k6.io/k6/v2` | — | — | — |
+| `std.testing.mockoonCli` | Official Mockoon CLI for headless API mock servers. | npm: `@mockoon/cli` | — | — | — |
+| `std.testing.oha` | HTTP load generator with JSON output and a noninteractive mode. | cargo: `oha` | — | — | — |
+| `std.testing.pact` | Official CLI for API contract verification and mock servers. | npm: `@pact-foundation/pact-cli` | — | — | — |
+| `std.testing.prism` | OpenAPI mock server and validation proxy CLI from Stoplight. | npm: `@stoplight/prism-cli` | — | — | — |
+| `std.testing.schemathesis` | CLI for property based API tests from OpenAPI and GraphQL schemas. | uv: `schemathesis` | — | — | — |
+| `std.testing.uiVerify` | Official UI Verify CLI for visual checks and screenshot uploads. | npm: `uiverify` | check-visual-changes, economical-visual-tests, setup-visual-testing, triage-visual-changes, playwright-visual-testing, vitest-visual-testing, bun-visual-testing, storybook-visual-testing, implement-figma-design, making-ui-changes | UIVERIFY_API_KEY | — |
 
 ## work
 
 | Bundle | Description | Install | Skills | Secrets | Unsupported reason |
 |---|---|---|---|---|---|
-| `std.work.larkCli` | Use Lark and Feishu chat, documents, spreadsheets, calendars, and tasks | npm: `@larksuite/cli` | lark-approval, lark-apps, lark-attendance, lark-base, lark-calendar, lark-contact, lark-doc, lark-drive, lark-event, lark-im, lark-mail, lark-markdown, lark-meeting, lark-note, lark-okr, lark-openapi-explorer, lark-shared, lark-sheets, lark-skill-maker, lark-slides, lark-task, lark-whiteboard, lark-wiki, lark-workflow-meeting-summary, lark-workflow-standup-report | LARKSUITE_CLI_APP_SECRET, LARKSUITE_CLI_USER_ACCESS_TOKEN, LARKSUITE_CLI_TENANT_ACCESS_TOKEN | — |
-| `std.work.linearCli` | Manage Linear issues, projects, cycles, documents, and comments | npm: `@schpet/linear-cli` | linear-cli | LINEAR_API_KEY | The Linux executable requires glibc. Alpine is not supported. |
-| `std.work.linearRelease` | Report CI deployments and release changes to Linear | GitHub release: `linear/linear-release` (latest) | linear-release-setup | LINEAR_ACCESS_KEY | No musl build is available. |
-| `std.work.slackCli` | Call Slack APIs and develop, run, and deploy Slack applications | GitHub release: `slackapi/slack-cli` (latest) | slack-cli | — | — |
-| `std.work.stripeCli` | Manage Stripe API resources, webhooks, and local payment integration workflows | npm: `@stripe/cli` | — | STRIPE_API_KEY | — |
+| `std.work.larkCli` | Use Lark and Feishu chat, documents, spreadsheets, calendars, and tasks. | npm: `@larksuite/cli` | lark-approval, lark-apps, lark-attendance, lark-base, lark-calendar, lark-contact, lark-doc, lark-drive, lark-event, lark-im, lark-mail, lark-markdown, lark-meeting, lark-note, lark-okr, lark-openapi-explorer, lark-shared, lark-sheets, lark-skill-maker, lark-slides, lark-task, lark-whiteboard, lark-wiki, lark-workflow-meeting-summary, lark-workflow-standup-report | LARKSUITE_CLI_APP_SECRET, LARKSUITE_CLI_USER_ACCESS_TOKEN, LARKSUITE_CLI_TENANT_ACCESS_TOKEN | — |
+| `std.work.linearCli` | Manage Linear issues, projects, cycles, documents, and comments. | npm: `@schpet/linear-cli` | linear-cli | LINEAR_API_KEY | The Linux executable requires glibc. Alpine is not supported. |
+| `std.work.linearRelease` | Report CI deployments and release changes to Linear. | GitHub release: `linear/linear-release` (latest) | linear-release-setup | LINEAR_ACCESS_KEY | No musl build is available. |
+| `std.work.slackCli` | Call Slack APIs and develop, run, and deploy Slack applications. | GitHub release: `slackapi/slack-cli` (latest) | slack-cli | — | — |
+| `std.work.stripeCli` | Manage Stripe API resources, webhooks, and local payment integration workflows. | npm: `@stripe/cli` | — | STRIPE_API_KEY | — |

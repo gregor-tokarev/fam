@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "sentry-cli"
-description = "Upload Sentry source maps, debug symbols, and release artifacts"
 version = "@FAM_VERSION@"
 requiredSecrets { "SENTRY_AUTH_TOKEN" }
 tasks {

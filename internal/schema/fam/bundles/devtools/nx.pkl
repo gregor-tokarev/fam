@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "nx"
-description = "Inspect monorepos, generate projects, and execute dependency-aware build tasks"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

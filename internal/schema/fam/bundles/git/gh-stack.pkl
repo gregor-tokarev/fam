@@ -12,7 +12,6 @@ import "../packages.pkl" as packages
 import "../../facts.pkl"
 
 name = "gh-stack"
-description = "Manage stacked branches and pull requests with GitHub’s official gh extension"
 version = "@FAM_VERSION@"
 requiredSecrets { "GH_TOKEN"; "GITHUB_TOKEN" }
 tasks {

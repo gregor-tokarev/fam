@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "turso"
-description = "Manage Turso databases, branches, and access tokens"
 version = "@FAM_VERSION@"
 requiredSecrets { "TURSO_API_TOKEN" }
 tasks {

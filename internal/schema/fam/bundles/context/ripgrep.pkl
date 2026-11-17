@@ -7,7 +7,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "ripgrep"
-description = "Search source trees with fast regular expressions and ignore-file support"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("rg", "BurntSushi/ripgrep")

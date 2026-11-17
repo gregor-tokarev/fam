@@ -17,7 +17,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "kind"
-description = "Run local Kubernetes clusters in containers"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("kind", "kubernetes-sigs/kind")

@@ -8,7 +8,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "mise"
-description = "Manage developer tools, project environments, and task execution"
 version = "@FAM_VERSION@"
 local systemPackage = packages.system(new Mapping {
   ["pacman"] = "mise"

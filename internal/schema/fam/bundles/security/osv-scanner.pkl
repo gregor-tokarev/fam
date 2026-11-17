@@ -15,7 +15,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "osv-scanner"
-description = "Find vulnerable dependencies in source trees, lockfiles, and container images"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("osv-scanner", "google/osv-scanner")

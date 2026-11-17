@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "ast-grep"
-description = "Search and rewrite source code with syntax-tree patterns."
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

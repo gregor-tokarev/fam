@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "drizzle-kit"
-description = "Generate and apply Drizzle database migrations"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

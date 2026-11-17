@@ -10,7 +10,6 @@ import "../../facts.pkl"
 local initOnly = List("alpine", "fedora", "rhel", "centos", "rocky", "almalinux", "amzn").contains(facts.distro)
 
 name = "rustup"
-description = "Manage Rust toolchains with Rustup"
 version = "@FAM_VERSION@"
 path {
   "~/.cargo/bin"

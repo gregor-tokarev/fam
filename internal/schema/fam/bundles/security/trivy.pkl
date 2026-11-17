@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "trivy"
-description = "Scan files, images, dependencies, secrets, and infrastructure configuration"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("trivy", "aquasecurity/trivy")

@@ -13,7 +13,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "newrelic"
-description = "Query New Relic data and manage observability resources"
 version = "@FAM_VERSION@"
 requiredSecrets { "NEW_RELIC_API_KEY" }
 tasks {

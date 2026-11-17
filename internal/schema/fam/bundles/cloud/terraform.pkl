@@ -58,7 +58,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "terraform"
-description = "Plan and apply infrastructure changes with Terraform"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage != null) {

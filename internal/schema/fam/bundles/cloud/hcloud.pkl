@@ -17,7 +17,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "hcloud"
-description = "Manage Hetzner Cloud servers, networks, and storage"
 version = "@FAM_VERSION@"
 requiredSecrets { "HCLOUD_TOKEN" }
 tasks {

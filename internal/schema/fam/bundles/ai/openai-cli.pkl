@@ -15,7 +15,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "openai-cli"
-description = "Call OpenAI APIs for responses, files, batches, images, audio, and administration"
 version = "@FAM_VERSION@"
 requiredSecrets { "OPENAI_API_KEY"; "OPENAI_ADMIN_KEY" }
 tasks {

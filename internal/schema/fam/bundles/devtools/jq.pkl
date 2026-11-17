@@ -7,7 +7,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "jq"
-description = "Read, transform, and query JSON in shell workflows"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("jq", "jqlang/jq")

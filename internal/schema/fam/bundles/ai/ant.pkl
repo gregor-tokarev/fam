@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "ant"
-description = "Call the Claude Platform API for messages, files, batches, and platform resources"
 version = "@FAM_VERSION@"
 requiredSecrets { "ANTHROPIC_API_KEY" }
 tasks {

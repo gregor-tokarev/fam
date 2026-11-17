@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "firecrawl"
-description = "Search, scrape, crawl, and extract web content with the official Firecrawl CLI."
 version = "@FAM_VERSION@"
 requiredSecrets { "FIRECRAWL_API_KEY" }
 tasks {

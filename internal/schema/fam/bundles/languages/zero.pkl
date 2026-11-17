@@ -10,7 +10,6 @@ import "../packages.pkl" as packages
 local systemPackage = packages.system(new Mapping { ["brew"] = "zerolang" })
 
 name = "zero"
-description = "The Zero programming language for agents"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage != null) {

@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "yq"
-description = "Read and transform YAML, JSON, XML, and other structured data"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("yq", "mikefarah/yq")

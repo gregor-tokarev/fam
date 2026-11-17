@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "litestream"
-description = "Replicate SQLite databases to external storage"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("litestream", "benbjohnson/litestream")

@@ -13,7 +13,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "hoverfly"
-description = "HTTP service simulation and API mock proxy CLI"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("hoverfly", "SpectoLabs/hoverfly")

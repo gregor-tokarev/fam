@@ -13,7 +13,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "supabase"
-description = "Manage Supabase projects, migrations, functions, and local databases"
 version = "@FAM_VERSION@"
 requiredSecrets { "SUPABASE_ACCESS_TOKEN" }
 tasks {

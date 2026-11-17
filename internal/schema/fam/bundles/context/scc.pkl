@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "scc"
-description = "Count source lines and estimate code complexity with structured output"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("scc", "boyter/scc")

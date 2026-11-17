@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "shfmt"
-description = "Format shell scripts and validate their syntax"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("shfmt", "mvdan/sh")

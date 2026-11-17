@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "kustomize"
-description = "Customize Kubernetes manifests without templates"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("kustomize", "kubernetes-sigs/kustomize")

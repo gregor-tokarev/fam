@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "sqlite-utils"
-description = "Import, transform, and query SQLite databases from the CLI"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

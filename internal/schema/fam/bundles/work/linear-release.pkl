@@ -10,7 +10,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "linear-release"
-description = "Report CI deployments and release changes to Linear"
 version = "@FAM_VERSION@"
 supported = facts.libc != "musl"
 unsupportedReason = "No musl build is available."

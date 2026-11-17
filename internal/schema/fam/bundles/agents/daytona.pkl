@@ -15,7 +15,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "daytona"
-description = "Create and manage Daytona sandboxes, snapshots, and remote command execution"
 version = "@FAM_VERSION@"
 supported = systemPackage != null || (facts.libc != "musl")
 unsupportedReason = "The Linux release requires glibc. Alpine is not supported."

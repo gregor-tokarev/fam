@@ -7,7 +7,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "fzf"
-description = "Filter and rank text candidates through fuzzy matching"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("fzf", "junegunn/fzf")

@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "uiverify"
-description = "Official UI Verify CLI for visual checks and screenshot uploads"
 version = "@FAM_VERSION@"
 requiredSecrets { "UIVERIFY_API_KEY" }
 tasks {

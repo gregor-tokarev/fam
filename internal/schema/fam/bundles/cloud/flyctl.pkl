@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "flyctl"
-description = "Deploy applications and manage Fly.io machines"
 version = "@FAM_VERSION@"
 requiredSecrets { "FLY_API_TOKEN" }
 tasks {

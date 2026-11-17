@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "promptfoo"
-description = "Evaluate model prompts and agents, and run adversarial evaluations"
 version = "@FAM_VERSION@"
 requiredSecrets { "OPENAI_API_KEY" }
 tasks {

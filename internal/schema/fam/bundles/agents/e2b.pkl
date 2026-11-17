@@ -9,7 +9,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "e2b"
-description = "Manage E2B cloud sandboxes and build sandbox templates"
 version = "@FAM_VERSION@"
 requiredSecrets { "E2B_API_KEY" }
 tasks {

@@ -17,7 +17,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "vhs"
-description = "Scripted terminal recording CLI that creates videos and GIFs"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("vhs", "charmbracelet/vhs")

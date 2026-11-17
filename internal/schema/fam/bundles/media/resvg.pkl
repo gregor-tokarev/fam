@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "resvg"
-description = "Official standalone SVG renderer CLI with PNG output"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("resvg", "linebender/resvg")

@@ -10,7 +10,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "lark-cli"
-description = "Use Lark and Feishu chat, documents, spreadsheets, calendars, and tasks"
 version = "@FAM_VERSION@"
 requiredSecrets { "LARKSUITE_CLI_APP_SECRET"; "LARKSUITE_CLI_USER_ACCESS_TOKEN"; "LARKSUITE_CLI_TENANT_ACCESS_TOKEN" }
 tasks {

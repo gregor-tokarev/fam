@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "difftastic"
-description = "Compare source files through syntax-aware diffs"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("difft", "Wilfred/difftastic")

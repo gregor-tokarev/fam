@@ -8,7 +8,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "just"
-description = "Run project commands and recipes from a justfile"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("just", "casey/just")

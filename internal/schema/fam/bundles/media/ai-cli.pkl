@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "ai-cli"
-description = "Generate anything from the terminal"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

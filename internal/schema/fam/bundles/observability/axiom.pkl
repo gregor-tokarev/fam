@@ -15,7 +15,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "axiom"
-description = "Query Axiom datasets, logs, and traces from the command line"
 version = "@FAM_VERSION@"
 requiredSecrets { "AXIOM_TOKEN" }
 tasks {

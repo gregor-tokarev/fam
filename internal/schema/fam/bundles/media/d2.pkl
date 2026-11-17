@@ -17,7 +17,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "d2"
-description = "Official text to diagram CLI for architecture and system designs"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("d2", "d2lang/d2")

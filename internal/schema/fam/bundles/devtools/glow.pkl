@@ -15,7 +15,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "glow"
-description = "Render Markdown files and standard input in a terminal"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("glow", "charmbracelet/glow")

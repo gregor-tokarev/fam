@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "opentofu"
-description = "Plan and apply infrastructure changes with OpenTofu"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage != null) {

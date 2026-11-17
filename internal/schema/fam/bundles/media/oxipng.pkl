@@ -15,7 +15,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "oxipng"
-description = "Lossless PNG optimization CLI with parallel processing"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("oxipng", "oxipng/oxipng")

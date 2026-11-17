@@ -7,7 +7,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "webreel"
-description = "Scripted browser demos as video"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

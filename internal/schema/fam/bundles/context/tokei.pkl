@@ -18,7 +18,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "tokei"
-description = "Count source lines, comments, and language totals across a repository"
 version = "@FAM_VERSION@"
 tasks {
   packages.cargo("tokei", "tokei", systemPackage)

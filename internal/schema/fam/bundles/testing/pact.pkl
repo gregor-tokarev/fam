@@ -10,7 +10,6 @@ import "../../tasks.pkl" as fam
 import "../packages.pkl" as packages
 
 name = "pact"
-description = "Official CLI for API contract verification and mock servers"
 version = "@FAM_VERSION@"
 
 tasks {

@@ -13,7 +13,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "oha"
-description = "HTTP load generator with JSON output and a noninteractive mode"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("oha", "hatoo/oha")

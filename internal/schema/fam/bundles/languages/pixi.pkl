@@ -13,7 +13,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "pixi"
-description = "Manage reproducible environments and command-line tools across language ecosystems"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage != null) {

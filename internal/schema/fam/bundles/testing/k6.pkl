@@ -13,7 +13,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "k6"
-description = "Scriptable HTTP and browser load testing CLI from Grafana"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("k6", "grafana/k6")

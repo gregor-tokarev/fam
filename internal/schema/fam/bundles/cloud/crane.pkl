@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "crane"
-description = "Inspect, copy, and modify container images in registries"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("crane", "google/go-containerregistry")

@@ -47,7 +47,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "kubectl"
-description = "Manage Kubernetes resources and clusters"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage != null) {

@@ -10,7 +10,6 @@ import "../../tasks.pkl" as fam
 import "../../facts.pkl"
 
 name = "imagemagick"
-description = "Official CLI for image conversion, resizing, comparison, and composition"
 version = "@FAM_VERSION@"
 tasks {
   new fam.Package {

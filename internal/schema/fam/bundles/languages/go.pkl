@@ -29,7 +29,6 @@ local retireLegacy = new fam.Script {
 }
 
 name = "go"
-description = "Build and format Go programs with the Go toolchain"
 version = "@FAM_VERSION@"
 tasks {
   retireLegacy

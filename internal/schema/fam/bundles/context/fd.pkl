@@ -8,7 +8,6 @@ import "../packages.pkl" as packages
 import "../../facts.pkl"
 
 name = "fd"
-description = "Find files and directories through a concise headless CLI"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("fd", "sharkdp/fd")

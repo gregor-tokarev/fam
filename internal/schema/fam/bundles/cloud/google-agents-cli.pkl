@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "google-agents-cli"
-description = "Create, evaluate, and deploy applications on Google Cloud"
 version = "@FAM_VERSION@"
 requiredSecrets { "GOOGLE_APPLICATION_CREDENTIALS"; "GEMINI_API_KEY"; "GOOGLE_API_KEY" }
 tasks {

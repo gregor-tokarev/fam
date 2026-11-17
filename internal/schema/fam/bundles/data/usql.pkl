@@ -14,7 +14,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "usql"
-description = "Query many database systems through a common CLI"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("usql", "xo/usql")

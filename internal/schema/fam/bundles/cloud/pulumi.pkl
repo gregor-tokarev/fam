@@ -16,7 +16,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "pulumi"
-description = "Manage cloud infrastructure through Pulumi programs"
 version = "@FAM_VERSION@"
 requiredSecrets { "PULUMI_ACCESS_TOKEN" }
 tasks {

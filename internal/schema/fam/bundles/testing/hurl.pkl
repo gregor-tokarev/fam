@@ -13,7 +13,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "hurl"
-description = "HTTP request runner and API test CLI with plain text input"
 version = "@FAM_VERSION@"
 tasks {
   when (systemPackage == null) {

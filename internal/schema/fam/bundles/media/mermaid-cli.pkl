@@ -8,7 +8,6 @@ amends "../../Bundle.pkl"
 import "../../tasks.pkl" as fam
 
 name = "mermaid-cli"
-description = "Official CLI that renders Mermaid diagrams to SVG, PNG, and PDF"
 version = "@FAM_VERSION@"
 env { ["PUPPETEER_SKIP_DOWNLOAD"] = "1" }
 tasks {

@@ -18,7 +18,6 @@ local systemPackage = packages.system(new Mapping {
 })
 
 name = "deno"
-description = "Run JavaScript and TypeScript with the Deno toolchain"
 version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("deno", "denoland/deno")
