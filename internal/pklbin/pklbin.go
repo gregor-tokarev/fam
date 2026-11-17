@@ -55,6 +55,28 @@ func CacheDir() (string, error) {
 	return filepath.Join(dir, "fam", "pkl", version.PklVersion), nil
 }
 
+// CachedPath finds and validates the pinned binary without downloads or writes.
+func CachedPath() (string, error) {
+	a, ok := assets[platformKey()]
+	if !ok {
+		return "", fmt.Errorf("pkl %s has no binary for %s", version.PklVersion, platformKey())
+	}
+	dir, err := CacheDir()
+	if err != nil {
+		return "", err
+	}
+	bin := filepath.Join(dir, a.name)
+	if st, err := os.Stat(bin); err == nil && st.Mode().IsRegular() && st.Mode()&0o111 != 0 {
+		if b, err := os.ReadFile(bin + ".sha256"); err == nil && strings.TrimSpace(string(b)) == a.sha256 {
+			return bin, nil
+		}
+		if sum, err := fileSHA256(bin); err == nil && sum == a.sha256 {
+			return bin, nil
+		}
+	}
+	return "", fmt.Errorf("pkl %s is not cached. Run `fam internal pkl-path`", version.PklVersion)
+}
+
 // Path returns the path of the pinned pkl binary. It downloads the binary on first use.
 func Path(ctx context.Context, progress io.Writer) (string, error) {
 	key := platformKey()

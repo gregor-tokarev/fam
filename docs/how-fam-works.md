@@ -1,5 +1,65 @@
 # How FAM works
 
+## Project tools
+
+Use these commands from a project folder. Set `--base <folder>` to select another project.
+Set `--config <file>` to select another entrypoint inside that project.
+`--json` and `--toon` select structured output for the commands below.
+
+### Find standard bundles
+
+`fam std list [group]` lists the embedded catalogue without network access after the pinned Pkl binary is cached.
+Each group has a heading. Each bundle has one line: `std.<group>.<name>()  <summary>`.
+`fam std show <group>.<name>` shows the full comment, bundle name, required secret names, skills, and verify scripts.
+It also shows platform restrictions from representative Linux and macOS facts.
+An unknown bundle exits with code `1` and lists the three closest names.
+These commands need no project.
+
+### Validate edits
+
+Run `fam check` after each edit, or in CI.
+It evaluates the project without SSH, task execution, downloads, or writes.
+The pinned Pkl binary must already be cached. The FAM package comes from the binary.
+Other remote Pkl dependencies must already be in the package cache.
+Use `fam internal pkl-path` once if the pinned Pkl binary is missing.
+
+The check uses representative Ubuntu amd64 and macOS arm64 facts for each machine.
+It validates Pkl types, bundle names, role references, required secret names, local resources, skills, and instruction templates.
+It also checks task definitions, the cockpit count, project folders, and the secrets source rules.
+It warns when the package pin differs from the binary. Run `fam migrate` to update the pin.
+The check cannot validate every condition that depends on remote facts. Run `fam plan` before apply.
+It does not download GitHub skills or inspect remote files.
+
+Each problem uses `error|warning <file>:<line> <message>` when FAM knows the position.
+FAM omits unknown position fields. The last line is `check: <errors> errors, <warnings> warnings`.
+Pkl errors also retain the original diagnostic on stderr, with source lines and the Pkl message.
+JSON and TOON include that diagnostic in the `pkl` field instead.
+Exit code `0` means no errors. Warnings alone do not fail the check.
+
+### Diagnose the environment
+
+`fam doctor` checks the binary version, project pins, editor state, both package caches, and the pinned Pkl binary.
+It summarizes `fam check` and runs `true` over SSH on each worker, in parallel.
+The cockpit needs no SSH. `--machine` selects machines.
+`--ssh-config` and `FAM_SSH_CONFIG` select the SSH configuration, as for plan.
+Each line uses `ok|warn|fail <check>: <detail>`.
+A warning or failure has a `fix: <command>` line.
+The release check times out after three seconds. FAM omits it when offline.
+`fam doctor --offline` skips release and SSH checks. A failure gives exit code `1`.
+For editor state problems, run `fam migrate`, then restart the editor language server.
+
+## Project guide
+
+`fam new` and `fam migrate` write a guide in the project base as `AGENTS.md`.
+They create `CLAUDE.md` with the single line `@AGENTS.md` only when that file does not exist.
+Claude Code imports the same guide through this line.
+
+FAM owns only the section between `<!-- fam:begin -->` and `<!-- fam:end -->`.
+Migration replaces that section and keeps text outside it.
+If the file has no markers, FAM appends the section.
+The guide explains project edits, bundle discovery, validation, and when to use plan and apply.
+`instructions/AGENTS.md` serves a different purpose: FAM installs its content on fleet machines.
+
 ## Run order
 
 `fam plan`, `fam apply`, and `fam verify` do these steps:

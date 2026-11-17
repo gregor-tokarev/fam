@@ -8,7 +8,10 @@
 | `internal/schema/fam` | The Pkl schema and the standard bundles: the files of the Pkl package `fam`. FAM embeds this folder and builds the package from it (`internal/schema`). `@FAM_VERSION@` becomes the FAM version. |
 | `internal/pklgen` | Go structs generated from the schema. Do not edit. |
 | `internal/pklbin` | Download and cache of the pinned `pkl` binary. |
-| `internal/project` | `fam new` and `fam migrate`. |
+| `internal/project` | `fam new`, `fam migrate`, and the embedded project guide in `guide.md`. Only `{{version}}` is substituted. |
+| `internal/engine/check.go` | Static project validation through the config validators and task builders. It uses the embedded package and cached dependencies. It blocks network reads. |
+| `internal/stdlib` | Catalogue reflection, selected bundle evaluation, and generated documentation. |
+| `internal/cli` | Command registration, project diagnostics, and environment checks. |
 
 ## Build
 

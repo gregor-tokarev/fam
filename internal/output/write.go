@@ -19,20 +19,25 @@ const (
 
 // Write writes the result in the format.
 func Write(w io.Writer, r *Run, f Format) error {
+	return WriteValue(w, r, f, func() { WriteText(w, r) })
+}
+
+// WriteValue writes a command result with the shared structured encoders.
+func WriteValue(w io.Writer, value any, f Format, plain func()) error {
 	switch f {
 	case JSON:
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		return enc.Encode(r)
+		return enc.Encode(value)
 	case TOON:
-		b, err := toon.Marshal(r)
+		b, err := toon.Marshal(value)
 		if err != nil {
 			return err
 		}
 		_, err = w.Write(append(b, '\n'))
 		return err
 	default:
-		WriteText(w, r)
+		plain()
 		return nil
 	}
 }

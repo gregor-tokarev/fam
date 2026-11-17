@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -121,48 +122,64 @@ func bundleEntry(entry any, origin string) (BundleUse, error) {
 }
 
 // Validate checks the rules that Pkl cannot check: bundle identity and the scripts.
-func Validate(cfg *config.Config) error {
+func Validate(cfg *config.Config) error { return errors.Join(ValidationErrors(cfg)...) }
+
+// ValidationErrors returns independent errors across all bundle scopes and machines.
+func ValidationErrors(cfg *config.Config) []error {
+	var problems []error
+	add := func(err error) {
+		if err != nil {
+			problems = append(problems, err)
+		}
+	}
 	if _, err := Machines(cfg); err != nil {
-		return err
+		add(err)
+	}
+	if len(cfg.Machines) == 0 {
+		add(fmt.Errorf("the config has no machines"))
+	}
+	names := make([]string, 0, len(cfg.Machines))
+	for name := range cfg.Machines {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		m := cfg.Machines[name]
+		if string(m.Role) != "cockpit" {
+			if _, ok := cfg.Roles[m.Role]; !ok {
+				add(fmt.Errorf("machine %s references role %q, but the config does not define it", name, m.Role))
+			}
+		}
 	}
 	sources := map[string]string{}
-	check := func(entries []any, where string) error {
+	check := func(entries []any, where string) {
 		seen := map[string]bool{}
 		for _, e := range entries {
 			u, err := bundleEntry(e, where)
 			if err != nil {
-				return err
+				add(err)
+				continue
 			}
 			name := u.Bundle.Name
 			if prev, ok := sources[name]; ok && prev != u.Bundle.Source {
-				return fmt.Errorf("two different files use the bundle name %q: %s and %s. A bundle name identifies one bundle", name, prev, u.Bundle.Source)
+				add(fmt.Errorf("two different files use the bundle name %q: %s and %s. A bundle name identifies one bundle", name, prev, u.Bundle.Source))
 			}
 			sources[name] = u.Bundle.Source
 			if seen[name] {
-				return fmt.Errorf("the bundle %q is listed two times in %s", name, where)
+				add(fmt.Errorf("the bundle %q is listed two times in %s", name, where))
 			}
 			seen[name] = true
 			if err := validateTasks(u.Bundle.Tasks, "bundle "+name); err != nil {
-				return err
+				add(err)
 			}
 			if err := validateTasks(u.Bundle.Uninstall, "bundle "+name+" (uninstall)"); err != nil {
-				return err
+				add(err)
 			}
 		}
-		return nil
 	}
-	if err := check(cfg.Bundles, "the bundles of config.pkl"); err != nil {
-		return err
-	}
-	names := make([]string, 0, len(cfg.Machines))
-	for n := range cfg.Machines {
-		names = append(names, n)
-	}
-	sort.Strings(names)
+	check(cfg.Bundles, "the bundles of config.pkl")
 	for _, n := range names {
-		if err := check(cfg.Machines[n].Bundles, "the bundles of machine "+n); err != nil {
-			return err
-		}
+		check(cfg.Machines[n].Bundles, "the bundles of machine "+n)
 	}
 	roles := make([]string, 0, len(cfg.Roles))
 	for r := range cfg.Roles {
@@ -172,13 +189,11 @@ func Validate(cfg *config.Config) error {
 	for _, r := range roles {
 		for k, rb := range cfg.Roles {
 			if string(k) == r {
-				if err := check(rb.Bundles, "the bundles of role "+r); err != nil {
-					return err
-				}
+				check(rb.Bundles, "the bundles of role "+r)
 			}
 		}
 	}
-	return nil
+	return problems
 }
 
 func validateTasks(ts []tasks.Task, where string) error {

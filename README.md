@@ -34,6 +34,10 @@ To update FAM, run `fam update`.
 
 ```sh
 fam new      # create a project
+fam std list # find ready bundles
+fam std show computer.agentDesktop # read what a bundle provides
+fam check    # find project errors before a run
+fam doctor   # find environment and connection problems
 fam plan     # show what is different on each machine
 fam apply    # make the machines match, then prove that the tools work
 fam verify   # prove it again
