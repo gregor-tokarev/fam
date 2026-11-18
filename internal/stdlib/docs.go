@@ -3,7 +3,6 @@ package stdlib
 import (
 	"context"
 	"fmt"
-	"path"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -45,21 +44,8 @@ func Docs(ctx context.Context) ([]byte, error) {
 						tag = *x.GetTag()
 					}
 					install = append(install, "GitHub release: `"+x.GetRepo()+"` ("+tag+")")
-				case tasks.GitHubSkill:
-					name := path.Base(x.GetPath())
-					if x.GetName() != nil {
-						name = *x.GetName()
-					}
-					skills = append(skills, name)
-				case tasks.Skill:
-					name := path.Base(x.GetPath())
-					if name == "skill" {
-						name = b.Name
-					}
-					if x.GetName() != nil {
-						name = *x.GetName()
-					}
-					skills = append(skills, name)
+				case tasks.AgentSkill:
+					skills = append(skills, engine.AgentSkillName(x, b.Name))
 				}
 			}
 			desc := summary(entry.Doc)

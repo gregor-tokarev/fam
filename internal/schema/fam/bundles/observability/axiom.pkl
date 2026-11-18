@@ -23,20 +23,20 @@ tasks {
     package = systemPackage ?? new fam.PackageRef { package = "github.com/axiomhq/cli/cmd/axiom"; manager = "go" }
     binary = "axiom"
   }
-  new fam.GitHubSkill {
-    repo = "axiomhq/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/axiomhq/cli"
     path = "skills/axiom-apl"
   }
-  new fam.GitHubSkill {
-    repo = "axiomhq/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/axiomhq/cli"
     path = "skills/detect-anomalies"
   }
-  new fam.GitHubSkill {
-    repo = "axiomhq/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/axiomhq/cli"
     path = "skills/explore-dataset"
   }
-  new fam.GitHubSkill {
-    repo = "axiomhq/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/axiomhq/cli"
     path = "skills/find-traces"
   }
 }

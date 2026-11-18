@@ -19,8 +19,8 @@ tasks {
       ["darwin-arm64"] { name = "slack_cli_{version}_macOS_arm64.tar.gz"; format = "tar.gz"; file = "bin/slack" }
     }
   }
-  new fam.GitHubSkill {
-    repo = "slackapi/slack-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/slackapi/slack-cli"
     path = "cmd/skill"
     name = "slack-cli"
   }

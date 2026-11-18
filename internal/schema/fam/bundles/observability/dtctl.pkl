@@ -36,8 +36,8 @@ tasks {
       }
     }
   }
-  new fam.GitHubSkill {
-    repo = "Dynatrace/dtctl"
+  new fam.AgentSkill {
+    source = "https://github.com/Dynatrace/dtctl"
     path = "skills/dtctl"
   }
 }

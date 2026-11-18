@@ -17,44 +17,44 @@ tasks {
     package = "@datadog/pup"
     binary = "pup"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-apm"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-debugger"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-docs"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-idp"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-logs"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-monitors"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-pup"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-symdb"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-triage-flaky-test"
   }
-  new fam.GitHubSkill {
-    repo = "DataDog/pup"
+  new fam.AgentSkill {
+    source = "https://github.com/DataDog/pup"
     path = "skills/dd-unblock-pr"
   }
 }

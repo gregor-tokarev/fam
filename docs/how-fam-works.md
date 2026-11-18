@@ -88,14 +88,14 @@ bundles/tool.pkl      # amends "@fam/Bundle.pkl"
 - `fam new` and `fam migrate` also write `.pkl-lsp/projects.json`, the project state that the Pkl language server writes on "Sync Projects". So the editor needs no sync after these commands, also in editors that have no "Sync Projects" command, such as Zed. Restart the language server after `fam migrate`. The folder has its own `.gitignore`.
 - The project pins one FAM version. A binary of another patch release of the same minor version works with it: patch releases do not change the schema. Otherwise FAM asks for `fam migrate` (an older project) or `fam update` (a newer project).
 - `fam migrate` changes the version in `PklProject` and the checksum in `PklProject.deps.json`. It keeps the other dependencies of the project.
-- A standard bundle comes from the package, so it has no folder: it cannot use `fam.Skill` with a local folder.
+- A standard bundle comes from the package, so it has no folder: it cannot use `fam.AgentSkill` with a relative folder.
 
 ## Task order on a machine
 
 1. Environment: `~/.config/fam/secrets.env`, `~/.config/fam/env.sh`, and the loader blocks.
 2. Agents: the CLI package, then the settings merge, for each agent. They come after the environment, so that the installers see its variables (for example a proxy).
 3. Bundles: first the `bundles` of `config.pkl` (every machine), then the bundles of the machine's role (`roles` in `config.pkl`), then the `bundles` of the machine entry, each in list order. An entry with the name of an earlier bundle replaces it at its position, so a role or a machine can change or remove (`state = "absent"`) a bundle of every machine.
-4. The skills of `skills/`, then the removal of old managed skills. (Bundle skills are tasks of their bundle.)
+4. The removal of old managed skills. (Skills are tasks of their bundle.)
 5. Instructions.
 
 ## Check exit codes
@@ -157,11 +157,20 @@ There is no `.Agent` variable. Bundles add no instructions: a bundle's skill tel
 
 ## Skills
 
-FAM copies each folder of `skills/` (resolved relative to `--base`, or set with `--skills`) after the bundles. The skill name is the folder name.
+Skills come only from bundles: FAM does not copy a project folder to every machine. A bundle for every machine, a role, or one machine selects the skills, so the skills can be different on each machine.
 
-Bundles install skills with tasks, as many as they need, in task order: `new fam.Skill { path }` for a folder of the bundle, and `new fam.GitHubSkill { repo; path; ref }` for a folder in a public GitHub repository. A skill task copies the skill and links `~/.claude/skills/<name>`. The name is the folder name (a bundle folder named `skill` gets the bundle name), or `name`. With `state = "absent"`, or in an absent bundle, the task removes the skill, but only one that FAM made. Two skills with the same name are an error. FAM removes managed skills that no bundle and no folder of `skills/` lists any more.
+A bundle installs skills with `new fam.AgentSkill { source }` tasks, as many as it needs, in task order. `source` is one of:
 
-For a GitHub skill, the cockpit downloads the repository archive from `codeload.github.com` and copies the folder like a local one. All skills of one repository and ref share one download. FAM keeps the archive in `<user cache dir>/fam/github/` with its ETag. Once in each run, also for `fam plan`, FAM asks GitHub with this ETag, and GitHub sends the archive again only when it changed (a new commit on a branch, or a moved tag). FAM removes an archive that no run used for 30 days. Without a `ref`, FAM uses the tag of the latest release (the redirect of `github.com/<repo>/releases/latest`, no API token). FAM tries a request up to three times when the network fails. A link in the folder becomes a copy of the file that it points to, which must be in the same folder. FAM reads at most 1 GiB of the archive and keeps only the folder (at most 16 MiB for each file, 64 MiB and 5000 files in total).
+- A folder on the cockpit with `SKILL.md`: a path relative to the bundle file, or an absolute path. A standard bundle has no folder, so it cannot use a relative path.
+- A public GitHub repository, `https://github.com/<owner>/<repo>`, with the skill folder in `path` and a tag, branch, or commit in `ref`. A `https://github.com/<owner>/<repo>/tree/<ref>/<folder>` URL sets both (the ref is one part of the URL; set `ref` for a ref with `/`).
+- A `.tar.gz`, `.tgz`, or `.zip` archive at an `https://` URL, with the skill folder in `path`. When all files of the archive are in one top folder, `path` is relative to that folder.
+- A `.md` file at an `https://` URL, a skill of one file. FAM saves it as `SKILL.md`. A GitHub file page (`/blob/`) becomes its raw file.
+
+A skill task copies the skill and links `~/.claude/skills/<name>`. The name is `name`, or else the last part of `path`, or else the last part of `source` (without the archive extension; the folder of a `SKILL.md` file). A local folder named `skill` gets the bundle name. With `state = "absent"`, or in an absent bundle, the task removes the skill, but only one that FAM made. Two skills with the same name are an error. FAM removes managed skills that no bundle lists any more.
+
+Earlier versions of FAM copied each folder of `skills/` in the project to every machine. A folder of `skills/` that no bundle of a machine lists makes the plan of that machine stop before FAM removes the skill: add it to a bundle (`source = "../skills/<name>"` in `bundles/`), or add it with `state = "absent"`.
+
+For a GitHub skill, the cockpit downloads the repository archive from `codeload.github.com` and copies the folder like a local one. All skills of one repository and ref share one download. Without a `ref`, FAM uses the tag of the latest release (the redirect of `github.com/<repo>/releases/latest`, no API token). Other URLs are downloads of the archive or the file. FAM keeps each download in `<user cache dir>/fam/github/` with its ETag. Once in each run, also for `fam plan`, FAM asks the server with this ETag, and the server sends the file again only when it changed (for GitHub, a new commit on a branch, or a moved tag). FAM removes a download that no run used for 30 days. FAM tries a request up to three times when the network fails. A link in the folder becomes a copy of the file that it points to, which must be in the same folder. FAM reads at most 1 GiB of an archive and keeps only the folder (at most 16 MiB for each file, 64 MiB and 5000 files in total). `fam check` does not download skills.
 
 ## Secrets
 
@@ -236,7 +245,7 @@ Without `secrets` in the config, FAM removes `~/.config/fam/secrets.env` only wh
 
 ## Standard bundles
 
-`@fam/std.pkl` has ready bundles for agent tools, in groups: `bundles { std.networking.portless(); std.media.hyperframes() }`. Each bundle is a function, so that it can take options later. Each bundle uses `fam.Package` when a suitable package exists. It selects the system package for the distribution, or an official npm, uv, Go, or Cargo package. Release downloads remain as fallbacks when no suitable package exists. Skills come from GitHub. CLI bundles do not install browsers or configure services. Language bundles install their named toolchain or manager. Other bundles require their documented runtimes or compilers. A skill without a tool is not a standard bundle: add it with `new fam.GitHubSkill { repo; path }` in a bundle of your own.
+`@fam/std.pkl` has ready bundles for agent tools, in groups: `bundles { std.networking.portless(); std.media.hyperframes() }`. Each bundle is a function, so that it can take options later. Each bundle uses `fam.Package` when a suitable package exists. It selects the system package for the distribution, or an official npm, uv, Go, or Cargo package. Release downloads remain as fallbacks when no suitable package exists. Skills come from GitHub. CLI bundles do not install browsers or configure services. Language bundles install their named toolchain or manager. Other bundles require their documented runtimes or compilers. A skill without a tool is not a standard bundle: add it with `new fam.AgentSkill { source }` in a bundle of your own.
 
 See the [standard bundle catalogue](std.md) for descriptions, install methods, skills, and required secrets.
 

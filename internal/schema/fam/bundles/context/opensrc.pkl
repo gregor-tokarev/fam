@@ -13,8 +13,8 @@ tasks {
   new fam.Package {
     package = "opensrc"
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/opensrc"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/opensrc"
     path = "skills/opensrc"
   }
 }

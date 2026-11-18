@@ -25,8 +25,8 @@ tasks {
     }
     binary = "just"
   }
-  new fam.GitHubSkill {
-    repo = "casey/just"
+  new fam.AgentSkill {
+    source = "https://github.com/casey/just"
     path = "skills/just"
   }
 }

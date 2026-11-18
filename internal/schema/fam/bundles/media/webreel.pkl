@@ -12,8 +12,8 @@ tasks {
   new fam.Package {
     package = "webreel"
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/webreel"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/webreel"
     path = "skills/webreel"
   }
 }

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -28,61 +29,65 @@ var (
 	CodeloadBase = "https://codeload.github.com"
 )
 
-// githubSkills holds the skills that this run read, so that all machines share one read for
-// each repository, folder, and ref.
-var githubSkills = struct {
+// remoteSkills holds the skills that this run read, so that all machines share one read for
+// each source.
+var remoteSkills = struct {
 	sync.Mutex
-	done map[string]*githubSkillResult
-}{done: map[string]*githubSkillResult{}}
+	done map[string]*remoteSkillResult
+}{done: map[string]*remoteSkillResult{}}
 
-type githubSkillResult struct {
+type remoteSkillResult struct {
 	once  sync.Once
-	ref   string
+	src   string
 	files []skillFile
 	err   error
 }
 
-// loadGitHubSkill downloads a skill folder from a GitHub repository. name is the skill name
-// ("" for the last part of the folder path).
-func loadGitHubSkill(ctx context.Context, repo, folder string, refp *string, name, origin string) (*SkillSource, error) {
-	ref := ""
-	if refp != nil {
-		ref = *refp
-	}
-	key := repo + "\x00" + folder + "\x00" + ref
-	githubSkills.Lock()
-	r, ok := githubSkills.done[key]
+// remoteSkillOnce runs load once in a run for each key. A canceled load is not kept, so that a
+// later call tries again.
+func remoteSkillOnce(ctx context.Context, key string, load func() (src string, files []skillFile, err error)) (string, []skillFile, error) {
+	remoteSkills.Lock()
+	r, ok := remoteSkills.done[key]
 	if !ok {
-		r = &githubSkillResult{}
-		githubSkills.done[key] = r
+		r = &remoteSkillResult{}
+		remoteSkills.done[key] = r
 	}
-	githubSkills.Unlock()
-	r.once.Do(func() {
-		r.ref = ref
-		if r.ref == "" {
-			r.ref, r.err = latestReleaseOnce(ctx, repo)
-			if r.err != nil {
-				return
+	remoteSkills.Unlock()
+	r.once.Do(func() { r.src, r.files, r.err = load() })
+	if r.err != nil && ctx.Err() != nil {
+		remoteSkills.Lock()
+		if remoteSkills.done[key] == r {
+			delete(remoteSkills.done, key)
+		}
+		remoteSkills.Unlock()
+	}
+	return r.src, r.files, r.err
+}
+
+// loadGitHubSkill downloads a skill folder from a GitHub repository. folder "" is the top of the
+// repository. ref "" is the latest release.
+func loadGitHubSkill(ctx context.Context, repo, folder, ref, name, origin string) (*SkillSource, error) {
+	key := "github\x00" + repo + "\x00" + folder + "\x00" + ref
+	src, files, err := remoteSkillOnce(ctx, key, func() (string, []skillFile, error) {
+		r := ref
+		if r == "" {
+			var err error
+			if r, err = latestReleaseOnce(ctx, repo); err != nil {
+				return "", nil, err
 			}
 		}
-		r.files, r.err = downloadSkill(ctx, repo, folder, r.ref)
-	})
-	if r.err != nil && ctx.Err() != nil {
-		// Do not keep a canceled download: a later call tries again.
-		githubSkills.Lock()
-		if githubSkills.done[key] == r {
-			delete(githubSkills.done, key)
+		src := "github.com/" + repo
+		if folder != "" {
+			src += "/" + folder
 		}
-		githubSkills.Unlock()
+		src += "@" + r
+		files, err := downloadSkill(ctx, repo, folder, r)
+		return src, files, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("skill %s (%s): %w", name, origin, err)
 	}
-	if name == "" {
-		name = path.Base(folder)
-	}
-	src := fmt.Sprintf("github.com/%s/%s@%s", repo, folder, r.ref)
-	if r.err != nil {
-		return nil, fmt.Errorf("skill %s (%s): %w", name, origin, r.err)
-	}
-	return &SkillSource{Name: name, Dir: src, Origin: origin, files: r.files}, nil
+	return &SkillSource{Name: name, Dir: src, Origin: origin, files: files}, nil
 }
 
 // latestTags holds the latest release tag of each repository for this run.
@@ -164,8 +169,17 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 		segs[i] = url.PathEscape(sg)
 	}
 	u := CodeloadBase + "/" + repo + "/tar.gz/" + strings.Join(segs, "/")
+	return downloadCached(ctx, repo, ref, u, maxArchive, func(r io.Reader, _ *io.SectionReader) ([]skillFile, error) {
+		return readSkill(tarEntries(r, u), folder, u, true)
+	})
+}
+
+// downloadCached downloads u through the archive cache (key and ref name the cache file) and
+// reads it with read. sec is the cached file; it is nil when the cache folder cannot keep the
+// download, and read then gets only the stream r. A damaged cache file is downloaded once more.
+func downloadCached(ctx context.Context, key, ref, u string, limit int64, read func(r io.Reader, sec *io.SectionReader) ([]skillFile, error)) ([]skillFile, error) {
 	for attempt := 0; ; attempt++ {
-		a, direct, err := cachedArchiveFor(ctx, repo, ref, u, attempt > 0)
+		a, direct, err := cachedDownloadFor(ctx, key, ref, u, attempt > 0, limit)
 		if errors.Is(err, errNoCache) {
 			// The cache folder cannot keep the archive: read the download directly.
 			if direct == nil {
@@ -174,12 +188,13 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 				}
 			}
 			defer direct.Close()
-			return readSkill(direct, folder, u)
+			return read(&capReader{r: direct, left: limit}, nil)
 		}
 		if err != nil {
 			return nil, err
 		}
-		files, err := readSkill(a.reader(), folder, u)
+		sec := a.section()
+		files, err := read(sec, sec)
 		var ae *archiveError
 		if err != nil && errors.As(err, &ae) && attempt == 0 {
 			// A damaged file in the cache: download it again, without the ETag.
@@ -229,7 +244,9 @@ type runArchive struct {
 	noCache bool     // the cache folder cannot keep this archive in this run
 }
 
-func (a *runArchive) reader() io.Reader {
+func (a *runArchive) reader() io.Reader { return a.section() }
+
+func (a *runArchive) section() *io.SectionReader {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return io.NewSectionReader(a.file, a.data, a.size-a.data)
@@ -544,112 +561,221 @@ func (s *stallReader) Close() error {
 	return err
 }
 
-// readSkill reads the files of one folder from a .tar.gz archive of a repository.
-func readSkill(archive io.Reader, folder, u string) ([]skillFile, error) {
-	capped := &capReader{r: archive, left: maxArchive}
-	gz, err := gzip.NewReader(capped)
-	if err != nil {
-		return nil, badArchive(u, err)
-	}
-	fail := func(format string, a ...any) ([]skillFile, error) {
-		return nil, fmt.Errorf("skill %s in %s: %s", folder, u, fmt.Sprintf(format, a...))
-	}
-	prefix := strings.Trim(folder, "/") + "/"
-	var files []skillFile
-	byRel := map[string]int{}
-	links := map[string]string{} // rel path in the folder -> link target in the repository
-	total := 0
-	root := ""
-	data := &capReader{r: gz, left: maxArchive}
-	tr := tar.NewReader(data)
-	for {
-		h, err := tr.Next()
-		if errors.Is(err, io.EOF) {
-			// Read the rest of the gzip stream, so that its checksum finds a damaged archive.
-			if _, err := io.Copy(io.Discard, data); err != nil {
-				return nil, badArchive(u, err)
-			}
-			break
-		}
+// archiveEntry is one entry of a .tar.gz or .zip archive.
+type archiveEntry struct {
+	name    string
+	regular bool
+	symlink bool
+	link    string // the target of a symbolic link
+	size    int64
+	exec    bool
+	open    func() (io.Reader, error)
+}
+
+// entryWalker calls fn for each entry of an archive. An error of fn stops the walk and comes
+// back unchanged; an error of the archive data is an *archiveError.
+type entryWalker func(fn func(e archiveEntry) error) error
+
+// tarEntries walks a .tar.gz stream.
+func tarEntries(archive io.Reader, u string) entryWalker {
+	return func(fn func(e archiveEntry) error) error {
+		gz, err := gzip.NewReader(&capReader{r: archive, left: maxArchive})
 		if err != nil {
-			return nil, badArchive(u, err)
+			return badArchive(u, err)
 		}
-		if h.Typeflag == tar.TypeXGlobalHeader {
-			continue
-		}
-		// The archive has one top folder (<name>-<ref>/).
-		top, inRepo, _ := strings.Cut(h.Name, "/")
-		if root == "" {
-			root = top
-		} else if top != root {
-			return fail("the archive has more than one top folder")
-		}
-		inRepo = path.Clean(inRepo)
-		if !strings.HasPrefix(inRepo, prefix) {
-			continue
-		}
-		rel := strings.TrimPrefix(inRepo, prefix)
-		// FAM writes its own marker file into each skill folder: skip that name and anything below it.
-		if rel == managedMarker || strings.HasPrefix(rel, managedMarker+"/") || strings.HasPrefix(rel, "../") {
-			continue
-		}
-		switch h.Typeflag {
-		case tar.TypeReg:
-			if h.Size > maxSkillFile {
-				return fail("the file %s has %d bytes, more than the limit of %d", rel, h.Size, maxSkillFile)
+		data := &capReader{r: gz, left: maxArchive}
+		tr := tar.NewReader(data)
+		for {
+			h, err := tr.Next()
+			if errors.Is(err, io.EOF) {
+				// Read the rest of the gzip stream, so that its checksum finds a damaged archive.
+				if _, err := io.Copy(io.Discard, data); err != nil {
+					return badArchive(u, err)
+				}
+				return nil
 			}
-			total += int(h.Size)
-			if total > maxSkillBytes || len(files) >= maxSkillFiles {
+			if err != nil {
+				return badArchive(u, err)
+			}
+			if h.Typeflag == tar.TypeXGlobalHeader {
+				continue
+			}
+			e := archiveEntry{name: h.Name, size: h.Size, exec: h.Mode&0o100 != 0, open: func() (io.Reader, error) { return tr, nil }}
+			switch h.Typeflag {
+			case tar.TypeReg:
+				e.regular = true
+			case tar.TypeSymlink:
+				e.symlink, e.link = true, h.Linkname
+			}
+			if err := fn(e); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// zipEntries walks a .zip archive.
+func zipEntries(ra io.ReaderAt, size int64, u string) entryWalker {
+	return func(fn func(e archiveEntry) error) error {
+		zr, err := zip.NewReader(ra, size)
+		if err != nil {
+			return badArchive(u, err)
+		}
+		for _, f := range zr.File {
+			mode := f.Mode()
+			e := archiveEntry{name: f.Name, size: int64(f.UncompressedSize64), exec: mode.Perm()&0o100 != 0, open: func() (io.Reader, error) { return f.Open() }}
+			switch {
+			case mode&os.ModeSymlink != 0:
+				r, err := f.Open()
+				if err != nil {
+					return badArchive(u, err)
+				}
+				target, err := io.ReadAll(io.LimitReader(r, 4096))
+				r.Close()
+				if err != nil {
+					return badArchive(u, err)
+				}
+				e.symlink, e.link = true, string(target)
+			case mode.IsRegular():
+				e.regular = true
+			}
+			if err := fn(e); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+// skillFolder collects the files of one skill folder from an archive.
+type skillFolder struct {
+	files []skillFile
+	byRel map[string]int
+	links map[string]string // rel path in the folder -> link target, relative to the folder
+	total int
+}
+
+func (c *skillFolder) empty() bool { return len(c.files) == 0 && len(c.links) == 0 }
+
+// readSkill reads the files of one folder ("" for the top) of an archive. With strict, the
+// archive has one top folder (a GitHub archive: <name>-<ref>/), and folder is relative to it.
+// Otherwise folder is relative to the one top folder when the archive has one and the folder is
+// in it, and to the top of the archive in all other cases.
+func readSkill(walk entryWalker, folder, u string, strict bool) ([]skillFile, error) {
+	where := "the top"
+	if folder != "" {
+		where = "the folder " + folder
+	}
+	fail := func(format string, a ...any) error {
+		return fmt.Errorf("skill in %s of %s: %s", where, u, fmt.Sprintf(format, a...))
+	}
+	folder = strings.Trim(folder, "/")
+	under := func(p string) (string, bool) {
+		if folder == "" {
+			return p, p != ""
+		}
+		rel, ok := strings.CutPrefix(p, folder+"/")
+		return rel, ok && rel != ""
+	}
+	inTop, atRoot := &skillFolder{byRel: map[string]int{}, links: map[string]string{}}, &skillFolder{byRel: map[string]int{}, links: map[string]string{}}
+	tops := map[string]bool{}
+	add := func(c *skillFolder, rel string, e archiveEntry) error {
+		// FAM writes its own marker file into each skill folder: skip that name and anything below it.
+		if rel == managedMarker || strings.HasPrefix(rel, managedMarker+"/") {
+			return nil
+		}
+		switch {
+		case e.regular:
+			if e.size > maxSkillFile {
+				return fail("the file %s has %d bytes, more than the limit of %d", rel, e.size, maxSkillFile)
+			}
+			c.total += int(e.size)
+			if c.total > maxSkillBytes || len(c.files) >= maxSkillFiles {
 				return fail("the folder has more than %d bytes or %d files", maxSkillBytes, maxSkillFiles)
 			}
-			data, err := io.ReadAll(tr)
+			r, err := e.open()
 			if err != nil {
-				return nil, badArchive(u, err)
+				return badArchive(u, err)
 			}
-			byRel[rel] = len(files)
-			files = append(files, skillFile{rel: rel, data: data, exec: h.Mode&0o100 != 0})
-		case tar.TypeSymlink:
-			if path.IsAbs(h.Linkname) {
-				links[rel] = h.Linkname
+			tooLarge := fail("the file %s has more than %d bytes", rel, maxSkillFile)
+			data, err := io.ReadAll(&capReader{r: r, left: maxSkillFile, limitError: tooLarge})
+			if cl, ok := r.(io.Closer); ok {
+				cl.Close()
+			}
+			if errors.Is(err, tooLarge) {
+				return err
+			}
+			if err != nil {
+				return badArchive(u, err)
+			}
+			c.byRel[rel] = len(c.files)
+			c.files = append(c.files, skillFile{rel: rel, data: data, exec: e.exec})
+		case e.symlink:
+			if path.IsAbs(e.link) {
+				c.links[rel] = e.link
 			} else {
-				links[rel] = path.Clean(path.Join(path.Dir(rel), h.Linkname))
+				c.links[rel] = path.Clean(path.Join(path.Dir(rel), e.link))
 			}
 		}
+		return nil
+	}
+	err := walk(func(e archiveEntry) error {
+		name := path.Clean("/" + e.name)[1:]
+		if name == "" {
+			return nil
+		}
+		top, rest, _ := strings.Cut(name, "/")
+		tops[top] = true
+		if strict && len(tops) > 1 {
+			return fail("the archive has more than one top folder")
+		}
+		if rel, ok := under(rest); ok {
+			if err := add(inTop, rel, e); err != nil {
+				return err
+			}
+		}
+		if !strict {
+			if rel, ok := under(name); ok {
+				return add(atRoot, rel, e)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	c := inTop
+	if !strict && (len(tops) != 1 || inTop.empty()) {
+		c = atRoot
 	}
 	// A link in the folder becomes a copy of the file that it points to (as for local skills).
 	// The target must be a file in the same folder.
 	// The copies count against the same limits as regular files.
-	for rel, target := range links {
+	for rel, target := range c.links {
 		// Follow a chain of links (alias.md -> other.md -> file), at most 16 steps.
 		for hops := 0; hops < 16; hops++ {
-			next, isLink := links[target]
+			next, isLink := c.links[target]
 			if !isLink {
 				break
 			}
 			target = next
 		}
-		i, ok := byRel[target]
+		i, ok := c.byRel[target]
 		if !ok || path.IsAbs(target) {
-			return fail("the link %s does not point to a file in the skill folder", rel)
+			return nil, fail("the link %s does not point to a file in the skill folder", rel)
 		}
-		f := files[i]
-		total += len(f.data)
-		if total > maxSkillBytes || len(files) >= maxSkillFiles {
-			return fail("the folder has more than %d bytes or %d files", maxSkillBytes, maxSkillFiles)
+		f := c.files[i]
+		c.total += len(f.data)
+		if c.total > maxSkillBytes || len(c.files) >= maxSkillFiles {
+			return nil, fail("the folder has more than %d bytes or %d files", maxSkillBytes, maxSkillFiles)
 		}
-		files = append(files, skillFile{rel: rel, data: f.data, exec: f.exec})
+		c.files = append(c.files, skillFile{rel: rel, data: f.data, exec: f.exec})
 	}
-	hasSkill := false
-	for _, f := range files {
-		if f.rel == "SKILL.md" {
-			hasSkill = true
-		}
+	if _, ok := c.byRel["SKILL.md"]; !ok {
+		return nil, fail("the folder has no SKILL.md")
 	}
-	if !hasSkill {
-		return fail("the folder has no SKILL.md")
-	}
-	sort.Slice(files, func(i, j int) bool { return files[i].rel < files[j].rel })
-	return files, nil
+	sort.Slice(c.files, func(i, j int) bool { return c.files[i].rel < c.files[j].rel })
+	return c.files, nil
 }
 
 // errArchiveTooLarge: the archive has more than maxArchive bytes.

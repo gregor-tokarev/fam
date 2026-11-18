@@ -17,8 +17,8 @@ tasks {
     package = "lat.md"
     binary = "lat"
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/lat.md"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/lat.md"
     path = "templates/skill"
     name = "lat-md"
   }

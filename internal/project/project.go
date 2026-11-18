@@ -42,7 +42,6 @@ func New(opts NewOptions) ([]string, error) {
 		"machines.pkl":               machinesPkl,
 		"agents.pkl":                 agentsPkl(agents),
 		"instructions/AGENTS.md":     "",
-		"skills/.gitkeep":            "",
 		"bundles/hello.pkl":          helloBundle,
 		"bundles/files/fam-hello.sh": helloScript,
 		"bundles/worker-setup.pkl":   workerSetup,

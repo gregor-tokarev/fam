@@ -17,8 +17,8 @@ version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("pitchfork", "jdx/pitchfork")
   packages.cargo("pitchfork-cli", "pitchfork", systemPackage)
-  new fam.GitHubSkill {
-    repo = "jdx/pitchfork"
+  new fam.AgentSkill {
+    source = "https://github.com/jdx/pitchfork"
     path = "skills/pitchfork"
   }
 }

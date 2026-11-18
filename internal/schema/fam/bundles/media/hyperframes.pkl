@@ -14,28 +14,28 @@ tasks {
   new fam.Package {
     package = "hyperframes"
   }
-  new fam.GitHubSkill {
-    repo = "heygen-com/hyperframes"
+  new fam.AgentSkill {
+    source = "https://github.com/heygen-com/hyperframes"
     path = "skills/hyperframes"
   }
-  new fam.GitHubSkill {
-    repo = "heygen-com/hyperframes"
+  new fam.AgentSkill {
+    source = "https://github.com/heygen-com/hyperframes"
     path = "skills/hyperframes-cli"
   }
-  new fam.GitHubSkill {
-    repo = "heygen-com/hyperframes"
+  new fam.AgentSkill {
+    source = "https://github.com/heygen-com/hyperframes"
     path = "skills/hyperframes-registry"
   }
-  new fam.GitHubSkill {
-    repo = "heygen-com/hyperframes"
+  new fam.AgentSkill {
+    source = "https://github.com/heygen-com/hyperframes"
     path = "skills/media-use"
   }
-  new fam.GitHubSkill {
-    repo = "heygen-com/hyperframes"
+  new fam.AgentSkill {
+    source = "https://github.com/heygen-com/hyperframes"
     path = "skills/reverse-any-video"
   }
-  new fam.GitHubSkill {
-    repo = "heygen-com/hyperframes"
+  new fam.AgentSkill {
+    source = "https://github.com/heygen-com/hyperframes"
     path = "skills/style-sampling"
   }
 }

@@ -23,8 +23,8 @@ tasks {
     package = systemPackage ?? new fam.PackageRef { package = "github.com/openai/openai-cli/cmd/openai"; manager = "go" }
     binary = "openai"
   }
-  new fam.GitHubSkill {
-    repo = "openai/openai-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/openai/openai-cli"
     path = "skills/openai-cli"
   }
 }

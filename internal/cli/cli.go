@@ -30,7 +30,6 @@ type Options struct {
 	SudoPasswordFile string
 	SSHConfig        string
 	InstructionsDir  string
-	SkillsDir        string
 	RefreshSecrets   bool
 	NoProgress       bool
 }
@@ -87,7 +86,7 @@ func (o *Options) resolve() error {
 	} else if o.Config, err = filepath.Abs(o.Config); err != nil {
 		return err
 	}
-	for _, d := range []*string{&o.InstructionsDir, &o.SkillsDir, &o.SudoPasswordFile, &o.SSHConfig} {
+	for _, d := range []*string{&o.InstructionsDir, &o.SudoPasswordFile, &o.SSHConfig} {
 		if *d != "" {
 			if *d, err = filepath.Abs(*d); err != nil {
 				return err

@@ -17,104 +17,104 @@ tasks {
     package = "@larksuite/cli"
     binary = "lark-cli"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-approval"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-apps"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-attendance"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-base"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-calendar"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-contact"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-doc"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-drive"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-event"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-im"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-mail"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-markdown"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-meeting"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-note"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-okr"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-openapi-explorer"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-shared"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-sheets"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-skill-maker"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-slides"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-task"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-whiteboard"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-wiki"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-workflow-meeting-summary"
   }
-  new fam.GitHubSkill {
-    repo = "larksuite/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/larksuite/cli"
     path = "skills/lark-workflow-standup-report"
   }
 }

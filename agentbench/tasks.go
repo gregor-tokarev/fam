@@ -202,7 +202,7 @@ var tasks = []*Task{
 		Prompt: "Give every agent on every machine a skill named release-checklist. It tells the agent to update CHANGELOG.md and to tag the release." + handsOff,
 		Valid:  true,
 		Grade: func(g *Grader) map[string]bool {
-			// A folder of skills/ or a skill folder of a bundle.
+			// A skill folder that a bundle installs with an AgentSkill task.
 			sk := ""
 			filepath.WalkDir(g.Project, func(p string, d os.DirEntry, err error) error {
 				if err == nil && d.Name() == "SKILL.md" {
@@ -213,9 +213,19 @@ var tasks = []*Task{
 				}
 				return nil
 			})
+			s := g.mustSummary()
+			task := false
+			for _, b := range s.Bundles {
+				for _, t := range b.Tasks {
+					if b.State == "present" && t.Kind == "AgentSkill" {
+						task = true
+					}
+				}
+			}
 			return map[string]bool{
 				"skill-file":  strings.Contains(sk, "CHANGELOG"),
 				"description": strings.Contains(sk, "description:"),
+				"bundle-task": task,
 			}
 		},
 	},
@@ -243,7 +253,7 @@ var tasks = []*Task{
 			ok := false
 			for _, b := range s.Bundles {
 				for _, t := range b.Tasks {
-					if b.State == "present" && t.Kind == "GitHubSkill" && strings.Contains(t.JSON, `"anthropics/skills"`) && strings.Contains(t.JSON, `"skills/frontend-design"`) {
+					if b.State == "present" && t.Kind == "AgentSkill" && strings.Contains(t.JSON, "github.com/anthropics/skills") && strings.Contains(t.JSON, "skills/frontend-design") {
 						ok = true
 					}
 				}

@@ -236,11 +236,6 @@ func checkProject(p *Project) error {
 	if _, err := os.Stat(p.InstructionsDir + "/AGENTS.md"); err != nil {
 		return fmt.Errorf("the project has no %s/AGENTS.md. Create it (it can be empty)", p.InstructionsDir)
 	}
-	if p.SkillsDir != "" {
-		if st, err := os.Stat(p.SkillsDir); err == nil && !st.IsDir() {
-			return fmt.Errorf("%s is not a directory", p.SkillsDir)
-		}
-	}
 	return nil
 }
 

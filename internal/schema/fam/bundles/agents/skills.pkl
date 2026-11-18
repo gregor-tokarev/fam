@@ -14,8 +14,8 @@ tasks {
   new fam.Package {
     package = "skills"
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/skills"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/skills"
     path = "skills/find-skills"
   }
 }

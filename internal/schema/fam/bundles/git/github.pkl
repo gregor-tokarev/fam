@@ -27,12 +27,12 @@ tasks {
     }
     binary = "gh"
   }
-  new fam.GitHubSkill {
-    repo = "cli/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/cli/cli"
     path = "skills/gh"
   }
-  new fam.GitHubSkill {
-    repo = "cli/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/cli/cli"
     path = "skills/gh-skill"
   }
 }

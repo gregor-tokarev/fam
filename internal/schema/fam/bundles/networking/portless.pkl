@@ -13,8 +13,8 @@ tasks {
   new fam.Package {
     package = "portless"
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/portless"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/portless"
     path = "skills/portless"
   }
 }

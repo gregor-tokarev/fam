@@ -20,8 +20,8 @@ tasks {
     package = "@schpet/linear-cli"
     binary = "linear"
   }
-  new fam.GitHubSkill {
-    repo = "schpet/linear-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/schpet/linear-cli"
     path = "skills/linear-cli"
   }
 }

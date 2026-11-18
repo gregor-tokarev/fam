@@ -1,0 +1,11 @@
+// Agent skills. Each skill comes from a folder of this project or from a URL. A bundle can go to
+// every machine, a role, or one machine, so the skills can be different on each machine.
+amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
+
+name = "agent-skills"
+
+tasks {
+  new fam.AgentSkill { source = "../skills/release-notes" }
+  new fam.AgentSkill { source = "https://github.com/anthropics/skills/tree/main/skills/frontend-design" }
+}

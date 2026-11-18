@@ -13,8 +13,8 @@ tasks {
     package = "ai-cli"
     binary = "ai"
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/ai-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/ai-cli"
     path = "skills/ai-cli"
   }
 }

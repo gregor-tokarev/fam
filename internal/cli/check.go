@@ -10,14 +10,11 @@ import (
 )
 
 func (o *Options) project() *engine.Project {
-	instructions, skills := o.InstructionsDir, o.SkillsDir
+	instructions := o.InstructionsDir
 	if instructions == "" {
 		instructions = filepath.Join(o.Base, "instructions")
 	}
-	if skills == "" {
-		skills = filepath.Join(o.Base, "skills")
-	}
-	return &engine.Project{Base: o.Base, ConfigPath: o.Config, InstructionsDir: instructions, SkillsDir: skills}
+	return &engine.Project{Base: o.Base, ConfigPath: o.Config, InstructionsDir: instructions}
 }
 func checkCmd(o *Options) *cobra.Command {
 	return &cobra.Command{Use: "check", Short: "Validate the project without SSH or changes", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {

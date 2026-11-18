@@ -24,8 +24,8 @@ tasks {
     path = "~/.local/share/gh/extensions/gh-stack"
     content = "\(facts.home)/.local/bin\n"
   }
-  new fam.GitHubSkill {
-    repo = "github/gh-stack"
+  new fam.AgentSkill {
+    source = "https://github.com/github/gh-stack"
     path = "skills/gh-stack"
   }
 }

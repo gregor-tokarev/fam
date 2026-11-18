@@ -18,20 +18,20 @@ tasks {
     binary = "promptfoo"
     versionCommand = "PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo --version"
   }
-  new fam.GitHubSkill {
-    repo = "promptfoo/promptfoo"
+  new fam.AgentSkill {
+    source = "https://github.com/promptfoo/promptfoo"
     path = "plugins/promptfoo/skills/promptfoo-evals"
   }
-  new fam.GitHubSkill {
-    repo = "promptfoo/promptfoo"
+  new fam.AgentSkill {
+    source = "https://github.com/promptfoo/promptfoo"
     path = "plugins/promptfoo/skills/promptfoo-provider-setup"
   }
-  new fam.GitHubSkill {
-    repo = "promptfoo/promptfoo"
+  new fam.AgentSkill {
+    source = "https://github.com/promptfoo/promptfoo"
     path = "plugins/promptfoo/skills/promptfoo-redteam-run"
   }
-  new fam.GitHubSkill {
-    repo = "promptfoo/promptfoo"
+  new fam.AgentSkill {
+    source = "https://github.com/promptfoo/promptfoo"
     path = "plugins/promptfoo/skills/promptfoo-redteam-setup"
   }
 }

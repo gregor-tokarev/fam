@@ -19,28 +19,28 @@ tasks {
     }
     binary = "browser-use"
   }
-  new fam.GitHubSkill {
-    repo = "browser-use/browser-use"
+  new fam.AgentSkill {
+    source = "https://github.com/browser-use/browser-use"
     path = "skills/browser-use"
   }
-  new fam.GitHubSkill {
-    repo = "browser-use/browser-use"
+  new fam.AgentSkill {
+    source = "https://github.com/browser-use/browser-use"
     path = "skills/remote-browser"
   }
-  new fam.GitHubSkill {
-    repo = "browser-use/browser-use"
+  new fam.AgentSkill {
+    source = "https://github.com/browser-use/browser-use"
     path = "skills/qa"
   }
-  new fam.GitHubSkill {
-    repo = "browser-use/browser-use"
+  new fam.AgentSkill {
+    source = "https://github.com/browser-use/browser-use"
     path = "skills/cloud"
   }
-  new fam.GitHubSkill {
-    repo = "browser-use/browser-use"
+  new fam.AgentSkill {
+    source = "https://github.com/browser-use/browser-use"
     path = "skills/open-source"
   }
-  new fam.GitHubSkill {
-    repo = "browser-use/browser-use"
+  new fam.AgentSkill {
+    source = "https://github.com/browser-use/browser-use"
     path = "skills/x402"
   }
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gregor-tokarev/fam/internal/config"
 	"github.com/gregor-tokarev/fam/internal/output"
+	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
 	"github.com/gregor-tokarev/fam/internal/transport"
 )
 
@@ -58,8 +59,9 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 			verify = append(verify, VerifySpec{Bundle: u.Bundle.Name, Name: name, Event: string(v.Event), Script: v.Script})
 		}
 	}
-	// The skills of the bundle tasks: each name once, across all bundles and skills/.
+	// The skills of the bundle tasks: each name once, across all bundles.
 	bundleSkills := map[string]string{}
+	keep := map[string]bool{}
 	var skillNames []string
 	for _, sec := range out {
 		for _, t := range sec.Tasks {
@@ -68,32 +70,29 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 					return nil, nil, fmt.Errorf("two skills have the name %q: %s and %s", st.Skill.Name, prev, st.Skill.Dir)
 				}
 				bundleSkills[st.Skill.Name] = st.Skill.Dir
+				keep[st.Skill.Name] = true
 				skillNames = append(skillNames, st.Skill.Name)
 			}
 		}
 	}
-	// Keep existing skills of skipped bundles without loading their sources or verifying them.
-	preservedSkills := map[string]bool{}
+	// Each skill name that a bundle lists. Keep existing skills of skipped bundles without
+	// loading their sources or verifying them.
+	listed := map[string]bool{}
 	for _, u := range spec.Bundles {
-		if !u.Skipped() {
-			continue
-		}
-		for _, task := range u.Bundle.Tasks {
+		for i, task := range append(append([]tasks.Task{}, u.Bundle.Tasks...), u.Bundle.Uninstall...) {
 			if name, ok := bundleSkillName(task, u); ok {
-				preservedSkills[name] = true
+				listed[name] = true
+				if u.Skipped() && i < len(u.Bundle.Tasks) {
+					keep[name] = true
+				}
 			}
 		}
 	}
-	sk, err := skillsSection(env, bundleSkills, preservedSkills)
+	sk, err := skillsSection(env, keep, listed)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, t := range sk.Tasks {
-		if st, ok := t.(*SkillTask); ok {
-			skillNames = append(skillNames, st.Skill.Name)
-		}
-	}
-	// A skill that an absent bundle removes but another bundle or skills/ installs stays.
+	// A skill that an absent bundle removes but another bundle installs stays.
 	installed := map[string]bool{}
 	for _, n := range skillNames {
 		installed[n] = true

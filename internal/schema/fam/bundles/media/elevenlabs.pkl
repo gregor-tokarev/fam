@@ -17,8 +17,8 @@ tasks {
     package = "@elevenlabs/cli"
     binary = "elevenlabs"
   }
-  new fam.GitHubSkill {
-    repo = "elevenlabs/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/elevenlabs/cli"
     path = ".agents/skills/custom-commands"
     name = "elevenlabs-custom-commands"
   }

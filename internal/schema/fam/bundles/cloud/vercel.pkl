@@ -15,8 +15,8 @@ tasks {
     binary = "vercel"
     versionCommand = "vercel --version"
   }
-  new fam.GitHubSkill {
-    repo = "vercel/vercel"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel/vercel"
     path = "skills/vercel-cli"
   }
 }
