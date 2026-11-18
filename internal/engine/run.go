@@ -583,11 +583,16 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	// order is the run order of the tasks of the apply loop. pos is the position of each task.
 	var order []Task
 	pos := map[Task]int{}
+	// secEnd is the position after the last task of the section of each task.
+	secEnd := map[Task]int{}
 	for _, s := range mr.sects {
 		if s.SkipReason == "" {
 			for _, t := range s.Tasks {
 				pos[t] = len(order)
 				order = append(order, t)
+			}
+			for _, t := range s.Tasks {
+				secEnd[t] = len(order)
 			}
 		}
 	}
@@ -605,10 +610,16 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	// after the refresh. FAM uses it also when it is an error. A result of the first check pass
 	// is used only when it is satisfied: there, as before, an error makes the task check again.
 	fresh := false
-	refreshFrom := func(t Task, n int) {
+	// inSection limits the refresh to the section of t: a restart at the end of the section
+	// changes the machine, so results after it would be old.
+	refreshFrom := func(t Task, n int, inSection bool) {
 		refresh = false
+		end := len(order)
+		if inSection {
+			end = secEnd[t]
+		}
 		var seg []Task
-		for _, x := range order[pos[t]:] {
+		for _, x := range order[pos[t]:end] {
 			if isUpdater(x) || !satisfied[x] {
 				break
 			}
@@ -647,7 +658,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			// After an update, a task that the first pass found satisfied starts a refresh. Any
 			// other task checks itself, and the refresh waits for the next satisfied task.
 			if _, ok := pre[t]; !ok && refresh && !isUpdater(t) && satisfied[t] {
-				refreshFrom(t, n)
+				refreshFrom(t, n, s.RestartUnits && len(units) > 0)
 			}
 			mr.p.Task(n, taskLabel(t))
 			// A satisfied result skips the check. A task that changes the machine always checks
