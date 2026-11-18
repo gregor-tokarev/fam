@@ -9,6 +9,6 @@ func init() {
 	pkl.RegisterMappingFor[BundleRef]("fam.base#BundleRef")
 	pkl.RegisterMappingFor[Infisical]("fam.base#Infisical")
 	pkl.RegisterMappingFor[Machine]("fam.base#Machine")
-	pkl.RegisterMappingFor[RoleBundles]("fam.base#RoleBundles")
 	pkl.RegisterMappingFor[Secrets]("fam.base#Secrets")
+	pkl.RegisterMappingFor[TagBundles]("fam.base#TagBundles")
 }

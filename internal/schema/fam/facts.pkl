@@ -11,8 +11,11 @@ module fam.facts
 /// The machine name: the key in `machines`.
 machine: String = read("prop:fam.machine")
 
-/// The role of the machine: `"cockpit"` or `"worker"`.
-role: String = read("prop:fam.role")
+/// True for the cockpit: the machine that runs FAM.
+cockpit: Boolean = read("prop:fam.cockpit") == "true"
+
+/// The tags of the machine, in the order of its `tags`.
+tags: List<String> = let (s = read("prop:fam.tags")) if (s.isEmpty) List() else s.split(",")
 
 /// The operating system: `"linux"` or `"darwin"`.
 os: String = read("prop:fam.os")

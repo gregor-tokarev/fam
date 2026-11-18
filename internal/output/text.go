@@ -25,7 +25,11 @@ func WriteText(w io.Writer, r *Run) {
 		if m.Target != "" {
 			target += " " + m.Target
 		}
-		fmt.Fprintf(w, "== %s (%s, %s): %s\n", m.Name, m.Role, target, m.Status)
+		tags := ""
+		if len(m.Tags) > 0 {
+			tags = ", tags " + strings.Join(m.Tags, " ")
+		}
+		fmt.Fprintf(w, "== %s (%s%s): %s\n", m.Name, target, tags, m.Status)
 		if m.Facts != nil {
 			f := m.Facts
 			fmt.Fprintf(w, "   %s %s %s, %s, %d CPUs, user %s\n", f.OS, f.Distro, f.DistroVersion, f.Arch, f.CPUs, f.User)

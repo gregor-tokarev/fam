@@ -12,8 +12,8 @@ import (
 // A bundle: a reusable part of the config. Usually one tool or one piece of machine setup, with
 // its tasks (also skills: [t.AgentSkill]), environment, and checks.
 //
-// `config.pkl` selects the machines: `bundles` (every machine), `roles` (every machine with a
-// role), or the `bundles` of one machine. A bundle itself does not know the machines.
+// `config.pkl` selects the machines: `bundles` (every machine), `tags` (every machine with a
+// tag), or the `bundles` of one machine. A bundle itself does not know the machines.
 //
 // A bundle file amends this module:
 //

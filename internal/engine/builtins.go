@@ -413,8 +413,8 @@ func (t *ManagedFileTask) Apply(ctx context.Context, env *Env) (string, error) {
 func templateData(env *Env) map[string]any {
 	f := env.Facts
 	return map[string]any{
-		"Machine": map[string]any{"Name": env.Machine.Name, "Role": env.Machine.Role, "Address": env.Machine.Address, "User": env.Machine.User},
-		"Facts": map[string]any{"Machine": f.Machine, "Role": f.Role, "OS": f.OS, "Distro": f.Distro, "DistroVersion": f.DistroVersion,
+		"Machine": map[string]any{"Name": env.Machine.Name, "Cockpit": env.Machine.Cockpit, "Tags": env.Machine.Tags, "Address": env.Machine.Address, "User": env.Machine.User},
+		"Facts": map[string]any{"Machine": f.Machine, "Cockpit": f.Cockpit, "Tags": f.Tags, "OS": f.OS, "Distro": f.Distro, "DistroVersion": f.DistroVersion,
 			"Arch": f.Arch, "CPUs": f.CPUs, "Home": f.Home, "User": f.User, "Hostname": f.Hostname, "Init": f.Init, "Shell": f.Shell},
 	}
 }

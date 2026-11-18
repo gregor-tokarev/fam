@@ -7,7 +7,6 @@ import (
 	"github.com/apple/pkl-go/pkl"
 	"github.com/gregor-tokarev/fam/internal/pklgen/base"
 	"github.com/gregor-tokarev/fam/internal/pklgen/base/agentname"
-	"github.com/gregor-tokarev/fam/internal/pklgen/base/role"
 )
 
 // The entrypoint of a FAM project.
@@ -19,13 +18,14 @@ import (
 // import "@fam/std.pkl"
 //
 // bundles { std.computer.agentBrowser() }
-// roles { ["worker"] { bundles { import("bundles/worker-setup.pkl") } } }
+// tags { ["worker"] { bundles { import("bundles/worker-setup.pkl") } } }
 // machines = import("machines.pkl").machines
 // agents = import("agents.pkl").agents
 // ```
 //
-// A machine gets the bundles of `bundles`, then the bundles of its role in `roles`, then its own
-// `bundles` (in `machines`). FAM runs them in this order.
+// A machine gets the bundles of `bundles`, then the bundles of each of its tags in `tags` (in the
+// order of the `tags` of the machine), then its own `bundles` (in `machines`). FAM runs them in
+// this order.
 //
 // FAM evaluates this module once for each machine, with the facts of that machine.
 type Config struct {
@@ -46,16 +46,19 @@ type Config struct {
 	// How FAM gives secrets to the machines. When it is `null`, FAM does not manage secrets.
 	Secrets *base.Secrets `pkl:"secrets"`
 
-	// Bundles for every machine with a role, after the bundles of every machine.
+	// Bundles for every machine with a tag, after the bundles of every machine.
 	//
 	// ```
-	// roles {
+	// tags {
 	//   ["worker"] { bundles { import("bundles/worker-setup.pkl") } }
+	//   ["gpu"] { bundles { import("bundles/cuda.pkl") } }
+	//   ["laptop"] {}
 	// }
 	// ```
 	//
-	// An entry here wins over the bundle with the same `name` in [bundles].
-	Roles map[role.Role]base.RoleBundles `pkl:"roles"`
+	// An entry here wins over the bundle with the same `name` in [bundles], and over the bundle of an
+	// earlier tag of the machine.
+	Tags map[string]base.TagBundles `pkl:"tags"`
 }
 
 // LoadFromPath loads the pkl module at the given path and evaluates it into a Config

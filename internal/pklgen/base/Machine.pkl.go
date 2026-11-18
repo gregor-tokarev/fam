@@ -1,14 +1,18 @@
 // Code generated from Pkl module `fam.base`. DO NOT EDIT.
 package base
 
-import "github.com/gregor-tokarev/fam/internal/pklgen/base/role"
-
 // One machine of the fleet.
 type Machine struct {
-	// The role of the machine.
+	// The machine that runs FAM. FAM runs its commands locally, not over SSH.
 	//
-	// Exactly one machine can have the role `"cockpit"`.
-	Role role.Role `pkl:"role"`
+	// At most one machine can be the cockpit. All other machines are workers.
+	Cockpit bool `pkl:"cockpit"`
+
+	// The tags of the machine, for example `tags { "worker"; "gpu" }`.
+	//
+	// The machine gets the bundles of each tag in `tags` of `config.pkl`, in the order of this list.
+	// A tag must be in `tags` of `config.pkl`, also when it has no bundles.
+	Tags []string `pkl:"tags"`
 
 	// The SSH host name or IP address of a worker.
 	//
@@ -22,7 +26,7 @@ type Machine struct {
 
 	// Bundles for this machine only.
 	//
-	// An entry here wins over the bundle with the same `name` in `bundles` or `roles` of `config.pkl`.
+	// An entry here wins over the bundle with the same `name` in `bundles` or `tags` of `config.pkl`.
 	// Use `new { bundle = …; state = "absent" }` to remove such a bundle from this machine.
 	Bundles []any `pkl:"bundles"`
 }

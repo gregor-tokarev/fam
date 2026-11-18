@@ -201,8 +201,9 @@ agents = import("agents.pkl").agents
 //   }
 // }
 
-// Bundles for every machine with a role, after the bundles of every machine.
-roles {
+// Bundles for every machine with a tag, after the bundles of every machine.
+// A machine can have many tags: they come in the order of its own tags.
+tags {
   ["worker"] { bundles { import("bundles/worker-setup.pkl") } }
 }
 `
@@ -211,10 +212,10 @@ const machinesPkl = `amends "@fam/Machines.pkl"
 
 machines {
   ["cockpit"] {
-    role = "cockpit"
+    cockpit = true
   }
   // ["worker1"] {
-  //   role = "worker"
+  //   tags { "worker" }
   //   address = "worker1.example"
   //   user = "me"
   // }

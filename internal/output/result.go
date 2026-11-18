@@ -24,10 +24,11 @@ type Run struct {
 
 // MachineResult is the result for one machine.
 type MachineResult struct {
-	Name      string `json:"name" toon:"name"`
-	Role      string `json:"role" toon:"role"`
-	Target    string `json:"target,omitempty" toon:"target,omitempty"`
-	Transport string `json:"transport" toon:"transport"`
+	Name      string   `json:"name" toon:"name"`
+	Cockpit   bool     `json:"cockpit,omitempty" toon:"cockpit,omitempty"`
+	Tags      []string `json:"tags" toon:"tags"`
+	Target    string   `json:"target,omitempty" toon:"target,omitempty"`
+	Transport string   `json:"transport" toon:"transport"`
 	// Status is "ok", "changes", "changed", "failed", "conflict", or "error".
 	Status string `json:"status" toon:"status"`
 	// ErrorKind is "connection", "unsupported", "config", "sudo", or "task" when Status is "error" or "failed".

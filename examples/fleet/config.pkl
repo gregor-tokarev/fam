@@ -26,7 +26,9 @@ secrets {
   file = "~/.config/fam/fleet-secrets.env"
 }
 
-// Bundles for the workers only, after the bundles of every machine.
-roles {
+// Bundles for the machines with a tag, after the bundles of every machine.
+tags {
   ["worker"] { bundles { import("bundles/worker-setup.pkl") } }
+  // A tag without bundles of its own. Bundles can read it: `facts.tags.contains("big")`.
+  ["big"] {}
 }

@@ -41,7 +41,7 @@ type AgentSkillImpl struct {
 	//   When all files of the archive are in one top folder, [path] is relative to that folder.
 	// - A `.md` file at an `https://` URL: a skill of one file. FAM saves it as `SKILL.md`.
 	//
-	// A bundle for every machine, a role, or one machine selects its skills, so the skills can be
+	// A bundle for every machine, a tag, or one machine selects its skills, so the skills can be
 	// different on each machine.
 	Source string `pkl:"source"`
 
@@ -87,7 +87,7 @@ type AgentSkillImpl struct {
 //     When all files of the archive are in one top folder, [path] is relative to that folder.
 //   - A `.md` file at an `https://` URL: a skill of one file. FAM saves it as `SKILL.md`.
 //
-// A bundle for every machine, a role, or one machine selects its skills, so the skills can be
+// A bundle for every machine, a tag, or one machine selects its skills, so the skills can be
 // different on each machine.
 func (rcv AgentSkillImpl) GetSource() string {
 	return rcv.Source

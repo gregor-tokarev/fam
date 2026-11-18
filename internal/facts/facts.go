@@ -15,19 +15,20 @@ import (
 // Facts describe one machine. FAM gives them to Pkl as `fam.<name>` properties
 // and to instruction templates as `.Facts`.
 type Facts struct {
-	Machine       string `json:"machine" toon:"machine"`
-	Role          string `json:"role" toon:"role"`
-	OS            string `json:"os" toon:"os"`
-	Distro        string `json:"distro" toon:"distro"`
-	DistroVersion string `json:"distroVersion" toon:"distroVersion"`
-	Arch          string `json:"arch" toon:"arch"`
-	Libc          string `json:"libc" toon:"libc"`
-	CPUs          int    `json:"cpus" toon:"cpus"`
-	Home          string `json:"home" toon:"home"`
-	User          string `json:"user" toon:"user"`
-	Hostname      string `json:"hostname" toon:"hostname"`
-	Init          string `json:"init" toon:"init"`
-	Shell         string `json:"shell" toon:"shell"`
+	Machine       string   `json:"machine" toon:"machine"`
+	Cockpit       bool     `json:"cockpit" toon:"cockpit"`
+	Tags          []string `json:"tags" toon:"tags"`
+	OS            string   `json:"os" toon:"os"`
+	Distro        string   `json:"distro" toon:"distro"`
+	DistroVersion string   `json:"distroVersion" toon:"distroVersion"`
+	Arch          string   `json:"arch" toon:"arch"`
+	Libc          string   `json:"libc" toon:"libc"`
+	CPUs          int      `json:"cpus" toon:"cpus"`
+	Home          string   `json:"home" toon:"home"`
+	User          string   `json:"user" toon:"user"`
+	Hostname      string   `json:"hostname" toon:"hostname"`
+	Init          string   `json:"init" toon:"init"`
+	Shell         string   `json:"shell" toon:"shell"`
 	// BashSSHRC is true when Bash reads ~/.bashrc for noninteractive SSH commands
 	// (Bash built with SSH_SOURCE_BASHRC, for example on Debian, Ubuntu, Fedora; not on Arch).
 	// It is not a Pkl property.
@@ -38,7 +39,8 @@ type Facts struct {
 func (f Facts) Properties() map[string]string {
 	return map[string]string{
 		"fam.machine":       f.Machine,
-		"fam.role":          f.Role,
+		"fam.cockpit":       strconv.FormatBool(f.Cockpit),
+		"fam.tags":          strings.Join(f.Tags, ","),
 		"fam.os":            f.OS,
 		"fam.distro":        f.Distro,
 		"fam.distroVersion": f.DistroVersion,
@@ -95,7 +97,7 @@ if [ -n "$b" ] && grep -a -q SSH2_CLIENT "$b" 2>/dev/null; then echo bashsshrc=y
 `
 
 // Collect runs the fact script on the machine.
-func Collect(ctx context.Context, t transport.Transport, machine, role string) (Facts, error) {
+func Collect(ctx context.Context, t transport.Transport, machine string, cockpit bool, tags []string) (Facts, error) {
 	r, err := t.Run(ctx, transport.Cmd{Script: script, Timeout: 2 * time.Minute, Label: "collect facts"})
 	if err != nil {
 		return Facts{}, err
@@ -122,7 +124,8 @@ func Collect(ctx context.Context, t transport.Transport, machine, role string) (
 	}
 	f := Facts{
 		Machine:       machine,
-		Role:          role,
+		Cockpit:       cockpit,
+		Tags:          append([]string{}, tags...),
 		Distro:        kv["distro"],
 		DistroVersion: kv["distroVersion"],
 		Home:          kv["home"],
