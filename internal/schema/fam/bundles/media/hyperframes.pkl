@@ -1,7 +1,7 @@
 /// HyperFrames: agents write HTML, HyperFrames renders it to video (https://github.com/heygen-com/hyperframes).
 ///
 /// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
-/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+/// release from GitHub. For another package manager, use `withManager`, for example `withManager("vite")`.
 /// The skills are the core set of HyperFrames. The CLI needs Node.js 22 or later, FFmpeg, and Chrome to
 /// render. FAM does not install them: `hyperframes doctor` shows what is missing.
 amends "../../Bundle.pkl"

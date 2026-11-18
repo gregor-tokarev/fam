@@ -1,7 +1,7 @@
 /// opensrc: fetches the source code of npm packages for agents (https://github.com/vercel-labs/opensrc).
 ///
 /// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
-/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+/// release from GitHub. For another package manager, use `withManager`, for example `withManager("vite")`.
 /// opensrc needs Node.js 24 or later.
 amends "../../Bundle.pkl"
 

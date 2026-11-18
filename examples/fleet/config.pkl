@@ -12,7 +12,8 @@ bundles {
   import("bundles/opencode.pkl")
   import("bundles/typescript.pkl")
   import("bundles/agent-skills.pkl")
-  std.computer.agentBrowser()
+  // Node.js comes from Vite+, so the JavaScript CLIs are global packages of Vite+.
+  std.computer.agentBrowser().withManager("vite")
 }
 
 machines = import("machines.pkl").machines
@@ -28,10 +29,4 @@ secrets {
 // Bundles for the workers only, after the bundles of every machine.
 roles {
   ["worker"] { bundles { import("bundles/worker-setup.pkl") } }
-}
-
-// Node.js comes from Vite+, so the JavaScript CLIs use the global packages of Vite+ instead of npm.
-packageManagers {
-  ["agent-browser"] = "vite"
-  ["typescript"] = "vite"
 }

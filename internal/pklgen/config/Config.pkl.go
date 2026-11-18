@@ -8,7 +8,6 @@ import (
 	"github.com/gregor-tokarev/fam/internal/pklgen/base"
 	"github.com/gregor-tokarev/fam/internal/pklgen/base/agentname"
 	"github.com/gregor-tokarev/fam/internal/pklgen/base/role"
-	"github.com/gregor-tokarev/fam/internal/pklgen/tasks/manager"
 )
 
 // The entrypoint of a FAM project.
@@ -57,17 +56,6 @@ type Config struct {
 	//
 	// An entry here wins over the bundle with the same `name` in [bundles].
 	Roles map[role.Role]base.RoleBundles `pkl:"roles"`
-
-	// The package manager for a package name, for every machine.
-	//
-	// It replaces the manager of each `Package` task with this package, also in the standard bundles:
-	//
-	// ```
-	// packageManagers { ["agent-browser"] = "vite" }
-	// ```
-	//
-	// A machine can set its own `packageManagers`, which win over these.
-	PackageManagers map[string]manager.Manager `pkl:"packageManagers"`
 }
 
 // LoadFromPath loads the pkl module at the given path and evaluates it into a Config

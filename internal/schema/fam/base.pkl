@@ -61,10 +61,6 @@ class Machine {
   /// An entry here wins over the bundle with the same `name` in `bundles` or `roles` of `config.pkl`.
   /// Use `new { bundle = …; state = "absent" }` to remove such a bundle from this machine.
   bundles: Listing<Bundle|BundleRef> = new Listing { default = (_) -> new BundleRef {} }
-
-  /// The package manager for a package name on this machine, for example
-  /// `packageManagers { ["agent-browser"] = "brew" }`. It wins over `packageManagers` in `config.pkl`.
-  packageManagers: Mapping<String, t.Manager>
 }
 
 /// The settings of one coding agent.

@@ -41,7 +41,15 @@ unsupportedReason: String?
 version: String?
 
 /// The location of this bundle file. FAM resolves all paths of the bundle relative to it.
-fixed source: String = reflect.Module(module).uri
+///
+/// FAM sets it. Do not set it.
+source: String = reflect.Module(module).uri
+
+/// The package manager of each `Package` task of this bundle, also for a task that selects its
+/// own manager. When it is `null`, each task uses its own manager.
+///
+/// Set it with [withManager].
+manager: t.Manager?
 
 /// Environment variables that FAM exports in every shell of the machine.
 env: Mapping<String(matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))), String>
@@ -64,6 +72,16 @@ verify: Listing<Verify>
 ///
 /// Use them for steps that FAM cannot undo, for example a [t.Script].
 uninstall: Listing<t.Task>
+
+/// This bundle with another package manager for its `Package` tasks.
+///
+/// ```
+/// bundles { std.computer.agentBrowser().withManager("vite") }
+/// ```
+function withManager(m: t.Manager): module = let (src = source) (module) {
+  source = src
+  manager = m
+}
 
 /// The event after which a verify script runs.
 ///

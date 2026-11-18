@@ -1,10 +1,7 @@
 // Code generated from Pkl module `fam.base`. DO NOT EDIT.
 package base
 
-import (
-	"github.com/gregor-tokarev/fam/internal/pklgen/base/role"
-	"github.com/gregor-tokarev/fam/internal/pklgen/tasks/manager"
-)
+import "github.com/gregor-tokarev/fam/internal/pklgen/base/role"
 
 // One machine of the fleet.
 type Machine struct {
@@ -28,8 +25,4 @@ type Machine struct {
 	// An entry here wins over the bundle with the same `name` in `bundles` or `roles` of `config.pkl`.
 	// Use `new { bundle = …; state = "absent" }` to remove such a bundle from this machine.
 	Bundles []any `pkl:"bundles"`
-
-	// The package manager for a package name on this machine, for example
-	// `packageManagers { ["agent-browser"] = "brew" }`. It wins over `packageManagers` in `config.pkl`.
-	PackageManagers map[string]manager.Manager `pkl:"packageManagers"`
 }

@@ -1,7 +1,7 @@
 /// lat.md: a knowledge graph of a codebase, written in Markdown (https://github.com/vercel-labs/lat.md).
 ///
 /// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
-/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+/// release from GitHub. For another package manager, use `withManager`, for example `withManager("vite")`.
 /// On Linux, lat.md needs glibc: its database module has no build for musl (Alpine).
 amends "../../Bundle.pkl"
 
