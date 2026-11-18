@@ -32,23 +32,25 @@ Test setup: one Ubuntu 26.04 VM of the acceptance harness (3 vCPU, 4 GB) with th
 
 | Command | Network | Before | After |
 |---|---|---|---|
-| `fam apply` | 100 ms round trip | 48.4 s, 54.6 s, 48.0 s | 18.7 s, 18.0 s, 18.0 s |
-| `fam plan` | 100 ms round trip | 12.4 s | 3.2 s |
-| SSH commands in one apply | | 160 | 108 |
-| SSH commands in one plan | | 46 | 40 |
+| `fam apply` | 100 ms round trip | 45.3 s, 45.2 s, 45.2 s | 22.9 s, 21.6 s, 21.3 s |
+| `fam plan` | 100 ms round trip | 12.1 s, 11.9 s, 11.8 s, 12.1 s, 11.9 s | 3.5 s, 3.6 s, 3.6 s, 3.5 s |
+| SSH commands in one apply | | 160 | 144 |
+| SSH commands in one plan | | 46 | 46 |
+
+One more plan run of the new binary took 7.9 s: the skill download from GitHub took 5.4 s in that run. Both binaries do this download in the same way.
 
 Time of each step of one apply with a 100 ms round trip:
 
 | Step | Before | After |
 |---|---|---|
 | Facts and Pkl evaluation | 1.4 s | 1.2 s |
-| Skill downloads and task build | 1.6 s | 0.8 s |
-| Checks before the apply loop | 9.8 s | 1.1 s |
-| Apply loop (updates and checks) | 28.0 s | 14.1 s |
+| Skill downloads and task build | 1.1 s | 1.0 s |
+| Checks before the apply loop | 9.5 s | 1.4 s |
+| Apply loop (updates and checks) | 25.7 s | 16.5 s |
 | Shell blocks | 1.1 s | 0.2 s |
-| Verify | 6.5 s | 1.3 s |
+| Verify | 6.5 s | 1.4 s |
 
-The update commands themselves (`claude update`, `rustup update`, `vp upgrade`, and others) take approximately 10 s of the apply loop, one update after the other. Their time changes from run to run with the network and the package registries.
+The update commands themselves (`claude update`, `rustup update`, `vp upgrade`, and others) take approximately 8 s of the apply loop, one update after the other. The other 8.6 s of the loop is the network wait of the checks and version commands around them (17.8 s before). Their time changes from run to run with the network and the package registries.
 
 The first apply of a new machine takes approximately 28 minutes in the VM. The downloads inside the VM take almost all of that time, for example 17 minutes for rustup. The change does not make these downloads faster.
 
