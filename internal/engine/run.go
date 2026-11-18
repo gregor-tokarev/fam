@@ -523,8 +523,6 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	stopped := false
 	mr.p.Count("applying", countTasks(mr.sects, true))
 	n := 0
-	// From here, the checks of packages with an update command also read the version.
-	env.probeVersions = true
 	// order is the run order of the tasks of the apply loop. pos is the position of each task.
 	var order []Task
 	pos := map[Task]int{}
@@ -545,6 +543,9 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	//     the update are not current.
 	isUpdater := func(t Task) bool { _, ok := t.(Updater); return ok }
 	refresh := false
+	// failed holds the connection errors of a refresh. Unlike pre, a later change does not clear
+	// them: the task fails with its connection error, and FAM stops.
+	failed := map[Task]error{}
 	refreshFrom := func(t Task) {
 		refresh = false
 		var seg []Task
@@ -558,11 +559,14 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		pre = make(map[Task]checked, len(seg))
 		for i, x := range seg {
 			res := results[i]
-			// A connection error is the result of the task, as when the task checks itself. Any
-			// other error or a difference: the task checks again right before it runs.
-			if res.ran && (res.err == nil && res.c.Status == Satisfied || transport.IsConnError(res.err)) {
+			switch {
+			case !res.ran:
+			case transport.IsConnError(res.err):
+				failed[x] = res.err
+			case res.err == nil && res.c.Status == Satisfied:
 				pre[x] = res
 			}
+			// Any other error or a difference: the task checks again right before it runs.
 		}
 	}
 	// The position of each task in r.Tasks.
@@ -583,15 +587,19 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 				continue
 			}
 			n++
-			mr.p.Task(n, taskLabel(t))
 			if _, ok := pre[t]; !ok && refresh && !isUpdater(t) {
+				// The checks of the refresh run at the same time: show only the count.
+				mr.p.Task(n, "")
 				refreshFrom(t)
 			}
-			// Only a satisfied result (or a connection error of the refresh) skips the check. A
-			// task that changes the machine always checks right before, for example a removal
-			// that checks the owner, or an update that needs the program.
+			mr.p.Task(n, taskLabel(t))
+			// Only a satisfied result skips the check. A task that changes the machine always
+			// checks right before, for example a removal that checks the owner, or an update
+			// that needs the program.
 			var p *checked
-			if res, ok := pre[t]; ok && !isUpdater(t) && (res.err == nil && res.c.Status == Satisfied || transport.IsConnError(res.err)) {
+			if err, ok := failed[t]; ok {
+				p = &checked{err: err, ran: true}
+			} else if res, ok := pre[t]; ok && !isUpdater(t) && res.err == nil && res.c.Status == Satisfied {
 				p = &res
 			}
 			st, detail, err, touch := applyTask(ctx, env, t, p)
@@ -727,28 +735,20 @@ func restoreBlocks(ctx context.Context, env *Env, mr *machineRun, index map[Task
 		setError(r, connErr)
 		return true
 	}
-	// After FAM writes one block, the results of the other blocks can be old: two startup files
-	// can be one file (a link). Then each next block checks again before it runs, as before.
+	// A block with a satisfied result needs nothing. Each other block checks again right before
+	// FAM writes it, as before. After FAM writes one block, the results of the other blocks can be
+	// old (two startup files can be one file, a link), so each next block checks again.
 	wrote := false
 	for k, t := range blocks {
 		res := results[k]
-		var p *checked
-		if !wrote {
-			if res.err == nil && res.c.Status == Satisfied {
-				continue
-			}
-			if res.err == nil {
-				p = &res
-			}
+		if !wrote && res.err == nil && res.c.Status == Satisfied {
+			continue
 		}
-		st, detail, err, _ := applyTask(ctx, env, t, p)
+		st, detail, err, _ := applyTask(ctx, env, t, nil)
 		if st == Unchanged {
 			continue
 		}
 		wrote = true
-		if detail == "" && p != nil {
-			detail = res.c.Detail
-		}
 		if st == Changed {
 			detail += " (again: a later task changed the file)"
 		}
@@ -779,7 +779,18 @@ const (
 // this task; FAM uses it instead of a new check when it is not nil.
 func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, detail string, err error, tc touch) {
 	var c Check
-	if pre != nil {
+	var before string
+	if u, ok := t.(Updater); ok && pre == nil {
+		// Before only reads, so it runs at the same time as the check.
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			before = u.Before(ctx, env)
+		}()
+		c, err = check(ctx, env, t)
+		wg.Wait()
+	} else if pre != nil {
 		c, err = pre.c, pre.err
 	} else {
 		c, err = check(ctx, env, t)
@@ -796,7 +807,7 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 		if !ok {
 			return Unchanged, "", nil, touchNone
 		}
-		up, err := u.Update(ctx, env, c)
+		up, err := u.Update(ctx, env, before)
 		if err != nil {
 			return Failed, "update failed", err, touchApply
 		}

@@ -11,20 +11,17 @@ The fleet VPN has a round trip of 60 ms to 210 ms. With 100 ms, one command cost
 The old apply did these steps one after the other:
 
 - It ran the check of each task two times: once before the apply loop (to find conflicts) and once in the apply loop.
-- It ran each check, each verify shell, and each skill download alone.
-- A package update used five commands: version, update, find, version, find.
-- A skill check used three commands: the folder, the FAM marker, and the digest.
+- It ran each check and each verify shell alone.
+- A package update used six commands, one after the other: find, version, update, find, version, find.
 - It evaluated the Pkl config of one machine at a time.
 
 ## What changed
 
 - **Checks run at the same time.** A check changes nothing. Plan, the check before the apply loop, and the check of the shell blocks run up to 8 checks of a machine at the same time. The default `MaxSessions` of sshd is 10. When sshd refuses a session, `ssh` opens a separate connection for it, so the command is slower but does not fail. After a connection error, FAM starts no more checks and lets the running checks end.
-- **One check for a satisfied task.** A task with a satisfied check before the apply loop does not check again until a task changes the machine. A task that changes the machine always checks right before its apply.
-- **Updates make FAM check again.** An update script can change files of other tasks, also without a new version. After an update, FAM checks the next tasks again at the same time, up to the next package with an update command. After an apply or a restart, each next task checks again before it runs.
-- **One command for each package update.** In the apply loop, the check reads the version together with the program path. The update and the probe after it run in one command when both run as the same user. Each user script still runs as its own top-level script. When the probe cannot find the program, FAM looks again in a new SSH command, because the update can change the shell startup files. `fam plan` runs no version command that it did not run before.
-- **One command for each skill check.**
-- **Verify scripts run at the same time.** Up to 8 `fresh_shell` scripts of a machine run at the same time. The two shells of one script run one after the other. The report keeps the order of the config. The `reconnect` scripts run after them, one at a time.
-- **Skill downloads run at the same time**, at most 4, before FAM builds the tasks.
+- **One check for a satisfied task.** A task with a satisfied check before the apply loop does not check again until a task changes the machine. A task that changes the machine (an apply or an update) always checks right before it.
+- **Updates make FAM check again.** An update script can change files of other tasks, also without a new version. After an update, FAM checks the next tasks again at the same time, up to the next package with an update command. A connection error in these checks fails the task and stops the machine. After an apply or a restart, each next task checks again before it runs.
+- **Fewer waits for each package update.** The commands are the same as before, and each has its own timeout. Commands that only read run at the same time: the check with the version before the update, and the search with the version after it. The search and the version after the update are the full check of the task, so the third search is not necessary. An update now waits for three round trips, not six.
+- **Verify scripts run at the same time.** Up to 8 `fresh_shell` scripts of a machine run at the same time. The two shells of one script run one after the other. The report keeps the order of the config. The `reconnect` scripts run after them, one at a time. Two verify scripts must not share a fixed port or a file.
 - **Machines evaluate the Pkl config at the same time.**
 
 The output of plan and apply does not change.

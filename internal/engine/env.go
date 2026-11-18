@@ -25,10 +25,6 @@ type Env struct {
 	// restarted holds the units that the last Service task restarted. The apply loop removes
 	// them from the restart requests made before that task.
 	restarted map[Unit]bool
-	// probeVersions lets the checks of packages with an update command also read the version,
-	// for the update after the check. FAM sets it only in the apply loop, after the conflict
-	// check, so that plan never runs a version command that it did not run before.
-	probeVersions bool
 }
 
 func (e *Env) markRestarted(u Unit) {
@@ -88,20 +84,6 @@ unset HOME_FAM
 func (e *Env) UserScript(ctx context.Context, script string, sudo bool, label string, timeout time.Duration) (transport.Result, error) {
 	s := e.prelude() + `if command -v bash >/dev/null 2>&1; then exec bash -c "$0"; else exec sh -c "$0"; fi`
 	full := "sh -c " + transport.Quote(s) + " " + transport.Quote(script)
-	return e.T.Run(ctx, transport.Cmd{Script: full, Sudo: sudo, Label: label, Timeout: timeout})
-}
-
-// UserScripts runs a FAM-internal POSIX driver with the FAM environment. In the driver, "$1" is
-// the shell for user scripts (bash when the machine has it, else sh), and "$2", "$3", ... are the
-// user scripts. The driver runs each one with `"$1" -c "$n"`, so each runs as its own top-level
-// script, exactly as with UserScript. The driver sets no shell variables, so it cannot change a
-// variable of the FAM environment that a user script reads.
-func (e *Env) UserScripts(ctx context.Context, driver string, scripts []string, sudo bool, label string, timeout time.Duration) (transport.Result, error) {
-	s := e.prelude() + "if command -v bash >/dev/null 2>&1; then set -- bash \"$@\"; else set -- sh \"$@\"; fi\n" + driver
-	full := "sh -c " + transport.Quote(s) + " fam"
-	for _, sc := range scripts {
-		full += " " + transport.Quote(sc)
-	}
 	return e.T.Run(ctx, transport.Cmd{Script: full, Sudo: sudo, Label: label, Timeout: timeout})
 }
 

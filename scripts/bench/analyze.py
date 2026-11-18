@@ -44,13 +44,16 @@ for k, (n, ms) in sorted(by.items(), key=lambda kv: -kv[1][1])[:20]:
 print(f"\nslowest {top}:")
 for c in sorted(cmds, key=lambda c: -c.get("durationMs", 0))[:top]:
     print(f"  {c.get('durationMs',0)/1000:7.2f}s  {c.get('label','')[:90]}")
-# Gaps between commands (local work: Pkl, GitHub, etc.)
+# Idle gaps: time when no command ran (local work: Pkl, GitHub, etc.). The log writes each
+# entry when the command ends, so a command ran from time - duration to time.
+spans = sorted((ts(c["time"]).timestamp() - c.get("durationMs", 0) / 1000, ts(c["time"]).timestamp(), c.get("label", "")) for c in cmds)
 gaps = []
-for a, b in zip(cmds, cmds[1:]):
-    # The log writes each entry when the command ends.
-    end_a = ts(a["time"]).timestamp()
-    g = ts(b["time"]).timestamp() - b.get("durationMs", 0) / 1000 - end_a
-    gaps.append((g, a.get("label", ""), b.get("label", "")))
-print("\nlargest gaps between commands:")
+end, end_label = None, ""
+for start, stop, label in spans:
+    if end is not None and start > end:
+        gaps.append((start - end, end_label, label))
+    if end is None or stop > end:
+        end, end_label = stop, label
+print("\nlargest idle gaps (no command running):")
 for g, a, b in sorted(gaps, reverse=True)[:8]:
     print(f"  {g:6.2f}s  after [{a[:50]}] before [{b[:50]}]")

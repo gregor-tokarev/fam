@@ -27,10 +27,6 @@ const (
 type Check struct {
 	Status Status
 	Detail string
-	// version is the installed version that the check found, for the update after it. It is
-	// valid when versionKnown is true.
-	version      string
-	versionKnown bool
 }
 
 // Task is one unit of work on a machine.
@@ -49,8 +45,11 @@ type Task interface {
 
 // Updater is a task that also runs on apply when its check is satisfied, for example a package update.
 type Updater interface {
-	// Update gets the satisfied check of the task, which is current.
-	Update(ctx context.Context, env *Env, c Check) (Update, error)
+	// Before reads what Update compares, for example the version. It changes nothing, so FAM
+	// runs it at the same time as the check before the update.
+	Before(ctx context.Context, env *Env) string
+	// Update runs after a satisfied check. before is the result of Before.
+	Update(ctx context.Context, env *Env, before string) (Update, error)
 }
 
 // Update is the result of an update. FAM treats each update that ran as a possible change of the

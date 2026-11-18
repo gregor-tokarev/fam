@@ -41,9 +41,6 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 	if len(agentSec.Tasks) > 0 {
 		out = append(out, agentSec)
 	}
-	if !staticOnly {
-		prefetchSkills(ctx, spec.Bundles)
-	}
 	var verify []VerifySpec
 	for _, u := range spec.Bundles {
 		s, err := bundleSection(ctx, u, env.Facts, staticOnly)
@@ -133,18 +130,6 @@ type shellRun struct {
 
 // verifyShells are the two shells of each fresh_shell script.
 var verifyShells = [2]string{"noninteractive", "interactive"}
-
-// reportConnFailure adds the first verify shell, in config order, that lost the connection.
-func reportConnFailure(r *output.MachineResult, verify []VerifySpec, runs [][2]shellRun, add func(VerifySpec, string, transport.Result, error)) {
-	for i, v := range verify {
-		for k := range runs[i] {
-			if sr := runs[i][k]; sr.ran && transport.IsConnError(sr.err) {
-				add(v, verifyShells[k], sr.res, sr.err)
-				return
-			}
-		}
-	}
-}
 
 // verifyMachine runs the verify scripts in new shells.
 //   - fresh_shell: a noninteractive and an interactive login shell of the user. These scripts
@@ -241,22 +226,15 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		wg.Wait()
 	}
 
+	// Report every shell that ran, in config order, also after a connection error: those
+	// results are real. A shell that did not start after the error has no row.
 	var reconnect []VerifySpec
 	for i, v := range mr.verify {
 		switch v.Event {
 		case "fresh_shell":
 			for k, shell := range verifyShells {
-				sr := runs[i][k]
-				if !sr.ran {
-					// Another script lost the connection: report its failed shell, then the error.
-					reportConnFailure(r, mr.verify, runs, add)
-					setError(r, connErr)
-					return
-				}
-				add(v, shell, sr.res, sr.err)
-				if transport.IsConnError(sr.err) {
-					setError(r, sr.err)
-					return
+				if sr := runs[i][k]; sr.ran {
+					add(v, shell, sr.res, sr.err)
 				}
 			}
 		case "reconnect":
@@ -264,6 +242,10 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		case "reboot":
 			r.Verify = append(r.Verify, output.VerifyResult{Bundle: v.Bundle, Name: v.Name, Event: v.Event, Shell: "-", Status: "skipped", Output: "reboot verification is not in FAM version 0"})
 		}
+	}
+	if connErr != nil {
+		setError(r, connErr)
+		return
 	}
 	if len(reconnect) > 0 {
 		mr.p.Stage("reconnecting to verify")
