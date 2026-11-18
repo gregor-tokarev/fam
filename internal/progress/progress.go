@@ -263,10 +263,11 @@ func (r *Reporter) logSlow() {
 // progress is the stage, the counter, and the task of the machine.
 func (m *Machine) progress() string {
 	s := m.stage
+	// Steps that run at the same time report only the count, without a task name.
+	if m.total > 0 && m.stage == m.count && (m.task != "" || m.index > 0) {
+		s += fmt.Sprintf(" %d/%d", m.index, m.total)
+	}
 	if m.task != "" {
-		if m.total > 0 {
-			s += fmt.Sprintf(" %d/%d", m.index, m.total)
-		}
 		s += ": " + m.task
 	}
 	return s

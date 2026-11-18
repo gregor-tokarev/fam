@@ -91,12 +91,13 @@ func (e *Env) UserScript(ctx context.Context, script string, sudo bool, label st
 	return e.T.Run(ctx, transport.Cmd{Script: full, Sudo: sudo, Label: label, Timeout: timeout})
 }
 
-// UserScripts runs a FAM-internal POSIX driver with the FAM environment. The driver gets the user
-// scripts as "$1", "$2", ... and runs each one with `"$FAM_SH" -c "$n"`: Bash when the machine has
-// it, else sh. Each user script runs as its own top-level script, exactly as with UserScript, so
-// one command can run several user scripts without a change to their meaning.
+// UserScripts runs a FAM-internal POSIX driver with the FAM environment. In the driver, "$1" is
+// the shell for user scripts (bash when the machine has it, else sh), and "$2", "$3", ... are the
+// user scripts. The driver runs each one with `"$1" -c "$n"`, so each runs as its own top-level
+// script, exactly as with UserScript. The driver sets no shell variables, so it cannot change a
+// variable of the FAM environment that a user script reads.
 func (e *Env) UserScripts(ctx context.Context, driver string, scripts []string, sudo bool, label string, timeout time.Duration) (transport.Result, error) {
-	s := e.prelude() + "if command -v bash >/dev/null 2>&1; then FAM_SH=bash; else FAM_SH=sh; fi\n" + driver
+	s := e.prelude() + "if command -v bash >/dev/null 2>&1; then set -- bash \"$@\"; else set -- sh \"$@\"; fi\n" + driver
 	full := "sh -c " + transport.Quote(s) + " fam"
 	for _, sc := range scripts {
 		full += " " + transport.Quote(sc)

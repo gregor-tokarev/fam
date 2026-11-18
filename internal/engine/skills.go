@@ -205,6 +205,7 @@ func (t *SkillTask) Check(ctx context.Context, env *Env) (Check, error) {
 	script := fmt.Sprintf(`p=%[1]s
 if [ -L "$p" ]; then echo state=other; exit 0
 elif [ -d "$p" ]; then
+  if [ ! -x "$p" ]; then echo "cannot look into $p: permission denied" >&2; exit 5; fi
   if [ -e "$p/%[2]s" ] || [ -L "$p/%[2]s" ]; then echo state=managed; else echo state=foreign; exit 0; fi
 elif [ -e "$p" ]; then echo state=other; exit 0
 else
@@ -221,8 +222,15 @@ fi
 	if err != nil {
 		return Check{}, err
 	}
-	state, _, _ := strings.Cut(r.Out(), "\n")
-	switch strings.TrimSpace(state) {
+	// A shell startup file can print lines before the output of the script.
+	state := ""
+	for _, l := range strings.Split(r.Out(), "\n") {
+		if l = strings.TrimSpace(l); strings.HasPrefix(l, "state=") {
+			state = l
+			break
+		}
+	}
+	switch state {
 	case "state=none":
 		return Check{Status: Change, Detail: "copy"}, nil
 	case "state=other":

@@ -1,10 +1,10 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -202,32 +202,37 @@ func runMarker(kind string) string {
 	return "FAM-" + kind + "-" + hex.EncodeToString(b)
 }
 
-// probeDriver runs the installed script ("$<inst>") and, when the program is found, prints mark
-// and the output of the version script ("$<ver>"). Its exit code is the code of the installed
-// script. Both scripts run as their own top-level scripts (see UserScripts).
-func probeDriver(inst, ver int, mark string) string {
-	return fmt.Sprintf(`"$FAM_SH" -c "$%[1]d"
-rc=$?
-[ "$rc" -eq 0 ] || exit "$rc"
-printf '\n%%s\n' '%[3]s'
-if v=$("$FAM_SH" -c "$%[2]d"); then printf '%%s\n' "$v"; fi
-exit 0
-`, inst, ver, mark)
+// probeDriver runs the installed script ("$2") and, when the program is found, prints mark, the
+// output of the version script ("$3"), and the end mark with the exit code of the version script.
+// Its exit code is the code of the installed script. It sets no shell variables.
+func probeDriver(mark string) string {
+	return `"$1" -c "$2" || exit $?
+printf '\n%s\n' '` + mark + `'
+"$1" -c "$3"
+printf '\n%s %s\n' '` + mark + `-END' "$?"
+`
 }
 
 // probeResult reads the result of probeDriver. version is "" when the program is not installed
-// or the version command fails.
+// or the version command fails, as with version.
 func (t *PackageTask) probeResult(r transport.Result, mark string) (ok bool, version string, err error) {
 	if ok, err = t.installedResult(r); !ok || err != nil {
 		return ok, "", err
 	}
-	if _, after, found := strings.Cut(string(r.Stdout), "\n"+mark+"\n"); found {
-		version = firstLine(after)
+	_, after, found := strings.Cut(string(r.Stdout), "\n"+mark+"\n")
+	if !found {
+		return true, "", nil
 	}
-	return true, version, nil
+	out, end, found := strings.Cut(after, "\n"+mark+"-END ")
+	if !found || strings.TrimSpace(end) != "0" {
+		return true, "", nil
+	}
+	return true, firstLine(out), nil
 }
 
-// probe finds the program and reads its version in one command.
+// probe finds the program and reads its version in one command. When the command does not end in
+// time (for example a version command that hangs), FAM only looks for the program, and the version
+// is "", as when a separate version command stops after its timeout.
 func (t *PackageTask) probe(ctx context.Context, env *Env) (ok bool, version string, err error) {
 	inst, label := t.installedScript(env)
 	if t.VersionCmd == "" {
@@ -235,8 +240,12 @@ func (t *PackageTask) probe(ctx context.Context, env *Env) (ok bool, version str
 		return ok, "", err
 	}
 	mark := runMarker("VERSION")
-	r, err := env.UserScripts(ctx, probeDriver(1, 2, mark), []string{inst, t.versionScript(env)}, t.sudo, label+" and its version", 4*time.Minute)
+	r, err := env.UserScripts(ctx, probeDriver(mark), []string{inst, t.versionScript(env)}, t.sudo, label+" and its version", 2*time.Minute)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil && !transport.IsConnError(err) {
+			ok, err = t.installed(ctx, env)
+			return ok, "", err
+		}
 		return false, "", err
 	}
 	return t.probeResult(r, mark)
@@ -316,7 +325,7 @@ func (t *PackageTask) Apply(ctx context.Context, env *Env) (string, error) {
 }
 
 // Update implements Updater. FAM compares the version before and after the update. c is the
-// satisfied check before the update, with the version when the check read it.
+// check right before the update, with the version when the check read it.
 func (t *PackageTask) Update(ctx context.Context, env *Env, c Check) (Update, error) {
 	if t.Absent || t.UpdateSh == "" {
 		return Update{}, nil
@@ -325,33 +334,9 @@ func (t *PackageTask) Update(ctx context.Context, env *Env, c Check) (Update, er
 	if !c.versionKnown {
 		before = t.version(ctx, env)
 	}
-	// When the update and the probe run as the same user, one command runs the update and then
-	// finds the program and its version again. updMark shows that the update succeeded.
-	together := t.applySudo() == t.sudo && t.VersionCmd != ""
-	updMark, verMark := runMarker("UPDATE"), runMarker("VERSION")
-	var r transport.Result
-	var err error
-	if together {
-		inst, _ := t.installedScript(env)
-		driver := `"$FAM_SH" -c "$1"
-rc=$?
-[ "$rc" -eq 0 ] || exit "$rc"
-printf '\n%s\n' '` + updMark + `'
-` + probeDriver(2, 3, verMark)
-		r, err = env.UserScripts(ctx, driver, []string{t.UpdateSh, inst, t.versionScript(env)}, t.sudo, "update "+t.Name(), scriptTimeout+4*time.Minute)
-	} else {
-		r, err = env.UserScript(ctx, t.UpdateSh, t.applySudo(), "update "+t.Name(), scriptTimeout)
-	}
+	r, err := env.UserScript(ctx, t.UpdateSh, t.applySudo(), "update "+t.Name(), scriptTimeout)
 	if err != nil {
 		return Update{Ran: true}, err
-	}
-	var probed *transport.Result
-	if together {
-		if out, after, found := bytes.Cut(r.Stdout, []byte("\n"+updMark+"\n")); found {
-			// The update succeeded. The exit code and the rest of stdout are of the probe.
-			probed = &transport.Result{Stdout: after, Stderr: r.Stderr, Code: r.Code}
-			r = transport.Result{Stdout: out, Stderr: r.Stderr}
-		}
 	}
 	// Exit code 42 with "FAM-ROOT: <command>": the update needs root (an OS package). FAM runs
 	// the command with its own sudo (sudo -n on workers, the password on the cockpit).
@@ -373,20 +358,10 @@ printf '\n%s\n' '` + updMark + `'
 	if r.Code != 0 {
 		return Update{Ran: true}, sudoHint(&ExitError{Label: "update", Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, t.applySudo(), "package")
 	}
-	// Check again: an update must leave the program installed. The probe also gives the version
-	// for the pin, so this is the full check of the task.
-	var ok bool
-	var after string
-	if probed != nil {
-		ok, after, err = t.probeResult(*probed, verMark)
-		if err == nil && !ok {
-			// The update can change the shell startup files (for example a new PATH entry) that
-			// only a new SSH command reads. Look again in a new command before FAM reports an error.
-			ok, after, err = t.probe(ctx, env)
-		}
-	} else {
-		ok, after, err = t.probe(ctx, env)
-	}
+	// Check again in a new command, which reads the shell startup files that the update can
+	// change: an update must leave the program installed. The probe also gives the version for
+	// the pin, so this is the full check of the task.
+	ok, after, err := t.probe(ctx, env)
 	if err != nil {
 		return Update{Ran: true}, err
 	} else if !ok {

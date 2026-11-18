@@ -178,13 +178,15 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 	return []Task{&SkillTask{base: g, Skill: src, units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
 }
 
+// prefetchSlots allows at most 4 skill downloads at a time for the whole run (all machines), so
+// that a server with a request limit does not refuse them.
+var prefetchSlots = make(chan struct{}, 4)
+
 // prefetchSkills downloads the remote skills of the present bundles, several at a time, before
 // FAM builds the tasks one bundle after the other. Each download goes into the cache of the
 // run, so the tasks get the same result, also an error, without a new request.
 func prefetchSkills(ctx context.Context, bundles []config.BundleUse) {
 	var wg sync.WaitGroup
-	// At most 4 downloads at a time, so that a server with a request limit does not refuse them.
-	sem := make(chan struct{}, 4)
 	for _, u := range bundles {
 		if u.State != "present" || u.Skipped() {
 			continue
@@ -199,10 +201,10 @@ func prefetchSkills(ctx context.Context, bundles []config.BundleUse) {
 				continue
 			}
 			wg.Add(1)
-			sem <- struct{}{}
+			prefetchSlots <- struct{}{}
 			go func() {
 				defer wg.Done()
-				defer func() { <-sem }()
+				defer func() { <-prefetchSlots }()
 				_, _ = spec.load(ctx, spec.name, "bundle "+u.Bundle.Name)
 			}()
 		}

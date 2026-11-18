@@ -124,6 +124,28 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 	return out, verify, nil
 }
 
+// shellRun is one verify shell of verifyMachine.
+type shellRun struct {
+	res transport.Result
+	err error
+	ran bool
+}
+
+// verifyShells are the two shells of each fresh_shell script.
+var verifyShells = [2]string{"noninteractive", "interactive"}
+
+// reportConnFailure adds the first verify shell, in config order, that lost the connection.
+func reportConnFailure(r *output.MachineResult, verify []VerifySpec, runs [][2]shellRun, add func(VerifySpec, string, transport.Result, error)) {
+	for i, v := range verify {
+		for k := range runs[i] {
+			if sr := runs[i][k]; sr.ran && transport.IsConnError(sr.err) {
+				add(v, verifyShells[k], sr.res, sr.err)
+				return
+			}
+		}
+	}
+}
+
 // verifyMachine runs the verify scripts in new shells.
 //   - fresh_shell: a noninteractive and an interactive login shell of the user. These scripts
 //     only prove that the tools work, so they run at the same time. FAM reports them in the
@@ -169,11 +191,6 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 	// run one after the other, so that a script that uses a fixed port or file does not meet a
 	// copy of itself. After a connection error FAM starts no more scripts and lets the running
 	// ones end.
-	type shellRun struct {
-		res transport.Result
-		err error
-		ran bool
-	}
 	runs := make([][2]shellRun, len(mr.verify))
 	var connErr error
 	{
@@ -196,6 +213,10 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 				defer wg.Done()
 				defer func() { <-sem }()
 				for k, interactive := range []bool{false, true} {
+					if k > 0 && stop.Load() {
+						// Another script lost the connection: start no new shell.
+						return
+					}
 					res, err := run(ctx, v, interactive)
 					mu.Lock()
 					runs[i][k] = shellRun{res: res, err: err, ran: true}
@@ -224,9 +245,11 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 	for i, v := range mr.verify {
 		switch v.Event {
 		case "fresh_shell":
-			for k, shell := range []string{"noninteractive", "interactive"} {
+			for k, shell := range verifyShells {
 				sr := runs[i][k]
 				if !sr.ran {
+					// Another script lost the connection: report its failed shell, then the error.
+					reportConnFailure(r, mr.verify, runs, add)
 					setError(r, connErr)
 					return
 				}

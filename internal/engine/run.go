@@ -537,27 +537,31 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		}
 	}
 	// pre holds check results that are still current. A task with a satisfied result in pre
-	// needs no new check. After a task changes the machine, FAM clears pre:
+	// needs no new check. A task that changes the machine (an apply or an update) always checks
+	// right before it. After a task changes the machine, FAM clears pre:
 	//   - after an apply or a restart, each next task checks again before it runs, as before.
-	//   - after an update, FAM checks the next tasks at the same time, up to and including the
-	//     next task with an update. An update can change files of other tasks, so the results of
-	//     before the update are not current.
+	//   - after an update, FAM checks the next tasks again at the same time, up to the next task
+	//     with an update. An update can change files of other tasks, so the results of before
+	//     the update are not current.
+	isUpdater := func(t Task) bool { _, ok := t.(Updater); return ok }
 	refresh := false
 	refreshFrom := func(t Task) {
 		refresh = false
 		var seg []Task
 		for _, x := range order[pos[t]:] {
-			seg = append(seg, x)
-			if _, ok := x.(Updater); ok {
+			if isUpdater(x) {
 				break
 			}
+			seg = append(seg, x)
 		}
 		results, _ := checkAll(ctx, env, seg, nil)
 		pre = make(map[Task]checked, len(seg))
 		for i, x := range seg {
-			// A connection error or another error: the task checks again itself.
-			if results[i].ran && results[i].err == nil {
-				pre[x] = results[i]
+			res := results[i]
+			// A connection error is the result of the task, as when the task checks itself. Any
+			// other error or a difference: the task checks again right before it runs.
+			if res.ran && (res.err == nil && res.c.Status == Satisfied || transport.IsConnError(res.err)) {
+				pre[x] = res
 			}
 		}
 	}
@@ -580,13 +584,14 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			}
 			n++
 			mr.p.Task(n, taskLabel(t))
-			if _, ok := pre[t]; !ok && refresh {
+			if _, ok := pre[t]; !ok && refresh && !isUpdater(t) {
 				refreshFrom(t)
 			}
-			// Only a satisfied result skips the check. A task that changes the machine always
-			// checks right before its apply, for example a removal that checks the owner.
+			// Only a satisfied result (or a connection error of the refresh) skips the check. A
+			// task that changes the machine always checks right before, for example a removal
+			// that checks the owner, or an update that needs the program.
 			var p *checked
-			if res, ok := pre[t]; ok && res.err == nil && res.c.Status == Satisfied {
+			if res, ok := pre[t]; ok && !isUpdater(t) && (res.err == nil && res.c.Status == Satisfied || transport.IsConnError(res.err)) {
 				p = &res
 			}
 			st, detail, err, touch := applyTask(ctx, env, t, p)
@@ -722,21 +727,26 @@ func restoreBlocks(ctx context.Context, env *Env, mr *machineRun, index map[Task
 		setError(r, connErr)
 		return true
 	}
+	// After FAM writes one block, the results of the other blocks can be old: two startup files
+	// can be one file (a link). Then each next block checks again before it runs, as before.
+	wrote := false
 	for k, t := range blocks {
 		res := results[k]
-		if res.err == nil && res.c.Status == Satisfied {
-			continue
-		}
-		// A check without an error is still valid: the tasks before changed only other files.
 		var p *checked
-		if res.err == nil {
-			p = &res
+		if !wrote {
+			if res.err == nil && res.c.Status == Satisfied {
+				continue
+			}
+			if res.err == nil {
+				p = &res
+			}
 		}
 		st, detail, err, _ := applyTask(ctx, env, t, p)
 		if st == Unchanged {
 			continue
 		}
-		if detail == "" {
+		wrote = true
+		if detail == "" && p != nil {
 			detail = res.c.Detail
 		}
 		if st == Changed {
