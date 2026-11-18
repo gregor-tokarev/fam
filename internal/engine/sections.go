@@ -121,11 +121,28 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 	return out, verify, nil
 }
 
-// shellRun is one verify shell of verifyMachine.
+// shellRun is one verify shell of verifyMachine. It keeps only the report row, not the output.
 type shellRun struct {
-	res transport.Result
+	row output.VerifyResult
 	err error
 	ran bool
+}
+
+// verifyRow is the report row of one verify shell.
+func verifyRow(v VerifySpec, shell string, res transport.Result, err error) output.VerifyResult {
+	vr := output.VerifyResult{Bundle: v.Bundle, Name: v.Name, Event: v.Event, Shell: shell, Code: res.Code}
+	switch {
+	case err != nil:
+		vr.Status = "failed"
+		vr.Code = -1
+		vr.Output = err.Error()
+	case res.Code == 0:
+		vr.Status = "passed"
+	default:
+		vr.Status = "failed"
+		vr.Output = tail(strings.TrimSpace(string(res.Stdout)+"\n"+string(res.Stderr)), 5)
+	}
+	return vr
 }
 
 // verifyShells are the two shells of each fresh_shell script.
@@ -140,26 +157,16 @@ var verifyShells = [2]string{"noninteractive", "interactive"}
 func verifyMachine(ctx context.Context, mr *machineRun) {
 	r := mr.res
 	env := mr.env
-	add := func(v VerifySpec, shell string, res transport.Result, err error) {
-		vr := output.VerifyResult{Bundle: v.Bundle, Name: v.Name, Event: v.Event, Shell: shell, Code: res.Code}
-		out := strings.TrimSpace(string(res.Stdout) + "\n" + string(res.Stderr))
-		switch {
-		case err != nil:
-			vr.Status = "failed"
-			vr.Code = -1
-			vr.Output = err.Error()
-		case res.Code == 0:
-			vr.Status = "passed"
-		default:
-			vr.Status = "failed"
-			vr.Output = tail(out, 5)
-		}
+	addRow := func(vr output.VerifyResult) {
 		if vr.Status == "passed" {
 			r.Counts.VerifyOK++
 		} else {
 			r.Counts.VerifyBad++
 		}
 		r.Verify = append(r.Verify, vr)
+	}
+	add := func(v VerifySpec, shell string, res transport.Result, err error) {
+		addRow(verifyRow(v, shell, res, err))
 	}
 	run := func(ctx context.Context, v VerifySpec, interactive bool) (transport.Result, error) {
 		return env.T.Run(ctx, transport.Cmd{Script: v.Script, LoginShell: true, Interactive: interactive, Timeout: 5 * time.Minute, Label: "verify " + v.Name})
@@ -177,7 +184,6 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 	// copy of itself. After a connection error FAM starts no more scripts and lets the running
 	// ones end.
 	runs := make([][2]shellRun, len(mr.verify))
-	var connErr error
 	{
 		var mu sync.Mutex
 		var stop atomic.Bool
@@ -204,13 +210,10 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 					}
 					res, err := run(ctx, v, interactive)
 					mu.Lock()
-					runs[i][k] = shellRun{res: res, err: err, ran: true}
+					runs[i][k] = shellRun{row: verifyRow(v, verifyShells[k], res, err), err: err, ran: true}
 					conn := transport.IsConnError(err)
 					if conn {
 						stop.Store(true)
-						if connErr == nil {
-							connErr = err
-						}
 					}
 					mu.Unlock()
 					if conn {
@@ -226,15 +229,22 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		wg.Wait()
 	}
 
-	// Report every shell that ran, in config order, also after a connection error: those
-	// results are real. A shell that did not start after the error has no row.
+	// Report the shells in config order, as if they ran one after the other: up to and
+	// including the first shell, in config order, that lost the connection. A shell that did not
+	// start after a connection error has no row.
 	var reconnect []VerifySpec
 	for i, v := range mr.verify {
 		switch v.Event {
 		case "fresh_shell":
-			for k, shell := range verifyShells {
-				if sr := runs[i][k]; sr.ran {
-					add(v, shell, sr.res, sr.err)
+			for k := range verifyShells {
+				sr := runs[i][k]
+				if !sr.ran {
+					continue
+				}
+				addRow(sr.row)
+				if transport.IsConnError(sr.err) {
+					setError(r, sr.err)
+					return
 				}
 			}
 		case "reconnect":
@@ -242,10 +252,6 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		case "reboot":
 			r.Verify = append(r.Verify, output.VerifyResult{Bundle: v.Bundle, Name: v.Name, Event: v.Event, Shell: "-", Status: "skipped", Output: "reboot verification is not in FAM version 0"})
 		}
-	}
-	if connErr != nil {
-		setError(r, connErr)
-		return
 	}
 	if len(reconnect) > 0 {
 		mr.p.Stage("reconnecting to verify")

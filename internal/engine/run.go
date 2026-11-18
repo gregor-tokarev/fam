@@ -543,9 +543,11 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	//     the update are not current.
 	isUpdater := func(t Task) bool { _, ok := t.(Updater); return ok }
 	refresh := false
-	// failed holds the connection errors of a refresh. Unlike pre, a later change does not clear
-	// them: the task fails with its connection error, and FAM stops.
-	failed := map[Task]error{}
+	// fresh is true while pre holds results of a refresh: each result there is the check of its
+	// task, as if the task checked itself at its turn, because no task changed the machine
+	// after the refresh. FAM uses it also when it is an error. A result of the first check pass
+	// is used only when it is satisfied: there, as before, an error makes the task check again.
+	fresh := false
 	refreshFrom := func(t Task) {
 		refresh = false
 		var seg []Task
@@ -558,16 +560,11 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		results, _ := checkAll(ctx, env, seg, nil)
 		pre = make(map[Task]checked, len(seg))
 		for i, x := range seg {
-			res := results[i]
-			switch {
-			case !res.ran:
-			case transport.IsConnError(res.err):
-				failed[x] = res.err
-			case res.err == nil && res.c.Status == Satisfied:
-				pre[x] = res
+			if results[i].ran {
+				pre[x] = results[i]
 			}
-			// Any other error or a difference: the task checks again right before it runs.
 		}
+		fresh = true
 	}
 	// The position of each task in r.Tasks.
 	index := map[Task]int{}
@@ -593,21 +590,24 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 				refreshFrom(t)
 			}
 			mr.p.Task(n, taskLabel(t))
-			// Only a satisfied result skips the check. A task that changes the machine always
-			// checks right before, for example a removal that checks the owner, or an update
-			// that needs the program.
+			// A satisfied result skips the check. A task that changes the machine always checks
+			// right before, for example a removal that checks the owner, or an update that needs
+			// the program.
 			var p *checked
-			if err, ok := failed[t]; ok {
-				p = &checked{err: err, ran: true}
-			} else if res, ok := pre[t]; ok && !isUpdater(t) && res.err == nil && res.c.Status == Satisfied {
-				p = &res
+			if res, ok := pre[t]; ok && !isUpdater(t) {
+				switch {
+				case res.err == nil && res.c.Status == Satisfied:
+					p = &res
+				case res.err != nil && fresh:
+					p = &res
+				}
 			}
 			st, detail, err, touch := applyTask(ctx, env, t, p)
 			switch touch {
 			case touchApply:
-				pre, refresh = nil, false
+				pre, refresh, fresh = nil, false, false
 			case touchUpdate:
-				pre, refresh = nil, true
+				pre, refresh, fresh = nil, true, false
 			}
 			index[t] = len(r.Tasks)
 			r.Tasks = append(r.Tasks, taskResult(t, st, detail, err))
@@ -656,7 +656,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 				}
 				seen[u] = true
 				mr.p.Stage("restarting " + u.Name)
-				pre, refresh = nil, false
+				pre, refresh, fresh = nil, false, false
 				rr := output.RestartResult{Unit: u.Name, Scope: u.Scope, Status: "restarted"}
 				if err := restartUnit(ctx, env, u); err != nil {
 					rr.Status = "failed"
@@ -729,7 +729,8 @@ func restoreBlocks(ctx context.Context, env *Env, mr *machineRun, index map[Task
 				prev := r.Tasks[i].Status
 				r.Tasks[i] = taskResult(t, Failed, "check failed", res.err)
 				r.Counts.Move(prev, string(Failed))
-				break
+				setError(r, res.err)
+				return true
 			}
 		}
 		setError(r, connErr)
@@ -779,18 +780,7 @@ const (
 // this task; FAM uses it instead of a new check when it is not nil.
 func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, detail string, err error, tc touch) {
 	var c Check
-	var before string
-	if u, ok := t.(Updater); ok && pre == nil {
-		// Before only reads, so it runs at the same time as the check.
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			before = u.Before(ctx, env)
-		}()
-		c, err = check(ctx, env, t)
-		wg.Wait()
-	} else if pre != nil {
+	if pre != nil {
 		c, err = pre.c, pre.err
 	} else {
 		c, err = check(ctx, env, t)
@@ -807,7 +797,7 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 		if !ok {
 			return Unchanged, "", nil, touchNone
 		}
-		up, err := u.Update(ctx, env, before)
+		up, err := u.Update(ctx, env, u.Before(ctx, env))
 		if err != nil {
 			return Failed, "update failed", err, touchApply
 		}

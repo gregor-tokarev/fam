@@ -180,6 +180,25 @@ func (t *PackageTask) version(ctx context.Context, env *Env) string {
 	return firstLine(r.Out())
 }
 
+// versionConn is version, but it returns a connection error instead of an unknown version.
+func (t *PackageTask) versionConn(ctx context.Context, env *Env) (string, error) {
+	if t.VersionCmd == "" {
+		return "", nil
+	}
+	cmd := t.VersionCmd
+	if b := t.bin(env); b != t.Binary && strings.HasPrefix(cmd, t.Binary+" ") {
+		cmd = transport.Quote(b) + cmd[len(t.Binary):]
+	}
+	r, err := env.UserScript(ctx, cmd, t.sudo, "version of "+t.Binary, 2*time.Minute)
+	if transport.IsConnError(err) {
+		return "", err
+	}
+	if err != nil || r.Code != 0 {
+		return "", nil
+	}
+	return firstLine(r.Out()), nil
+}
+
 func firstLine(s string) string {
 	s = strings.TrimSpace(s)
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
@@ -286,14 +305,21 @@ func (t *PackageTask) Update(ctx context.Context, env *Env, before string) (Upda
 	// two separate commands, as before, but they run at the same time: both only read.
 	var ok bool
 	var after string
+	var verErr error
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		after = t.version(ctx, env)
+		after, verErr = t.versionConn(ctx, env)
 	}()
 	ok, err = t.installed(ctx, env)
 	wg.Wait()
+	if err == nil && verErr != nil {
+		// The version command lost the connection, or exited with code 255. Then the version
+		// is unknown, and FAM looks for the program once more, as the check after the update
+		// did before: a lost connection is then a connection error.
+		ok, err = t.installed(ctx, env)
+	}
 	if err != nil {
 		return Update{Ran: true}, err
 	} else if !ok {
