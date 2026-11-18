@@ -123,6 +123,7 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 }
 
 // shellRun is one verify shell of verifyMachine. It keeps only the report row, not the output.
+// For a connection error it keeps only the error, and the report makes the row from it.
 type shellRun struct {
 	row output.VerifyResult
 	err error
@@ -214,8 +215,12 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 					}
 					res, err := run(ctx, v, interactive)
 					mu.Lock()
-					runs[i][k] = shellRun{row: verifyRow(v, verifyShells[k], res, err), err: err, ran: true}
 					conn := transport.IsConnError(err)
+					if conn {
+						runs[i][k] = shellRun{err: err, ran: true}
+					} else {
+						runs[i][k] = shellRun{row: verifyRow(v, verifyShells[k], res, err), ran: true}
+					}
 					if conn && int64(i) < stopAt.Load() {
 						stopAt.Store(int64(i))
 					}
@@ -241,11 +246,12 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 				if !sr.ran {
 					continue
 				}
-				addRow(sr.row)
 				if transport.IsConnError(sr.err) {
+					addRow(verifyRow(v, verifyShells[k], transport.Result{}, sr.err))
 					setError(r, sr.err)
 					return
 				}
+				addRow(sr.row)
 			}
 		case "reconnect":
 			reconnect = append(reconnect, v)
