@@ -24,7 +24,7 @@ func writeProject(dir, secretsFile string, machines []machineEntry) error {
 	var m strings.Builder
 	m.WriteString("amends \"@fam/Machines.pkl\"\n\nmachines {\n")
 	for _, e := range machines {
-		fmt.Fprintf(&m, "  [%q] { role = \"worker\"; address = %q; user = \"fam\" }\n", e.Name, alias(e.Target.Name))
+		fmt.Fprintf(&m, "  [%q] { tags { \"worker\" }; address = %q; user = \"fam\" }\n", e.Name, alias(e.Target.Name))
 	}
 	m.WriteString("}\n")
 	files := map[string]string{
@@ -45,7 +45,7 @@ secrets {
   file = %q
 }
 
-roles {
+tags {
   ["worker"] { bundles { import("bundles/worker.pkl") } }
 }
 `, secretsFile),
@@ -74,14 +74,14 @@ machines {
 		// Scenario 8: a failing check and a failing apply.
 		"config-fail.pkl": `amends "config.pkl"
 
-roles {
+tags {
   ["worker"] { bundles { import("bundles/failing.pkl") } }
 }
 `,
 		// Scenario 9: a slow script, so that the harness can stop the network during the run.
 		"config-slow.pkl": `amends "config.pkl"
 
-roles {
+tags {
   ["worker"] { bundles { import("bundles/slow.pkl") } }
 }
 `,
@@ -104,7 +104,7 @@ agents {
 		// Alpine: systemd tasks without a guard must fail with a clear error.
 		"config-systemd.pkl": `amends "config.pkl"
 
-roles {
+tags {
   ["worker"] { bundles { import("bundles/systemd.pkl") } }
 }
 `,
@@ -407,7 +407,7 @@ tasks {
 `,
 		"config-fail2.pkl": `amends "config.pkl"
 
-roles {
+tags {
   ["worker"] { bundles { import("bundles/failing2.pkl") } }
 }
 `,

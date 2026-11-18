@@ -65,6 +65,9 @@ func CheckProject(ctx context.Context, project *Project) (result CheckResult) {
 				msg = msg[:i]
 			}
 			p.Message = strings.Join(strings.Fields(msg), " ")
+			if h := ee.Hint(); h != "" {
+				p.Message = strings.TrimSuffix(p.Message, ".") + ". " + h
+			}
 		}
 		key := fmt.Sprintf("%s:%s:%d:%s", p.Severity, p.File, p.Line, p.Message)
 		if seen[key] {
@@ -127,13 +130,14 @@ func CheckProject(ctx context.Context, project *Project) (result CheckResult) {
 	}
 	if len(machines) == 0 {
 		add("error", project.ConfigPath, fmt.Errorf("the config has no machines"))
-		machines = []config.Machine{{Name: "check", Role: "cockpit"}}
+		machines = []config.Machine{{Name: "check", Cockpit: true}}
 	}
 	for _, m := range machines {
 		for _, osName := range []string{"linux", "darwin"} {
 			f := facts.Reference()
 			f.Machine = m.Name
-			f.Role = m.Role
+			f.Cockpit = m.Cockpit
+			f.Tags = m.Tags
 			if osName == "darwin" {
 				f.OS = "darwin"
 				f.Distro = "macos"

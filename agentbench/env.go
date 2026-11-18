@@ -119,10 +119,10 @@ const machinesFixture = `amends "@fam/Machines.pkl"
 
 machines {
   ["cockpit"] {
-    role = "cockpit"
+    cockpit = true
   }
   ["worker1"] {
-    role = "worker"
+    tags { "worker" }
     address = "worker1.example"
     user = "me"
   }

@@ -24,7 +24,7 @@ Other remote Pkl dependencies must already be in the package cache.
 Use `fam internal pkl-path` once if the pinned Pkl binary is missing.
 
 The check uses representative Ubuntu amd64 and macOS arm64 facts for each machine.
-It validates Pkl types, bundle names, role references, required secret names, local resources, skills, and instruction templates.
+It validates Pkl types, bundle names, tag references, required secret names, local resources, skills, and instruction templates.
 It also checks task definitions, the cockpit count, project folders, and the secrets source rules.
 It warns when the package pin differs from the binary. Run `fam migrate` to update the pin.
 The check cannot validate every condition that depends on remote facts. Run `fam plan` before apply.
@@ -94,7 +94,7 @@ bundles/tool.pkl      # amends "@fam/Bundle.pkl"
 
 1. Environment: `~/.config/fam/secrets.env`, `~/.config/fam/env.sh`, and the loader blocks.
 2. Agents: the CLI package, then the settings merge, for each agent. They come after the environment, so that the installers see its variables (for example a proxy).
-3. Bundles: first the `bundles` of `config.pkl` (every machine), then the bundles of the machine's role (`roles` in `config.pkl`), then the `bundles` of the machine entry, each in list order. An entry with the name of an earlier bundle replaces it at its position, so a role or a machine can change or remove (`state = "absent"`) a bundle of every machine.
+3. Bundles: first the `bundles` of `config.pkl` (every machine), then the bundles of each tag of the machine (`tags` in `config.pkl`, in the order of the machine's `tags`), then the `bundles` of the machine entry, each in list order. An entry with the name of an earlier bundle replaces it at its position, so a tag or a machine can change or remove (`state = "absent"`) a bundle of every machine.
 4. The removal of old managed skills. (Skills are tasks of their bundle.)
 5. Instructions.
 
@@ -150,14 +150,14 @@ FAM uses markers and release records to find what it manages:
 
 | Variable | Content |
 |---|---|
-| `.Machine.Name`, `.Machine.Role`, `.Machine.Address`, `.Machine.User` | The machine entry. |
-| `.Facts.OS`, `.Facts.Distro`, `.Facts.DistroVersion`, `.Facts.Arch`, `.Facts.Libc`, `.Facts.CPUs`, `.Facts.Home`, `.Facts.User`, `.Facts.Hostname`, `.Facts.Init`, `.Facts.Shell`, `.Facts.Machine`, `.Facts.Role` | The facts. |
+| `.Machine.Name`, `.Machine.Cockpit`, `.Machine.Tags`, `.Machine.Address`, `.Machine.User` | The machine entry. |
+| `.Facts.OS`, `.Facts.Distro`, `.Facts.DistroVersion`, `.Facts.Arch`, `.Facts.Libc`, `.Facts.CPUs`, `.Facts.Home`, `.Facts.User`, `.Facts.Hostname`, `.Facts.Init`, `.Facts.Shell`, `.Facts.Machine`, `.Facts.Cockpit`, `.Facts.Tags` | The facts. |
 
 There is no `.Agent` variable. Bundles add no instructions: a bundle's skill tells the agents about its tool.
 
 ## Skills
 
-Skills come only from bundles: FAM does not copy a project folder to every machine. A bundle for every machine, a role, or one machine selects the skills, so the skills can be different on each machine.
+Skills come only from bundles: FAM does not copy a project folder to every machine. A bundle for every machine, a tag, or one machine selects the skills, so the skills can be different on each machine.
 
 A bundle installs skills with `new fam.AgentSkill { source }` tasks, as many as it needs, in task order. `source` is one of:
 

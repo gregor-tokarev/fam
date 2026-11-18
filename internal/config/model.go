@@ -15,10 +15,11 @@ import (
 
 // Machine is one entry of the machines mapping.
 type Machine struct {
-	Name    string `json:"name"`
-	Role    string `json:"role"`
-	Address string `json:"address,omitempty"`
-	User    string `json:"user,omitempty"`
+	Name    string   `json:"name"`
+	Cockpit bool     `json:"cockpit,omitempty"`
+	Tags    []string `json:"tags"`
+	Address string   `json:"address,omitempty"`
+	User    string   `json:"user,omitempty"`
 }
 
 // Target returns the SSH target `user@address`.
@@ -30,14 +31,14 @@ func (m Machine) Target() string {
 }
 
 // IsCockpit reports whether FAM runs the commands of this machine locally.
-func (m Machine) IsCockpit() bool { return m.Role == "cockpit" }
+func (m Machine) IsCockpit() bool { return m.Cockpit }
 
 // BundleUse is one bundle on one machine.
 type BundleUse struct {
 	Bundle bundle.Bundle
 	// State is "present" or "absent".
 	State string
-	// Origin is "config" for a bundle of every machine, "role" for a bundle of the role, and
+	// Origin is "config" for a bundle of every machine, "tag <name>" for a bundle of a tag, and
 	// "machine" for a machine entry.
 	Origin string
 	// Dir is the directory of the bundle file. FAM resolves bundle paths relative to it.
@@ -74,7 +75,7 @@ func Machines(cfg *config.Config) ([]Machine, error) {
 	var out []Machine
 	cockpits := 0
 	for name, m := range cfg.Machines {
-		mm := Machine{Name: name, Role: string(m.Role)}
+		mm := Machine{Name: name, Cockpit: m.Cockpit, Tags: append([]string{}, m.Tags...)}
 		if m.Address != nil {
 			mm.Address = *m.Address
 		}
@@ -87,7 +88,7 @@ func Machines(cfg *config.Config) ([]Machine, error) {
 		out = append(out, mm)
 	}
 	if cockpits > 1 {
-		return nil, fmt.Errorf("the config has %d machines with role \"cockpit\". Only one machine can be the cockpit", cockpits)
+		return nil, fmt.Errorf("the config has %d machines with `cockpit = true`. Only one machine can be the cockpit", cockpits)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -142,10 +143,9 @@ func ValidationErrors(cfg *config.Config) []error {
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		m := cfg.Machines[name]
-		if string(m.Role) != "cockpit" {
-			if _, ok := cfg.Roles[m.Role]; !ok {
-				add(fmt.Errorf("machine %s references role %q, but the config does not define it", name, m.Role))
+		for _, tag := range cfg.Machines[name].Tags {
+			if _, ok := cfg.Tags[tag]; !ok {
+				add(fmt.Errorf("machine %s has the tag %q, but `tags` in the config does not define it. Add `[%q] {}` to `tags` when the tag has no bundles", name, tag, tag))
 			}
 		}
 	}
@@ -179,17 +179,13 @@ func ValidationErrors(cfg *config.Config) []error {
 	for _, n := range names {
 		check(cfg.Machines[n].Bundles, "the bundles of machine "+n)
 	}
-	roles := make([]string, 0, len(cfg.Roles))
-	for r := range cfg.Roles {
-		roles = append(roles, string(r))
+	tags := make([]string, 0, len(cfg.Tags))
+	for t := range cfg.Tags {
+		tags = append(tags, t)
 	}
-	sort.Strings(roles)
-	for _, r := range roles {
-		for k, rb := range cfg.Roles {
-			if string(k) == r {
-				check(rb.Bundles, "the bundles of role "+r)
-			}
-		}
+	sort.Strings(tags)
+	for _, t := range tags {
+		check(cfg.Tags[t].Bundles, "the bundles of tag "+t)
 	}
 	return problems
 }
@@ -230,8 +226,9 @@ func Resolve(cfg *config.Config, name string) (*Spec, error) {
 		index[u.Bundle.Name] = len(spec.Bundles)
 		spec.Bundles = append(spec.Bundles, u)
 	}
-	// The bundles of the role come after the bundles of every machine, and the machine entries
-	// last. An entry wins over the same bundle earlier in this order, at its earlier position.
+	// The bundles of the tags come after the bundles of every machine, in the order of the tags of
+	// the machine, and the machine entries last. An entry wins over the same bundle earlier in this
+	// order, at its earlier position.
 	add := func(entries []any, origin string) error {
 		for _, e := range entries {
 			u, err := bundleEntry(e, origin)
@@ -247,11 +244,9 @@ func Resolve(cfg *config.Config, name string) (*Spec, error) {
 		}
 		return nil
 	}
-	for k, rb := range cfg.Roles {
-		if string(k) == string(m.Role) {
-			if err := add(rb.Bundles, "role"); err != nil {
-				return nil, err
-			}
+	for _, tag := range m.Tags {
+		if err := add(cfg.Tags[tag].Bundles, "tag "+tag); err != nil {
+			return nil, err
 		}
 	}
 	if err := add(m.Bundles, "machine"); err != nil {

@@ -108,12 +108,12 @@ func Run(ctx context.Context, opts Options) *output.Run {
 	local := facts.Facts{}
 	{
 		lt := transport.NewLocal("cockpit", nil, nil)
-		if f, err := facts.Collect(ctx, lt, "", "cockpit"); err == nil {
+		if f, err := facts.Collect(ctx, lt, "", true, nil); err == nil {
 			local = f
 		}
 	}
-	// Step 1 reads only what does not depend on the facts of a machine: the machines and their
-	// roles, and the secrets. Pkl is lazy, so the rest of the config is not evaluated here.
+	// Step 1 reads only what does not depend on the facts of a machine: the machines with their
+	// tags, and the secrets. Pkl is lazy, so the rest of the config is not evaluated here.
 	// FAM evaluates and validates the full config once for each machine, with its own facts.
 	vprops := local.Properties()
 	machines, err := ev.MachineList(ctx, vprops)
@@ -167,7 +167,7 @@ func Run(ctx context.Context, opts Options) *output.Run {
 		}
 	}
 	if cockpits > 1 {
-		return fail(fmt.Errorf("the config has %d machines with role \"cockpit\". Only one machine can be the cockpit", cockpits))
+		return fail(fmt.Errorf("the config has %d machines with `cockpit = true`. Only one machine can be the cockpit", cockpits))
 	}
 	if len(opts.Machines) > 0 {
 		var sel []config.Machine
@@ -199,7 +199,7 @@ func Run(ctx context.Context, opts Options) *output.Run {
 	var evalMu sync.Mutex
 	work := func(i int) {
 		m := machines[i]
-		mr := &machineRun{m: m, p: machineProgress[i], res: &output.MachineResult{Name: m.Name, Role: m.Role, Tasks: []output.TaskResult{}}}
+		mr := &machineRun{m: m, p: machineProgress[i], res: &output.MachineResult{Name: m.Name, Cockpit: m.Cockpit, Tags: m.Tags, Tasks: []output.TaskResult{}}}
 		mr.res.Warnings = append(mr.res.Warnings, secretWarnings...)
 		runs[i] = mr
 		runMachine(ctx, opts, mr, secretList, addSecrets, func(props map[string]string) (*pklconfig.Config, error) {
@@ -279,7 +279,7 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 
 	// 2. Collect facts.
 	mr.p.Stage("collecting facts")
-	f, err := facts.Collect(ctx, t, m.Name, m.Role)
+	f, err := facts.Collect(ctx, t, m.Name, m.Cockpit, m.Tags)
 	if err != nil {
 		setError(mr.res, err)
 		return

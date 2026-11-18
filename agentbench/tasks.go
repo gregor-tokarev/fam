@@ -40,7 +40,7 @@ var tasks = []*Task{
 		Grade: func(g *Grader) map[string]bool {
 			s := g.mustSummary()
 			return map[string]bool{
-				"on-workers":     s.has(s.Roles["worker"], "tailscale", "present"),
+				"on-workers":     s.has(s.Tags["worker"], "tailscale", "present"),
 				"not-everywhere": !s.has(s.Bundles, "tailscale", ""),
 			}
 		},
@@ -61,7 +61,7 @@ var tasks = []*Task{
 		Grade: func(g *Grader) map[string]bool {
 			s := g.mustSummary()
 			m := s.Machines["w2"]
-			return map[string]bool{"machine": m.Role == "worker" && m.Address == "10.0.0.7" && m.User == "dev"}
+			return map[string]bool{"machine": m.hasTag("worker") && m.Address == "10.0.0.7" && m.User == "dev"}
 		},
 	},
 	{
@@ -88,7 +88,7 @@ var tasks = []*Task{
 			s, err := g.Summary()
 			return map[string]bool{
 				"evaluates":   err == nil,
-				"on-workers":  err == nil && s.has(s.Roles["worker"], "vercel", "present"),
+				"on-workers":  err == nil && s.has(s.Tags["worker"], "vercel", "present"),
 				"names-token": strings.Contains(g.Answer, "VERCEL_TOKEN"),
 				"names-file":  strings.Contains(g.Answer, "fleet.env"),
 			}
@@ -102,13 +102,13 @@ var tasks = []*Task{
 			if err := replaceIn(filepath.Join(p, "config.pkl"), "// std.computer.agentBrowser()", "std.computer.agentBrowse()"); err != nil {
 				return err
 			}
-			return replaceIn(filepath.Join(p, "machines.pkl"), `role = "worker"`, `role = "wroker"`)
+			return replaceIn(filepath.Join(p, "machines.pkl"), `tags { "worker" }`, `tags { "wroker" }`)
 		},
 		Grade: func(g *Grader) map[string]bool {
 			s := g.mustSummary()
 			return map[string]bool{
 				"browser": s.has(s.Bundles, "agent-browser", "present"),
-				"role":    s.Machines["worker1"].Role == "worker",
+				"tag":     s.Machines["worker1"].hasTag("worker") && !s.Machines["worker1"].hasTag("wroker"),
 			}
 		},
 	},
@@ -155,7 +155,7 @@ var tasks = []*Task{
 			s := g.mustSummary()
 			return map[string]bool{
 				"on-worker1":   s.has(s.Machines["worker1"].Bundles, "portless", "present"),
-				"not-on-roles": !s.has(s.Roles["worker"], "portless", "") && !s.has(s.Bundles, "portless", ""),
+				"not-on-roles": !s.has(s.Tags["worker"], "portless", "") && !s.has(s.Bundles, "portless", ""),
 			}
 		},
 	},
@@ -310,14 +310,26 @@ func replaceIn(path, old, new string) error {
 // Summary is the evaluated config, reduced to what the graders need.
 type Summary struct {
 	Bundles  []SBundle            `json:"bundles"`
-	Roles    map[string][]SBundle `json:"roles"`
-	Machines map[string]struct {
-		Role    string    `json:"role"`
-		Address string    `json:"address"`
-		User    string    `json:"user"`
-		Bundles []SBundle `json:"bundles"`
-	} `json:"machines"`
-	Agents map[string]string `json:"agents"`
+	Tags     map[string][]SBundle `json:"tags"`
+	Machines map[string]SMachine  `json:"machines"`
+	Agents   map[string]string    `json:"agents"`
+}
+
+type SMachine struct {
+	Cockpit bool      `json:"cockpit"`
+	Tags    []string  `json:"tags"`
+	Address string    `json:"address"`
+	User    string    `json:"user"`
+	Bundles []SBundle `json:"bundles"`
+}
+
+func (m SMachine) hasTag(tag string) bool {
+	for _, t := range m.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
 }
 
 type SBundle struct {
@@ -361,8 +373,8 @@ local function norm(e) =
   if (e.getClass().simpleName == "BundleRef") new Dynamic { name = e.bundle.name; state = e.state; files = files(e.bundle); env = e.bundle.env.toMap(); tasks = tasks(e.bundle) }
   else new Dynamic { name = e.name; state = "present"; files = files(e); env = e.env.toMap(); tasks = tasks(e) }
 bundles = c.bundles.toList().map((e) -> norm(e))
-roles = c.roles.toMap().mapValues((_, r) -> r.bundles.toList().map((e) -> norm(e)))
-machines = c.machines.toMap().mapValues((_, m) -> new Dynamic { role = m.role; address = m.address ?? ""; user = m.user ?? ""; bundles = m.bundles.toList().map((e) -> norm(e)) })
+tags = c.tags.toMap().mapValues((_, r) -> r.bundles.toList().map((e) -> norm(e)))
+machines = c.machines.toMap().mapValues((_, m) -> new Dynamic { cockpit = m.cockpit; tags = m.tags.toList(); address = m.address ?? ""; user = m.user ?? ""; bundles = m.bundles.toList().map((e) -> norm(e)) })
 agents = c.agents.toMap().mapValues((_, a) -> new JsonRenderer {}.renderValue(a.settings))
 output { renderer = new JsonRenderer {} }
 `
@@ -380,7 +392,7 @@ func (g *Grader) Summary() (*Summary, error) {
 	}
 	defer os.Remove(tmp)
 	args := []string{"eval", "--project-dir", g.Project}
-	for k, v := range map[string]string{"os": "linux", "arch": "amd64", "cpus": "4", "distro": "ubuntu", "distroVersion": "26.04", "home": "/home/me", "hostname": "worker1", "init": "systemd", "libc": "glibc", "machine": "worker1", "role": "worker", "shell": "/bin/bash", "user": "me"} {
+	for k, v := range map[string]string{"os": "linux", "arch": "amd64", "cpus": "4", "distro": "ubuntu", "distroVersion": "26.04", "home": "/home/me", "hostname": "worker1", "init": "systemd", "libc": "glibc", "machine": "worker1", "cockpit": "false", "tags": "worker", "shell": "/bin/bash", "user": "me"} {
 		args = append(args, "-p", "fam."+k+"="+v)
 	}
 	cmd := exec.CommandContext(g.ctx, g.Env.Pkl, append(args, tmp)...)

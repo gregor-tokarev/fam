@@ -115,7 +115,7 @@ func (e *Evaluator) Eval(ctx context.Context, props map[string]string) (*config.
 	return &cfg, nil
 }
 
-// MachineList evaluates only the machines mapping: name, role, address, and user of each machine.
+// MachineList evaluates only the machines mapping: name, cockpit, tags, address, and user of each machine.
 // Pkl is lazy, so this does not evaluate bundles that depend on the machine facts.
 func (e *Evaluator) MachineList(ctx context.Context, props map[string]string) ([]Machine, error) {
 	ev, err := e.manager.NewEvaluator(ctx, e.options(props)...)
@@ -124,13 +124,18 @@ func (e *Evaluator) MachineList(ctx context.Context, props map[string]string) ([
 	}
 	defer ev.Close()
 	var raw map[string]map[string]string
-	expr := `machines.toMap().mapValues((_, m) -> Map("role", m.role, "address", m.address ?? "", "user", m.user ?? ""))`
+	// Tag names cannot contain a comma, so one string keeps the map simple.
+	expr := `machines.toMap().mapValues((_, m) -> Map("cockpit", m.cockpit.toString(), "tags", m.tags.toList().join(","), "address", m.address ?? "", "user", m.user ?? ""))`
 	if err := ev.EvaluateExpression(ctx, pkl.FileSource(e.path), expr, &raw); err != nil {
 		return nil, &EvalError{Path: e.path, Err: err}
 	}
 	out := make([]Machine, 0, len(raw))
 	for name, m := range raw {
-		out = append(out, Machine{Name: name, Role: m["role"], Address: m["address"], User: m["user"]})
+		tags := []string{}
+		if m["tags"] != "" {
+			tags = strings.Split(m["tags"], ",")
+		}
+		out = append(out, Machine{Name: name, Cockpit: m["cockpit"] == "true", Tags: tags, Address: m["address"], User: m["user"]})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -158,7 +163,20 @@ type EvalError struct {
 
 func (e *EvalError) Error() string {
 	msg := fmt.Sprintf("evaluate %s:\n%s", e.Path, strings.TrimSpace(e.Err.Error()))
+	if h := e.Hint(); h != "" {
+		msg += "\n\n" + h
+	}
 	return msg
+}
+
+// Hint explains how to fix a config of an older FAM version, or returns "".
+func (e *EvalError) Hint() string {
+	msg := e.Err.Error()
+	if strings.Contains(msg, "Cannot find property `role`") || strings.Contains(msg, "Cannot find property `roles`") {
+		return "FAM replaced roles with tags. In machines.pkl, change `role = \"cockpit\"` to `cockpit = true`, and " +
+			"`role = \"worker\"` to `tags { \"worker\" }`. In config.pkl, rename `roles` to `tags`."
+	}
+	return ""
 }
 
 // FileFromURI converts a `file:` URI from `reflect.Module(module).uri` to a path.

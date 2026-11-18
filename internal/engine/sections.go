@@ -21,7 +21,7 @@ type VerifySpec struct {
 }
 
 // buildSections returns the task sections of one machine in run order:
-// environment and secrets, agents, bundles (every machine, then the role, then the machine),
+// environment and secrets, agents, bundles (every machine, then the tags, then the machine),
 // skills, instructions.
 func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly bool) ([]Section, []VerifySpec, error) {
 	var out []Section

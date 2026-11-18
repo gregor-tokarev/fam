@@ -14,8 +14,8 @@ import (
 // amends "@fam/Machines.pkl"
 //
 //	machines {
-//	  ["cockpit"] { role = "cockpit" }
-//	  ["worker1"] { role = "worker"; address = "worker1.example.com"; user = "dev" }
+//	  ["laptop"] { cockpit = true }
+//	  ["worker1"] { tags { "worker"; "gpu" }; address = "worker1.example.com"; user = "dev" }
 //	}
 //
 // ```
