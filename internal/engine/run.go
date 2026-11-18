@@ -563,6 +563,13 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			r.Counts.Add(string(Conflict))
 		}
 	}
+	// satisfied holds the tasks that the first check pass found satisfied. A refresh checks only
+	// these: a task that was not satisfied probably changes the machine, and then the results of
+	// the tasks after it are old.
+	satisfied := make(map[Task]bool, len(all))
+	for t, res := range pre {
+		satisfied[t] = res.err == nil && res.c.Status == Satisfied
+	}
 	if r.Counts.Conflict > 0 {
 		r.Status = "conflict"
 		r.Error = "the plan has conflicts. FAM changed nothing on this machine"
@@ -602,7 +609,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		refresh = false
 		var seg []Task
 		for _, x := range order[pos[t]:] {
-			if isUpdater(x) {
+			if isUpdater(x) || !satisfied[x] {
 				break
 			}
 			seg = append(seg, x)
@@ -637,7 +644,9 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 				continue
 			}
 			n++
-			if _, ok := pre[t]; !ok && refresh && !isUpdater(t) {
+			// After an update, a task that the first pass found satisfied starts a refresh. Any
+			// other task checks itself, and the refresh waits for the next satisfied task.
+			if _, ok := pre[t]; !ok && refresh && !isUpdater(t) && satisfied[t] {
 				refreshFrom(t, n)
 			}
 			mr.p.Task(n, taskLabel(t))
