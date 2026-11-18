@@ -71,14 +71,10 @@ func New(opts NewOptions) ([]string, error) {
 		}
 		written = append(written, name)
 	}
-	_, claudeErr := os.Lstat(filepath.Join(base, "CLAUDE.md"))
 	if err := pinPackage(base); err != nil {
 		return written, err
 	}
 	written = append(written, schema.ProjectFile, schema.DepsFile, "AGENTS.md")
-	if errors.Is(claudeErr, os.ErrNotExist) {
-		written = append(written, "CLAUDE.md")
-	}
 	return written, nil
 }
 
@@ -114,7 +110,7 @@ func pinPackage(base string) error {
 //go:embed guide.md
 var guide string
 
-// WriteGuide updates only the FAM section and creates the Claude import when absent.
+// WriteGuide updates only the FAM section of AGENTS.md.
 func WriteGuide(base string) error {
 	const begin, end = "<!-- fam:begin -->", "<!-- fam:end -->"
 	path := filepath.Join(base, "AGENTS.md")
@@ -139,22 +135,7 @@ func WriteGuide(base string) error {
 		}
 		text += section + "\n"
 	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		return err
-	}
-	f, err := os.OpenFile(filepath.Join(base, "CLAUDE.md"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if errors.Is(err, os.ErrExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	_, err = f.WriteString("@AGENTS.md\n")
-	closeErr := f.Close()
-	if err != nil {
-		return err
-	}
-	return closeErr
+	return os.WriteFile(path, []byte(text), 0o644)
 }
 
 // DetectAgents returns the agents that it finds on this machine.
