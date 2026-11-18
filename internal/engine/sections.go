@@ -152,7 +152,9 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		return env.T.Run(ctx, transport.Cmd{Script: v.Script, LoginShell: true, Interactive: interactive, Timeout: 5 * time.Minute, Label: "verify " + v.Name})
 	}
 	var reconnect []VerifySpec
-	for _, v := range mr.verify {
+	mr.p.Count("verifying", len(mr.verify))
+	for i, v := range mr.verify {
+		mr.p.Task(i+1, "verify "+v.Name)
 		switch v.Event {
 		case "fresh_shell":
 			res, err := run(v, false)
@@ -174,6 +176,7 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		}
 	}
 	if len(reconnect) > 0 {
+		mr.p.Stage("reconnecting to verify")
 		if err := env.T.Reconnect(ctx); err != nil {
 			setError(r, err)
 			return

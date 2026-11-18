@@ -72,6 +72,8 @@ The guide explains project edits, bundle discovery, validation, and when to use 
 6. **Restart.** At the end of each present bundle, FAM restarts each unit that a changed task names in `restarts` once. FAM does not restart units after a failure, and not for a bundle with `state = "absent"`.
 7. **Verify.** FAM runs the verify scripts of the bundles and the agent checks in new shells.
 
+While the steps run, FAM shows the progress on stderr. On a terminal, each machine has one live line with its step, the number of tasks done, and the current task. The lines go away before FAM writes the result. Without a terminal, FAM writes one line when a step starts and one line for a task that runs for more than 5 seconds. With `--json` or `--toon` and no terminal, FAM writes no progress. `--no-progress` turns the progress off.
+
 ## The fam package
 
 The schema (`Config.pkl`, `Bundle.pkl`, `tasks.pkl`, …) and the standard bundles (`std.pkl`) are the Pkl package `fam`. A project declares it in `PklProject`, as a Go project declares its modules in `go.mod`, and imports it with `@fam/`:

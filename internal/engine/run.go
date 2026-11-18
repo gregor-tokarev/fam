@@ -15,6 +15,7 @@ import (
 	"github.com/gregor-tokarev/fam/internal/facts"
 	"github.com/gregor-tokarev/fam/internal/output"
 	pklconfig "github.com/gregor-tokarev/fam/internal/pklgen/config"
+	"github.com/gregor-tokarev/fam/internal/progress"
 	"github.com/gregor-tokarev/fam/internal/schema"
 	"github.com/gregor-tokarev/fam/internal/secrets"
 	"github.com/gregor-tokarev/fam/internal/transport"
@@ -42,6 +43,8 @@ type Options struct {
 	Observer     transport.Observer
 	// Progress receives short progress lines (for example the pkl download). It can be nil.
 	Progress io.Writer
+	// Reporter shows the stages and the tasks while the run runs. It can be nil.
+	Reporter *progress.Reporter
 	RunID    string
 	// OnSecrets receives the secret values, so that the run log can hide them.
 	OnSecrets func(values []string)
@@ -52,6 +55,7 @@ type Options struct {
 // machineRun holds the state of one machine during a run.
 type machineRun struct {
 	m      config.Machine
+	p      *progress.Machine
 	res    *output.MachineResult
 	env    *Env
 	spec   *config.Spec
@@ -95,6 +99,7 @@ func Run(ctx context.Context, opts Options) *output.Run {
 	if _, err := os.Stat(opts.Project.ConfigPath); err != nil {
 		return fail(fmt.Errorf("no config entrypoint: %w", err))
 	}
+	opts.Reporter.Step("evaluating the config")
 	ev, err := config.NewEvaluator(ctx, opts.Project.Base, opts.Project.ConfigPath, opts.Progress)
 	if err != nil {
 		return fail(err)
@@ -145,6 +150,7 @@ func Run(ctx context.Context, opts Options) *output.Run {
 	var secretList []secrets.Secret
 	var secretWarnings []string
 	if sec != nil {
+		opts.Reporter.Step("reading the secrets")
 		src, err := loadSecrets(ctx, sec, opts.Project.Base, opts.RefreshSecrets, false)
 		// Hide the credentials also when the read failed.
 		addSecrets(src.values())
@@ -184,10 +190,15 @@ func Run(ctx context.Context, opts Options) *output.Run {
 
 	// 2-7 for each machine. Machines run in parallel unless --serial.
 	runs := make([]*machineRun, len(machines))
+	// Add all machines before the first starts, so that the live lines keep their order.
+	machineProgress := make([]*progress.Machine, len(machines))
+	for i, m := range machines {
+		machineProgress[i] = opts.Reporter.Machine(m.Name)
+	}
 	var evalMu sync.Mutex
 	work := func(i int) {
 		m := machines[i]
-		mr := &machineRun{m: m, res: &output.MachineResult{Name: m.Name, Role: m.Role, Tasks: []output.TaskResult{}}}
+		mr := &machineRun{m: m, p: machineProgress[i], res: &output.MachineResult{Name: m.Name, Role: m.Role, Tasks: []output.TaskResult{}}}
 		mr.res.Warnings = append(mr.res.Warnings, secretWarnings...)
 		runs[i] = mr
 		runMachine(ctx, opts, mr, secretList, addSecrets, func(props map[string]string) (*pklconfig.Config, error) {
@@ -195,6 +206,7 @@ func Run(ctx context.Context, opts Options) *output.Run {
 			defer evalMu.Unlock()
 			return ev.Eval(ctx, props)
 		})
+		mr.p.Done(mr.res.Status)
 	}
 	if opts.Serial {
 		for i := range machines {
@@ -270,6 +282,7 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 	defer t.Close()
 
 	// 2. Collect facts.
+	mr.p.Stage("collecting facts")
 	f, err := facts.Collect(ctx, t, m.Name, m.Role)
 	if err != nil {
 		setError(mr.res, err)
@@ -293,6 +306,7 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 	}
 
 	// 3. Evaluate Pkl for this machine.
+	mr.p.Stage("evaluating the config")
 	cfg, err := eval(f.Properties())
 	if err != nil {
 		setError(mr.res, err)
@@ -308,6 +322,7 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 		mr.res.Warnings = append(mr.res.Warnings, missingSecrets(spec, secretList)...)
 	}
 	mr.spec = spec
+	mr.p.Stage("preparing the tasks")
 	sects, verify, err := buildSections(ctx, mr.env, spec, false)
 	if err != nil {
 		mr.res.ErrorKind = "config"
@@ -365,11 +380,15 @@ func recordSkippedSection(r *output.MachineResult, s Section) bool {
 func planMachine(ctx context.Context, mr *machineRun) {
 	r := mr.res
 	r.Status = "ok"
+	mr.p.Count("checking", countTasks(mr.sects, true))
+	n := 0
 	for _, s := range mr.sects {
 		if recordSkippedSection(r, s) {
 			continue
 		}
 		for _, t := range s.Tasks {
+			n++
+			mr.p.Task(n, taskLabel(t))
 			c, err := check(ctx, mr.env, t)
 			r.Tasks = append(r.Tasks, taskResult(t, c.Status, c.Detail, err))
 			r.Counts.Add(string(c.Status))
@@ -396,8 +415,12 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	r := mr.res
 	env := mr.env
 	// The plan stops with a conflict before any change.
+	mr.p.Count("checking", countTasks(mr.sects, false))
+	n := 0
 	for _, s := range mr.sects {
 		for _, t := range s.Tasks {
+			n++
+			mr.p.Task(n, taskLabel(t))
 			c, err := check(ctx, env, t)
 			if transport.IsConnError(err) {
 				setError(r, err)
@@ -417,6 +440,8 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	}
 	r.Status = "ok"
 	stopped := false
+	mr.p.Count("applying", countTasks(mr.sects, true))
+	n = 0
 	// The position of each task in r.Tasks.
 	index := map[Task]int{}
 	// A change of the sshd configuration applies only to new connections.
@@ -434,6 +459,8 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 				r.Counts.Add(string(Skipped))
 				continue
 			}
+			n++
+			mr.p.Task(n, taskLabel(t))
 			st, detail, err := applyTask(ctx, env, t)
 			index[t] = len(r.Tasks)
 			r.Tasks = append(r.Tasks, taskResult(t, st, detail, err))
@@ -481,6 +508,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 					continue
 				}
 				seen[u] = true
+				mr.p.Stage("restarting " + u.Name)
 				rr := output.RestartResult{Unit: u.Name, Scope: u.Scope, Status: "restarted"}
 				if err := restartUnit(ctx, env, u); err != nil {
 					rr.Status = "failed"
@@ -498,6 +526,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		return
 	}
 	if !stopped {
+		mr.p.Stage("checking the shell blocks")
 		stopped = restoreBlocks(ctx, env, mr, index)
 		if r.Status == "error" {
 			return
@@ -516,6 +545,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	}
 	// 7. Verify.
 	if reconnect {
+		mr.p.Stage("reconnecting")
 		if err := env.T.Reconnect(ctx); err != nil {
 			setError(r, err)
 			return
@@ -620,4 +650,21 @@ func applyTask(ctx context.Context, env *Env, t Task) (Status, string, error) {
 		}
 	}
 	return Changed, detail, nil
+}
+
+// countTasks counts the tasks of the sections. withoutSkipped leaves out the skipped sections.
+func countTasks(sects []Section, withoutSkipped bool) int {
+	n := 0
+	for _, s := range sects {
+		if withoutSkipped && s.SkipReason != "" {
+			continue
+		}
+		n += len(s.Tasks)
+	}
+	return n
+}
+
+// taskLabel is the name of a task in the progress lines.
+func taskLabel(t Task) string {
+	return t.Group() + " › " + t.Kind() + " " + t.Name()
 }
