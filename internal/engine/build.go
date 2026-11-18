@@ -22,7 +22,7 @@ type Section struct {
 }
 
 // convert turns a schema task into an engine task.
-func convert(t tasks.Task, group string, absent bool, pm map[string]string, f facts.Facts) (Task, error) {
+func convert(t tasks.Task, group string, absent bool, bundleManager string, f facts.Facts) (Task, error) {
 	b := base{group: group, sudo: t.GetSudo()}
 	units := make([]Unit, 0, len(t.GetRestarts()))
 	for _, u := range t.GetRestarts() {
@@ -68,11 +68,7 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string, f fa
 			pt.Binary = *v
 		}
 		if p := x.GetPackage(); p != nil && *p != nil {
-			original, _, err := packageSpec(*p)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", group, err)
-			}
-			name, mgr, err := PackageSpec(*p, pm[original], f)
+			name, mgr, err := PackageSpec(*p, bundleManager, f)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", group, err)
 			}
@@ -188,11 +184,15 @@ var skillName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 // in reverse order, then runs its uninstall tasks. A present bundle restarts the units of its
 // changed tasks once, at its end. A restart of a unit that a Service task of the same bundle
 // manages uses the scope of that task.
-func BundleSection(ctx context.Context, u config.BundleUse, pm map[string]string, f facts.Facts) (Section, error) {
-	return bundleSection(ctx, u, pm, f, false)
+func BundleSection(ctx context.Context, u config.BundleUse, f facts.Facts) (Section, error) {
+	return bundleSection(ctx, u, f, false)
 }
 
-func bundleSection(ctx context.Context, u config.BundleUse, pm map[string]string, f facts.Facts, staticOnly bool) (Section, error) {
+func bundleSection(ctx context.Context, u config.BundleUse, f facts.Facts, staticOnly bool) (Section, error) {
+	bundleManager := ""
+	if u.Bundle.Manager != nil {
+		bundleManager = string(*u.Bundle.Manager)
+	}
 	group := "bundle " + u.Bundle.Name
 	sec := Section{Name: group}
 	if u.Skipped() {
@@ -208,7 +208,7 @@ func bundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 				sec.Tasks = append(sec.Tasks, st...)
 				continue
 			}
-			t, err := convert(u.Bundle.Tasks[i], group, true, pm, f)
+			t, err := convert(u.Bundle.Tasks[i], group, true, bundleManager, f)
 			if err != nil {
 				return sec, err
 			}
@@ -224,7 +224,7 @@ func bundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 				sec.Tasks = append(sec.Tasks, st...)
 				continue
 			}
-			t, err := convert(ut, group, false, pm, f)
+			t, err := convert(ut, group, false, bundleManager, f)
 			if err != nil {
 				return sec, err
 			}
@@ -254,7 +254,7 @@ func bundleSection(ctx context.Context, u config.BundleUse, pm map[string]string
 			return sec, err
 		}
 		if !ok {
-			t, err := convert(bt, group, false, pm, f)
+			t, err := convert(bt, group, false, bundleManager, f)
 			if err != nil {
 				return sec, err
 			}

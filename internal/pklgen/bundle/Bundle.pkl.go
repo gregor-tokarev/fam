@@ -6,6 +6,7 @@ import (
 
 	"github.com/apple/pkl-go/pkl"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
+	"github.com/gregor-tokarev/fam/internal/pklgen/tasks/manager"
 )
 
 // A bundle: a reusable part of the config. Usually one tool or one piece of machine setup, with
@@ -49,7 +50,15 @@ type Bundle struct {
 	Version *string `pkl:"version"`
 
 	// The location of this bundle file. FAM resolves all paths of the bundle relative to it.
+	//
+	// FAM sets it. Do not set it.
 	Source string `pkl:"source"`
+
+	// The package manager of each `Package` task of this bundle, also for a task that selects its
+	// own manager. When it is `null`, each task uses its own manager.
+	//
+	// Set it with [withManager].
+	Manager *manager.Manager `pkl:"manager"`
 
 	// Environment variables that FAM exports in every shell of the machine.
 	Env map[string]string `pkl:"env"`

@@ -1,7 +1,7 @@
 /// emulate: local emulation of APIs for CI and sandboxes without network (https://github.com/vercel-labs/emulate).
 ///
 /// FAM installs the CLI with the global npm of the machine, and copies the skill of its latest
-/// release from GitHub. To use another package manager, set `packageManagers` in `config.pkl`.
+/// release from GitHub. For another package manager, use `withManager`, for example `withManager("vite")`.
 amends "../../Bundle.pkl"
 
 import "../../tasks.pkl" as fam

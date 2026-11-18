@@ -91,7 +91,8 @@ case "$st" in *"install ok installed"*) exit 0 ;; *) exit 1 ;; esac`,
 		install: "apk add --no-cache %s", update: "apk add --no-cache --upgrade %s", uninstall: "apk del %s", root: true},
 }
 
-// PackageSpec resolves a package, its override, and the name for the selected manager.
+// PackageSpec resolves a package, its manager (the manager of the bundle wins when it is set),
+// and the name for the selected manager.
 func PackageSpec(v any, override string, f facts.Facts) (name, mgr string, err error) {
 	name, mgr, err = packageSpec(v)
 	if err != nil {

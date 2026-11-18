@@ -1,11 +1,10 @@
 /// agent-browser: a browser automation CLI for AI agents (https://github.com/vercel-labs/agent-browser).
 ///
 /// FAM installs the CLI with the global npm of the machine (Node.js 22 or later), and copies the
-/// skill of its latest release from GitHub. To use another package manager, set it in
-/// `config.pkl` (or for one machine):
+/// skill of its latest release from GitHub. To use another package manager, use `withManager`:
 ///
 /// ```
-/// packageManagers { ["agent-browser"] = "vite" }
+/// bundles { std.computer.agentBrowser().withManager("vite") }
 /// ```
 ///
 /// FAM does not install a browser and does not change the system. Install the browser that
@@ -17,7 +16,7 @@ import "../../tasks.pkl" as fam
 name = "agent-browser"
 version = "@FAM_VERSION@"
 tasks {
-  // npm by default. Another manager: package = new { package = "agent-browser"; manager = "brew" }
+  // npm by default. The config can select another manager with withManager.
   new fam.Package {
     package = "agent-browser"
   }

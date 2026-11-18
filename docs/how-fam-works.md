@@ -268,7 +268,7 @@ new fam.Package { package = "agent-browser" }                                   
 new fam.Package { package = new { package = "tree"; manager = "apt" } }
 ```
 
-`packageManagers` in `config.pkl` (and in a machine entry, which wins) replaces the manager for a package name in every bundle, also in the standard bundles: `packageManagers { ["agent-browser"] = "vite" }`. A bundle cannot be amended in the config for this, because Pkl cannot give the location of an amended module object (`reflect.Module(module)` fails).
+To use another package manager for a bundle that you cannot change, for example a standard bundle, call `withManager` on it in the config: `std.computer.agentBrowser().withManager("vite")`. The manager applies to every `Package` task of that bundle. In your own bundles, select the manager in the `Package` task.
 
 | Manager | Is it installed? | Install | Update | Remove | Runs as |
 |---|---|---|---|---|---|

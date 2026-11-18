@@ -43,7 +43,7 @@ More examples:
 - A script: `new fam.Script { name = "x"; apply = "..."; creates = "~/.local/bin/x" }`. FAM cannot undo a script, so add `uninstall` tasks to the bundle.
 - Platform limits: `supported = facts.os == "linux"` with `import "@fam/facts.pkl"`. FAM skips unsupported bundles.
 - Conditional tasks: `when (facts.os == "darwin") { new fam.File {...} }`.
-- Another package manager for one package, also in std bundles: `packageManagers { ["agent-browser"] = "bun" }` in `config.pkl` or in a machine entry.
+- Another package manager for a std bundle: `std.computer.agentBrowser().withManager("bun")` in `config.pkl`.
 
 Rules:
 - Edit only files of this folder. FAM puts files on the machines.

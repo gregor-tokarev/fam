@@ -20,7 +20,6 @@ module fam.Config
 
 import "base.pkl"
 import "Bundle.pkl"
-import "tasks.pkl" as t
 
 /// Bundles for every machine.
 ///
@@ -49,14 +48,3 @@ secrets: base.Secrets?
 ///
 /// An entry here wins over the bundle with the same `name` in [bundles].
 roles: Mapping<base.Role, base.RoleBundles>
-
-/// The package manager for a package name, for every machine.
-///
-/// It replaces the manager of each `Package` task with this package, also in the standard bundles:
-///
-/// ```
-/// packageManagers { ["agent-browser"] = "vite" }
-/// ```
-///
-/// A machine can set its own `packageManagers`, which win over these.
-packageManagers: Mapping<String, t.Manager>

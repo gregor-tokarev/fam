@@ -297,18 +297,9 @@ verify {
 }
 `,
 		"config-pkg.pkl": `amends "config.pkl"
-import "@fam/facts.pkl"
 
 bundles {
   import("bundles/pkgtest.pkl")
-}
-
-packageManagers {
-  ["tree"] =
-    if (facts.distro == "fedora") "dnf"
-    else if (facts.distro == "arch") "pacman"
-    else if (facts.distro == "alpine") "apk"
-    else "apt"
 }
 `,
 		"config-pkg-absent.pkl": `amends "config-pkg.pkl"

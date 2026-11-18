@@ -4,9 +4,9 @@ import "@fam/tasks.pkl" as fam
 name = "typescript"
 
 tasks {
-  // `package` alone uses npm. config.pkl selects Vite+ for it with `packageManagers`.
+  // Node.js comes from Vite+, so TypeScript is a global package of Vite+.
   new fam.Package {
-    package = "typescript"
+    package = new { package = "typescript"; manager = "vite" }
     binary = "tsc"
   }
 }

@@ -58,11 +58,9 @@ func (u BundleUse) SkipReason() string {
 // Spec is the evaluated config for one machine.
 type Spec struct {
 	Machine Machine
-	// PackageManagers maps a package name to its package manager: config.pkl, then the machine.
-	PackageManagers map[string]string
-	Bundles         []BundleUse
-	Agents          []AgentSpec
-	Secrets         *base.Secrets
+	Bundles []BundleUse
+	Agents  []AgentSpec
+	Secrets *base.Secrets
 }
 
 // AgentSpec is one agent entry.
@@ -217,13 +215,7 @@ func Resolve(cfg *config.Config, name string) (*Spec, error) {
 		return nil, fmt.Errorf("the config for machine %q has no machine %q", name, name)
 	}
 	ms, _ := Machines(cfg)
-	spec := &Spec{Secrets: cfg.Secrets, PackageManagers: map[string]string{}}
-	for k, v := range cfg.PackageManagers {
-		spec.PackageManagers[k] = string(v)
-	}
-	for k, v := range m.PackageManagers {
-		spec.PackageManagers[k] = string(v)
-	}
+	spec := &Spec{Secrets: cfg.Secrets}
 	for _, mm := range ms {
 		if mm.Name == name {
 			spec.Machine = mm
