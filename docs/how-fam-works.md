@@ -51,8 +51,6 @@ For editor state problems, run `fam migrate`, then restart the editor language s
 ## Project guide
 
 `fam new` and `fam migrate` write a guide in the project base as `AGENTS.md`.
-They create `CLAUDE.md` with the single line `@AGENTS.md` only when that file does not exist.
-Claude Code imports the same guide through this line.
 
 FAM owns only the section between `<!-- fam:begin -->` and `<!-- fam:end -->`.
 Migration replaces that section and keeps text outside it.
