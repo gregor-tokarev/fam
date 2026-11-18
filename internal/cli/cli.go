@@ -32,6 +32,7 @@ type Options struct {
 	InstructionsDir  string
 	SkillsDir        string
 	RefreshSecrets   bool
+	NoProgress       bool
 }
 
 // ExitError carries an exit code without an extra message.
