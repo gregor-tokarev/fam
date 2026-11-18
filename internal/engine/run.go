@@ -399,6 +399,9 @@ func checkAll(ctx context.Context, env *Env, ts []Task, rp *running) (out []chec
 			defer wg.Done()
 			defer func() { <-sem }()
 			c, err := check(ctx, env, t)
+			// A detail can be a part of the full output of a script: keep only a copy of the
+			// detail, so that the output does not stay in memory.
+			c.Detail = strings.Clone(c.Detail)
 			if err != nil && !transport.IsConnError(err) {
 				// Keep only the message (an ExitError holds all output of the script): all
 				// results stay in memory until the last check ends.
@@ -427,6 +430,8 @@ type running struct {
 	p     *progress.Machine
 	done  int
 	steps map[int]runningStep
+	// index, when it is not zero, is the step number to show, in place of the count.
+	index int
 }
 
 type runningStep struct {
@@ -467,7 +472,11 @@ func (r *running) show() {
 			oldest = st
 		}
 	}
-	r.p.TaskSince(r.done, oldest.label, oldest.at)
+	i := r.done
+	if r.index > 0 {
+		i = r.index
+	}
+	r.p.TaskSince(i, oldest.label, oldest.at)
 }
 
 // recordSkippedSection reports an unsupported bundle in every output format.
@@ -589,7 +598,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	// after the refresh. FAM uses it also when it is an error. A result of the first check pass
 	// is used only when it is satisfied: there, as before, an error makes the task check again.
 	fresh := false
-	refreshFrom := func(t Task) {
+	refreshFrom := func(t Task, n int) {
 		refresh = false
 		var seg []Task
 		for _, x := range order[pos[t]:] {
@@ -598,7 +607,10 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			}
 			seg = append(seg, x)
 		}
-		results, _ := checkAll(ctx, env, seg, nil)
+		// The progress keeps the number of the apply step and names the slowest check.
+		rp := newRunning(mr.p)
+		rp.index = n
+		results, _ := checkAll(ctx, env, seg, rp)
 		pre = make(map[Task]checked, len(seg))
 		for i, x := range seg {
 			if results[i].ran {
@@ -626,9 +638,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			}
 			n++
 			if _, ok := pre[t]; !ok && refresh && !isUpdater(t) {
-				// The checks of the refresh run at the same time: show only the count.
-				mr.p.Task(n, "")
-				refreshFrom(t)
+				refreshFrom(t, n)
 			}
 			mr.p.Task(n, taskLabel(t))
 			// A satisfied result skips the check. A task that changes the machine always checks
