@@ -647,12 +647,18 @@ func zipEntries(ra io.ReaderAt, size int64, u string) entryWalker {
 	}
 }
 
-// skillFolder collects the files of one skill folder from an archive.
+// skillFolder collects the files of one skill folder from an archive. err is the first error
+// of this folder: FAM reports it only when it selects this folder.
 type skillFolder struct {
 	files []skillFile
 	byRel map[string]int
 	links map[string]string // rel path in the folder -> link target, relative to the folder
 	total int
+	err   error
+}
+
+func newSkillFolder() *skillFolder {
+	return &skillFolder{byRel: map[string]int{}, links: map[string]string{}}
 }
 
 func (c *skillFolder) empty() bool { return len(c.files) == 0 && len(c.links) == 0 }
@@ -677,47 +683,12 @@ func readSkill(walk entryWalker, folder, u string, strict bool) ([]skillFile, er
 		rel, ok := strings.CutPrefix(p, folder+"/")
 		return rel, ok && rel != ""
 	}
-	inTop, atRoot := &skillFolder{byRel: map[string]int{}, links: map[string]string{}}, &skillFolder{byRel: map[string]int{}, links: map[string]string{}}
+	inTop, atRoot := newSkillFolder(), newSkillFolder()
 	tops := map[string]bool{}
-	add := func(c *skillFolder, rel string, e archiveEntry) error {
-		// FAM writes its own marker file into each skill folder: skip that name and anything below it.
-		if rel == managedMarker || strings.HasPrefix(rel, managedMarker+"/") {
-			return nil
-		}
-		switch {
-		case e.regular:
-			if e.size > maxSkillFile {
-				return fail("the file %s has %d bytes, more than the limit of %d", rel, e.size, maxSkillFile)
-			}
-			c.total += int(e.size)
-			if c.total > maxSkillBytes || len(c.files) >= maxSkillFiles {
-				return fail("the folder has more than %d bytes or %d files", maxSkillBytes, maxSkillFiles)
-			}
-			r, err := e.open()
-			if err != nil {
-				return badArchive(u, err)
-			}
-			tooLarge := fail("the file %s has more than %d bytes", rel, maxSkillFile)
-			data, err := io.ReadAll(&capReader{r: r, left: maxSkillFile, limitError: tooLarge})
-			if cl, ok := r.(io.Closer); ok {
-				cl.Close()
-			}
-			if errors.Is(err, tooLarge) {
-				return err
-			}
-			if err != nil {
-				return badArchive(u, err)
-			}
-			c.byRel[rel] = len(c.files)
-			c.files = append(c.files, skillFile{rel: rel, data: data, exec: e.exec})
-		case e.symlink:
-			if path.IsAbs(e.link) {
-				c.links[rel] = e.link
-			} else {
-				c.links[rel] = path.Clean(path.Join(path.Dir(rel), e.link))
-			}
-		}
-		return nil
+	// match is one candidate folder that an entry belongs to.
+	type match struct {
+		c   *skillFolder
+		rel string
 	}
 	err := walk(func(e archiveEntry) error {
 		name := path.Clean("/" + e.name)[1:]
@@ -729,14 +700,74 @@ func readSkill(walk entryWalker, folder, u string, strict bool) ([]skillFile, er
 		if strict && len(tops) > 1 {
 			return fail("the archive has more than one top folder")
 		}
+		var ms []match
 		if rel, ok := under(rest); ok {
-			if err := add(inTop, rel, e); err != nil {
-				return err
-			}
+			ms = append(ms, match{inTop, rel})
 		}
 		if !strict {
 			if rel, ok := under(name); ok {
-				return add(atRoot, rel, e)
+				ms = append(ms, match{atRoot, rel})
+			}
+		}
+		// Skip a folder with an error, and FAM's own marker file and anything below it.
+		kept := ms[:0]
+		for _, m := range ms {
+			if m.c.err == nil && m.rel != managedMarker && !strings.HasPrefix(m.rel, managedMarker+"/") {
+				kept = append(kept, m)
+			}
+		}
+		ms = kept
+		if len(ms) == 0 {
+			return nil
+		}
+		switch {
+		case e.symlink:
+			for _, m := range ms {
+				if path.IsAbs(e.link) {
+					m.c.links[m.rel] = e.link
+				} else {
+					m.c.links[m.rel] = path.Clean(path.Join(path.Dir(m.rel), e.link))
+				}
+			}
+		case e.regular:
+			// Check the limits of each folder first. A folder over a limit keeps its error.
+			read := ms[:0]
+			for _, m := range ms {
+				switch {
+				case e.size > maxSkillFile:
+					m.c.err = fail("the file %s has %d bytes, more than the limit of %d", m.rel, e.size, maxSkillFile)
+				case m.c.total+int(e.size) > maxSkillBytes || len(m.c.files) >= maxSkillFiles:
+					m.c.err = fail("the folder has more than %d bytes or %d files", maxSkillBytes, maxSkillFiles)
+				default:
+					read = append(read, m)
+				}
+			}
+			if len(read) == 0 {
+				return nil
+			}
+			// Read the entry once: a tar entry is a stream that only one read can consume.
+			r, err := e.open()
+			if err != nil {
+				return badArchive(u, err)
+			}
+			tooLarge := fail("the file %s has more than %d bytes", read[0].rel, maxSkillFile)
+			data, err := io.ReadAll(&capReader{r: r, left: maxSkillFile, limitError: tooLarge})
+			if cl, ok := r.(io.Closer); ok {
+				cl.Close()
+			}
+			if errors.Is(err, tooLarge) {
+				for _, m := range read {
+					m.c.err = tooLarge
+				}
+				return nil
+			}
+			if err != nil {
+				return badArchive(u, err)
+			}
+			for _, m := range read {
+				m.c.total += len(data)
+				m.c.byRel[m.rel] = len(m.c.files)
+				m.c.files = append(m.c.files, skillFile{rel: m.rel, data: data, exec: e.exec})
 			}
 		}
 		return nil
@@ -745,8 +776,11 @@ func readSkill(walk entryWalker, folder, u string, strict bool) ([]skillFile, er
 		return nil, err
 	}
 	c := inTop
-	if !strict && (len(tops) != 1 || inTop.empty()) {
+	if !strict && (len(tops) != 1 || (inTop.empty() && inTop.err == nil)) {
 		c = atRoot
+	}
+	if c.err != nil {
+		return nil, c.err
 	}
 	// A link in the folder becomes a copy of the file that it points to (as for local skills).
 	// The target must be a file in the same folder.
@@ -771,7 +805,13 @@ func readSkill(walk entryWalker, folder, u string, strict bool) ([]skillFile, er
 		}
 		c.files = append(c.files, skillFile{rel: rel, data: f.data, exec: f.exec})
 	}
-	if _, ok := c.byRel["SKILL.md"]; !ok {
+	hasSkill := false
+	for _, f := range c.files {
+		if f.rel == "SKILL.md" {
+			hasSkill = true
+		}
+	}
+	if !hasSkill {
 		return nil, fail("the folder has no SKILL.md")
 	}
 	sort.Slice(c.files, func(i, j int) bool { return c.files[i].rel < c.files[j].rel })
