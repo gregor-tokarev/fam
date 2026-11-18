@@ -45,6 +45,8 @@ type Options struct {
 	RunID    string
 	// OnSecrets receives the secret values, so that the run log can hide them.
 	OnSecrets func(values []string)
+	// RefreshSecrets reads the secrets from Infisical also when the cache is fresh.
+	RefreshSecrets bool
 }
 
 // machineRun holds the state of one machine during a run.
@@ -141,19 +143,15 @@ func Run(ctx context.Context, opts Options) *output.Run {
 		output.Redact(res, hidden)
 	}()
 	var secretList []secrets.Secret
+	var secretWarnings []string
 	if sec != nil {
-		if sec.Delivery != "copy-file" {
-			return fail(fmt.Errorf("secrets delivery %q is not supported. Use \"copy-file\"", sec.Delivery))
-		}
-		secretList, err = secrets.Load(sec.File, opts.Project.Base)
+		src, err := loadSecrets(ctx, sec, opts.Project.Base, opts.RefreshSecrets, false)
+		// Hide the credentials also when the read failed.
+		addSecrets(src.values())
 		if err != nil {
 			return fail(err)
 		}
-		values := make([]string, 0, len(secretList))
-		for _, s := range secretList {
-			values = append(values, s.Value)
-		}
-		addSecrets(values)
+		secretList, secretWarnings = src.List, src.Warnings
 	}
 	cockpits := 0
 	for _, m := range machines {
@@ -190,6 +188,7 @@ func Run(ctx context.Context, opts Options) *output.Run {
 	work := func(i int) {
 		m := machines[i]
 		mr := &machineRun{m: m, res: &output.MachineResult{Name: m.Name, Role: m.Role, Tasks: []output.TaskResult{}}}
+		mr.res.Warnings = append(mr.res.Warnings, secretWarnings...)
 		runs[i] = mr
 		runMachine(ctx, opts, mr, secretList, addSecrets, func(props map[string]string) (*pklconfig.Config, error) {
 			evalMu.Lock()

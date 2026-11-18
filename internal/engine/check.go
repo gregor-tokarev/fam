@@ -11,6 +11,7 @@ import (
 
 	"github.com/gregor-tokarev/fam/internal/config"
 	"github.com/gregor-tokarev/fam/internal/facts"
+	"github.com/gregor-tokarev/fam/internal/infisical"
 	"github.com/gregor-tokarev/fam/internal/output"
 	"github.com/gregor-tokarev/fam/internal/schema"
 	"github.com/gregor-tokarev/fam/internal/secrets"
@@ -112,17 +113,18 @@ func CheckProject(ctx context.Context, project *Project) (result CheckResult) {
 	if err != nil {
 		add("error", project.ConfigPath, err)
 	} else if sec != nil {
-		list, err = secrets.Load(sec.File, project.Base)
+		// Check never calls Infisical: it uses the cache of the last plan or apply.
+		src, err := loadSecrets(ctx, sec, project.Base, false, true)
+		redactor = output.NewRedactor(src.values())
+		list = src.List
 		secretsOK = err == nil
-		if err != nil {
-			add("error", sec.File, err)
+		switch {
+		case errors.Is(err, infisical.ErrNoCache):
+			add("warning", project.ConfigPath, fmt.Errorf("%v. Check does not call Infisical, so it does not compare the required secret names. Run `fam plan` once", err))
+		case err != nil:
+			add("error", sourceFile(sec, project.ConfigPath), err)
 		}
 	}
-	var values []string
-	for _, s := range list {
-		values = append(values, s.Value)
-	}
-	redactor = output.NewRedactor(values)
 	if len(machines) == 0 {
 		add("error", project.ConfigPath, fmt.Errorf("the config has no machines"))
 		machines = []config.Machine{{Name: "check", Role: "cockpit"}}

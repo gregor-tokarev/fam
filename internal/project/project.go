@@ -212,6 +212,14 @@ agents = import("agents.pkl").agents
 //   delivery = "copy-file"
 //   file = "~/.config/fam/secrets.env"
 // }
+// Or read the secrets from Infisical:
+// secrets {
+//   infisical {
+//     projectId = "<project ID>"
+//     environment = "prod"
+//     credentials = "~/.config/fam-secrets/infisical.env"
+//   }
+// }
 
 // Bundles for every machine with a role, after the bundles of every machine.
 roles {

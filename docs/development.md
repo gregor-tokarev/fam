@@ -9,6 +9,7 @@
 | `internal/pklgen` | Go structs generated from the schema. Do not edit. |
 | `internal/pklbin` | Download and cache of the pinned `pkl` binary. |
 | `internal/project` | `fam new`, `fam migrate`, and the embedded project guide in `guide.md`. Only `{{version}}` is substituted. |
+| `internal/infisical` | The Infisical client, its cache, and the mock server (`internal/infisical/mock`, served by `cmd/infisical-mock`). |
 | `internal/engine/check.go` | Static project validation through the config validators and task builders. It uses the embedded package and cached dependencies. It blocks network reads. |
 | `internal/stdlib` | Catalogue reflection, selected bundle evaluation, and generated documentation. |
 | `internal/cli` | Command registration, project diagnostics, and environment checks. |
@@ -76,6 +77,59 @@ go run ./cmd/fam internal std-docs --check
 ```
 
 The command evaluates the embedded package with fixed Ubuntu 26.04 amd64 facts. It does not download skills or install tools. CI runs the check.
+
+## Infisical mock
+
+`cmd/infisical-mock` is a small Infisical server in memory, for work on the Infisical source without an Infisical account. It serves Universal Auth login, access tokens with a lifetime, and the raw secrets API (`/api/v3/secrets/raw`): list with folders, imports, and recursive reads, and get, create, update, and delete of one secret. Errors have the JSON form of Infisical.
+
+```sh
+go run ./cmd/infisical-mock --addr 127.0.0.1:8085
+```
+
+Without `--data`, it serves the demo project `fam-demo` (environments `prod` and `shared`) and prints the demo credentials. Point a project at it:
+
+```pkl
+secrets {
+  infisical {
+    siteUrl = "http://127.0.0.1:8085"
+    projectId = "fam-demo"
+    environment = "prod"
+    recursive = true
+  }
+}
+```
+
+```sh
+INFISICAL_UNIVERSAL_AUTH_CLIENT_ID=fam-demo-client INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET=fam-demo-secret fam plan
+```
+
+| Flag | Effect |
+|---|---|
+| `--data <file>` | Your own identities, tokens, and secrets (format below). |
+| `--token-ttl 2h` | The lifetime of an access token from a login. |
+| `--rate-limit <n>` | At most `n` secret reads each minute, then HTTP 429, like Infisical Cloud. |
+| `--latency <d>` | A delay before each answer. |
+| `--quiet` | No request log. The log has the method, the path without the query, and the status, never a value. |
+
+`GET /mock/stats` gives the number of logins, secret reads and writes, rejected tokens, and HTTP 429 answers. `DELETE /mock/stats` sets them to zero. `POST /mock/revoke-tokens` makes all access tokens from logins invalid. Use them to see the cache of FAM: a second `fam plan` inside `cache` makes no request, and `--refresh-secrets` makes one read without a login.
+
+```json
+{
+  "identities": [{ "clientId": "fam", "clientSecret": "secret" }],
+  "tokens": ["st.static-token"],
+  "projects": {
+    "my-project": {
+      "prod": {
+        "/": { "secrets": { "GH_TOKEN": "value" }, "imports": [{ "environment": "shared", "path": "/" }] },
+        "/agents": { "secrets": { "OPENAI_API_KEY": "value" } }
+      },
+      "shared": { "/": { "secrets": { "CLOUDFLARE_ACCOUNT_ID": "value" } } }
+    }
+  }
+}
+```
+
+The mock does not check permissions: each identity and token can read and write all projects.
 
 ## Acceptance harness
 

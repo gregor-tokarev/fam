@@ -64,7 +64,7 @@ The guide explains project edits, bundle discovery, validation, and when to use 
 
 `fam plan`, `fam apply`, and `fam verify` do these steps:
 
-1. **Validate.** FAM puts its `fam` package into the Pkl cache and checks the version that `PklProject.deps.json` pins (see [The fam package](#the-fam-package)), and that the project has the directories that the config needs. It evaluates only the `machines` mapping and `secrets` (Pkl is lazy, so nothing that depends on the facts of a machine), checks that at most one machine is the cockpit, and reads the secrets file.
+1. **Validate.** FAM puts its `fam` package into the Pkl cache and checks the version that `PklProject.deps.json` pins (see [The fam package](#the-fam-package)), and that the project has the directories that the config needs. It evaluates only the `machines` mapping and `secrets` (Pkl is lazy, so nothing that depends on the facts of a machine), checks that at most one machine is the cockpit, and reads the secrets from the file or from Infisical.
 2. **Collect facts.** FAM runs one shell script on each machine: over SSH for workers, locally for the cockpit. Machines run in parallel. `--serial` runs them one at a time. FAM stops on a Windows machine.
 3. **Evaluate.** FAM evaluates the full config for each machine, with the facts of that machine as the Pkl properties `fam.<name>`, and checks the rules that Pkl cannot check: bundle names and scripts with a check.
 4. **Plan.** FAM runs the check of every task. A check changes nothing.
@@ -165,6 +165,10 @@ For a GitHub skill, the cockpit downloads the repository archive from `codeload.
 
 ## Secrets
 
+The secrets come from one source: a file on the cockpit (`file`) or a folder of an Infisical project (`infisical`). FAM writes them into the same `~/.config/fam/secrets.env` on each machine.
+
+### Secrets file
+
 The secrets file on the cockpit has `NAME=value` lines. Empty lines and lines that start with `#` are comments. `export ` before the name is allowed. A value can be in single quotes, or in double quotes with `\"`, `\\`, `\$`, and `` \` `` escapes. FAM stops on:
 
 - a file with a mode other than `0600`, or a file inside the project base,
@@ -172,8 +176,47 @@ The secrets file on the cockpit has `NAME=value` lines. Empty lines and lines th
 
 FAM writes the values as `export NAME='value'` with `'\''` for a single quote. The plan shows the names. The run log, the text output, JSON, and TOON replace each secret value with `[secret]`. The secrets file goes to the machine through stdin, so it is never in a command line or a log. FAM also hides the old values that it finds in the secrets file of a machine (after a rotation, scripts still load them), and the forms in which a value appears in output: without its outer spaces, and with `'\''` for a single quote.
 
+### Infisical
+
+```pkl
+secrets {
+  infisical {
+    siteUrl = "https://app.infisical.com" // the default; or https://eu.infisical.com, or a self-hosted site
+    projectId = "<project ID>"
+    environment = "prod"
+    path = "/"                            // the default
+    recursive = false                     // true also reads the subfolders
+    includeImports = true                 // a secret of the folder wins over an imported one
+    credentials = "~/.config/fam-secrets/infisical.env"
+    cache = 5.min                         // the default
+  }
+}
+```
+
+FAM signs in with a machine identity. The `credentials` file has `INFISICAL_UNIVERSAL_AUTH_CLIENT_ID` and `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET` (Universal Auth), or `INFISICAL_TOKEN` (an access token). The file has the rules of a secrets file: mode `0600`, outside the project base. Without `credentials`, FAM reads these variables from its environment. When the file is set, FAM ignores the environment, so a token in the shell for other tools does not change what FAM reads.
+
+The site must use HTTPS. Plain HTTP is allowed only for localhost, for example a local mock. FAM does not follow redirects, so that the client secret cannot go to another address.
+
+Each secret name must be a shell variable name, and each value must be on one line. FAM stops on another secret, and gives its name and folder. FAM also stops on a secret whose value the identity cannot read (Infisical sends a placeholder), on a secret without a value, on an answer without a list of secrets, and on secrets of another project, environment, or folder (a service token scoped to another environment makes Infisical answer for that scope). Keep such secrets in a folder that FAM does not read. With `recursive = true`, a name must occur in only one folder.
+
+FAM keeps the answers of Infisical in `<user cache dir>/fam/infisical/`: a directory with mode `0700` and files with mode `0600`, one for each site, credentials, project, environment, and folder. New credentials, also a new client secret, start with no cache. FAM uses only cache files of its own user, and checks the cached names and values again. When two FAM runs read Infisical at the same time, a lock file for each cache file makes sure that the cache keeps the answer of the later read. FAM also keeps the access token of a login there until one minute before it expires. When Infisical rejects the token, FAM signs in again once.
+
+| Command | Infisical |
+|---|---|
+| `fam plan`, `fam apply`, `fam verify` | FAM uses the cache when it is younger than `cache`. Else FAM reads Infisical and saves the cache. `cache = 0.s` reads Infisical on each run. |
+| `--refresh-secrets` | FAM reads Infisical also when the cache is fresh. Use it after a rotation. |
+| Infisical does not answer (network, HTTP 429, HTTP 5xx) | FAM uses the cache of any age. Each machine shows a warning with the age. Without a cache, the run stops. |
+| Infisical rejects the request (HTTP 4xx) | The run stops. FAM does not use the cache. |
+| `fam check` | FAM never calls Infisical. It uses the cache of any age. It needs the credentials to find the cache. Without a cache, it shows a warning and does not compare the required secret names. |
+
+The output hides the client secret, the token, and the access token like the secret values. An error never shows the text of an Infisical answer: a proxy or a server can put anything into it. FAM shows the HTTP status and its own message, for example "Infisical has no such project, environment, or folder" for HTTP 404. The `siteUrl` must not contain a user name or a password.
+
+On the cockpit, the credentials file must not be `~/.config/fam/secrets.env`, because apply writes that file.
+
+### Required secrets
+
 A bundle can list `requiredSecrets`, for example `requiredSecrets { "SENTRY_AUTH_TOKEN" }`.
-Plan and apply warn when the secrets file of the config does not supply a required name.
+Plan and apply warn when the secrets of the config do not supply a required name.
 Text, JSON, and TOON show the warning. It does not change the exit code.
 Absent bundles do not need secrets.
 

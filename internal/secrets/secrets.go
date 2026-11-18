@@ -1,4 +1,5 @@
-// Package secrets reads the secrets file of the cockpit and writes it in a form that shells read safely.
+// Package secrets reads the secrets file of the cockpit and writes the secrets in a form that
+// shells read safely.
 package secrets
 
 import (
@@ -98,10 +99,8 @@ func Parse(data []byte) ([]Secret, error) {
 		if err != nil {
 			return nil, fmt.Errorf("secrets file line %d: the value of %s %v. FAM cannot write it safely", lineNo, name, err)
 		}
-		for _, r := range v {
-			if r == 0 || r == '\n' || r == '\r' || (r < 0x20 && r != '\t') || r == 0x7f {
-				return nil, fmt.Errorf("secrets file line %d: the value of %s contains a control character or a new line. FAM cannot write it safely", lineNo, name)
-			}
+		if !SafeValue(v) {
+			return nil, fmt.Errorf("secrets file line %d: the value of %s contains a control character or a new line. FAM cannot write it safely", lineNo, name)
 		}
 		if i, ok := seen[name]; ok {
 			out[i].Value = v
@@ -114,6 +113,20 @@ func Parse(data []byte) ([]Secret, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+// ValidName reports whether name is a shell variable name.
+func ValidName(name string) bool { return nameRe.MatchString(name) }
+
+// SafeValue reports whether Render can write the value on one line: it has no new line and
+// no other control character except a tab.
+func SafeValue(v string) bool {
+	for _, r := range v {
+		if r == 0 || r == '\n' || r == '\r' || (r < 0x20 && r != '\t') || r == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 // unquote reads a value. A value that starts with a quote is read like a shell word:
