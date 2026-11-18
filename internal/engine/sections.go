@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
@@ -164,7 +165,10 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 	}
 	mr.p.Count("verifying", runnable)
 
-	// The fresh_shell runs: two shells for each script, at the same time.
+	// The fresh_shell runs. Different scripts run at the same time. The two shells of one script
+	// run one after the other, so that a script that uses a fixed port or file does not meet a
+	// copy of itself. After a connection error FAM starts no more scripts and lets the running
+	// ones end.
 	type shellRun struct {
 		res transport.Result
 		err error
@@ -173,49 +177,47 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 	runs := make([][2]shellRun, len(mr.verify))
 	var connErr error
 	{
-		cctx, cancel := context.WithCancel(ctx)
 		var mu sync.Mutex
+		var stop atomic.Bool
 		var wg sync.WaitGroup
 		sem := make(chan struct{}, parallelCommands)
-		left := make([]int, len(mr.verify))
 		done := 0
 		for i, v := range mr.verify {
 			if v.Event != "fresh_shell" {
 				continue
 			}
-			left[i] = 2
-			for k, interactive := range []bool{false, true} {
-				sem <- struct{}{}
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					defer func() { <-sem }()
-					// A stop after a connection error of another shell: no result.
-					stopped := func() bool { return cctx.Err() != nil && ctx.Err() == nil }
-					if stopped() {
-						return
-					}
-					res, err := run(cctx, v, interactive)
-					conn := transport.IsConnError(err)
-					if stopped() && !conn {
-						return
-					}
-					mu.Lock()
-					defer mu.Unlock()
-					runs[i][k] = shellRun{res: res, err: err, ran: true}
-					if conn && connErr == nil {
-						connErr = err
-						cancel()
-					}
-					if left[i]--; left[i] == 0 {
-						done++
-						mr.p.Task(done, "verify "+v.Name)
-					}
-				}()
+			sem <- struct{}{}
+			if stop.Load() {
+				<-sem
+				break
 			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer func() { <-sem }()
+				for k, interactive := range []bool{false, true} {
+					res, err := run(ctx, v, interactive)
+					mu.Lock()
+					runs[i][k] = shellRun{res: res, err: err, ran: true}
+					conn := transport.IsConnError(err)
+					if conn {
+						stop.Store(true)
+						if connErr == nil {
+							connErr = err
+						}
+					}
+					mu.Unlock()
+					if conn {
+						return
+					}
+				}
+				mu.Lock()
+				done++
+				mr.p.Task(done, "")
+				mu.Unlock()
+			}()
 		}
 		wg.Wait()
-		cancel()
 	}
 
 	var reconnect []VerifySpec

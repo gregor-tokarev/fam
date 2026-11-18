@@ -53,16 +53,17 @@ type Updater interface {
 	Update(ctx context.Context, env *Env, c Check) (Update, error)
 }
 
-// Update is the result of an update.
+// Update is the result of an update. FAM treats each update that ran as a possible change of the
+// machine: an update script can change files that other tasks own, also without a new version.
 type Update struct {
 	// Ran is false when the task has no update command: FAM ran nothing.
 	Ran bool
-	// Changed is true when the machine changed, for example a new version.
+	// Changed is true when the version changed.
 	Changed bool
-	// Unknown is true when FAM cannot tell whether the update changed the machine.
-	Unknown bool
-	// Checked is true when the update already checked the task again after it.
+	// Checked is true when the update already did the full check of the task after it. Diff is
+	// then the difference that this check found, or "".
 	Checked bool
+	Diff    string
 	Detail  string
 }
 

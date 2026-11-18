@@ -3,6 +3,8 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
@@ -193,28 +195,33 @@ func (t *PackageTask) version(ctx context.Context, env *Env) string {
 	return firstLine(r.Out())
 }
 
-// probeMark separates the output of the installed script from the version in probe.
-const probeMark = "FAM-PROBE-VERSION-7c1e"
-
-// probeScript finds the program and prints its version after probeMark, so that one command
-// does both. Its exit code is the code of installedScript.
-func (t *PackageTask) probeScript(env *Env) (script, label string) {
-	inst, label := t.installedScript(env)
-	if t.VersionCmd == "" {
-		return inst, label
-	}
-	return "(\n" + inst + "\n)\nrc=$?\n[ \"$rc\" -eq 0 ] || exit \"$rc\"\n" +
-		"printf '\\n%s\\n' " + probeMark + "\n" +
-		"if v=$(\n" + t.versionScript(env) + "\n); then printf '%s\\n' \"$v\"; fi\nexit 0", label + " and its version"
+// runMarker returns a separator line that no program prints by chance.
+func runMarker(kind string) string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return "FAM-" + kind + "-" + hex.EncodeToString(b)
 }
 
-// probeResult reads the result of probeScript. version is "" when the program is not installed
+// probeDriver runs the installed script ("$<inst>") and, when the program is found, prints mark
+// and the output of the version script ("$<ver>"). Its exit code is the code of the installed
+// script. Both scripts run as their own top-level scripts (see UserScripts).
+func probeDriver(inst, ver int, mark string) string {
+	return fmt.Sprintf(`"$FAM_SH" -c "$%[1]d"
+rc=$?
+[ "$rc" -eq 0 ] || exit "$rc"
+printf '\n%%s\n' '%[3]s'
+if v=$("$FAM_SH" -c "$%[2]d"); then printf '%%s\n' "$v"; fi
+exit 0
+`, inst, ver, mark)
+}
+
+// probeResult reads the result of probeDriver. version is "" when the program is not installed
 // or the version command fails.
-func (t *PackageTask) probeResult(r transport.Result) (ok bool, version string, err error) {
+func (t *PackageTask) probeResult(r transport.Result, mark string) (ok bool, version string, err error) {
 	if ok, err = t.installedResult(r); !ok || err != nil {
 		return ok, "", err
 	}
-	if _, after, found := strings.Cut(string(r.Stdout), "\n"+probeMark+"\n"); found {
+	if _, after, found := strings.Cut(string(r.Stdout), "\n"+mark+"\n"); found {
 		version = firstLine(after)
 	}
 	return true, version, nil
@@ -222,12 +229,17 @@ func (t *PackageTask) probeResult(r transport.Result) (ok bool, version string, 
 
 // probe finds the program and reads its version in one command.
 func (t *PackageTask) probe(ctx context.Context, env *Env) (ok bool, version string, err error) {
-	script, label := t.probeScript(env)
-	r, err := env.UserScript(ctx, script, t.sudo, label, 4*time.Minute)
+	inst, label := t.installedScript(env)
+	if t.VersionCmd == "" {
+		ok, err = t.installed(ctx, env)
+		return ok, "", err
+	}
+	mark := runMarker("VERSION")
+	r, err := env.UserScripts(ctx, probeDriver(1, 2, mark), []string{inst, t.versionScript(env)}, t.sudo, label+" and its version", 4*time.Minute)
 	if err != nil {
 		return false, "", err
 	}
-	return t.probeResult(r)
+	return t.probeResult(r, mark)
 }
 
 func firstLine(s string) string {
@@ -245,7 +257,7 @@ func (t *PackageTask) Check(ctx context.Context, env *Env) (Check, error) {
 	var err error
 	// A pin needs the version, and an update compares it with the version after the update. One
 	// command finds the program and reads the version.
-	probed := !t.Absent && (t.Pin != "" || t.UpdateSh != "") && t.VersionCmd != ""
+	probed := !t.Absent && t.VersionCmd != "" && (t.Pin != "" || t.UpdateSh != "" && env.probeVersions)
 	if probed {
 		ok, v, err = t.probe(ctx, env)
 	} else {
@@ -303,9 +315,6 @@ func (t *PackageTask) Apply(ctx context.Context, env *Env) (string, error) {
 	return verb, nil
 }
 
-// updateMark separates the output of the update from the output of probeScript after it.
-const updateMark = "FAM-UPDATE-DONE-3b9d"
-
 // Update implements Updater. FAM compares the version before and after the update. c is the
 // satisfied check before the update, with the version when the check read it.
 func (t *PackageTask) Update(ctx context.Context, env *Env, c Check) (Update, error) {
@@ -317,21 +326,28 @@ func (t *PackageTask) Update(ctx context.Context, env *Env, c Check) (Update, er
 		before = t.version(ctx, env)
 	}
 	// When the update and the probe run as the same user, one command runs the update and then
-	// finds the program and its version again. updateMark shows that the update succeeded.
-	together := t.applySudo() == t.sudo
-	script := t.UpdateSh
+	// finds the program and its version again. updMark shows that the update succeeded.
+	together := t.applySudo() == t.sudo && t.VersionCmd != ""
+	updMark, verMark := runMarker("UPDATE"), runMarker("VERSION")
+	var r transport.Result
+	var err error
 	if together {
-		probe, _ := t.probeScript(env)
-		script = "(\n" + t.UpdateSh + "\n)\nrc=$?\n[ \"$rc\" -eq 0 ] || exit \"$rc\"\n" +
-			"printf '\\n%s\\n' " + updateMark + "\n(\n" + probe + "\n)"
+		inst, _ := t.installedScript(env)
+		driver := `"$FAM_SH" -c "$1"
+rc=$?
+[ "$rc" -eq 0 ] || exit "$rc"
+printf '\n%s\n' '` + updMark + `'
+` + probeDriver(2, 3, verMark)
+		r, err = env.UserScripts(ctx, driver, []string{t.UpdateSh, inst, t.versionScript(env)}, t.sudo, "update "+t.Name(), scriptTimeout+4*time.Minute)
+	} else {
+		r, err = env.UserScript(ctx, t.UpdateSh, t.applySudo(), "update "+t.Name(), scriptTimeout)
 	}
-	r, err := env.UserScript(ctx, script, t.applySudo(), "update "+t.Name(), scriptTimeout)
 	if err != nil {
-		return Update{Ran: true, Unknown: true}, err
+		return Update{Ran: true}, err
 	}
 	var probed *transport.Result
 	if together {
-		if out, after, found := bytes.Cut(r.Stdout, []byte("\n"+updateMark+"\n")); found {
+		if out, after, found := bytes.Cut(r.Stdout, []byte("\n"+updMark+"\n")); found {
 			// The update succeeded. The exit code and the rest of stdout are of the probe.
 			probed = &transport.Result{Stdout: after, Stderr: r.Stderr, Code: r.Code}
 			r = transport.Result{Stdout: out, Stderr: r.Stderr}
@@ -347,38 +363,46 @@ func (t *PackageTask) Update(ctx context.Context, env *Env, c Check) (Update, er
 			}
 		}
 		if cmd == "" {
-			return Update{Ran: true, Unknown: true}, fmt.Errorf("update %s: exit code 42 without a FAM-ROOT command", t.Name())
+			return Update{Ran: true}, fmt.Errorf("update %s: exit code 42 without a FAM-ROOT command", t.Name())
 		}
 		r, err = env.UserScript(ctx, cmd, true, "update "+t.Name()+" as root", scriptTimeout)
 		if err != nil {
-			return Update{Ran: true, Unknown: true}, err
+			return Update{Ran: true}, err
 		}
 	}
 	if r.Code != 0 {
-		return Update{Ran: true, Unknown: true}, sudoHint(&ExitError{Label: "update", Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, t.applySudo(), "package")
+		return Update{Ran: true}, sudoHint(&ExitError{Label: "update", Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, t.applySudo(), "package")
 	}
-	// Check again: an update must leave the program installed. Without a pin, this is the full
-	// check of the task, so the apply needs no other check.
+	// Check again: an update must leave the program installed. The probe also gives the version
+	// for the pin, so this is the full check of the task.
 	var ok bool
 	var after string
 	if probed != nil {
-		ok, after, err = t.probeResult(*probed)
+		ok, after, err = t.probeResult(*probed, verMark)
+		if err == nil && !ok {
+			// The update can change the shell startup files (for example a new PATH entry) that
+			// only a new SSH command reads. Look again in a new command before FAM reports an error.
+			ok, after, err = t.probe(ctx, env)
+		}
 	} else {
 		ok, after, err = t.probe(ctx, env)
 	}
 	if err != nil {
-		return Update{Ran: true, Unknown: true}, err
+		return Update{Ran: true}, err
 	} else if !ok {
 		return Update{Ran: true, Changed: true}, fmt.Errorf("the update of %s ran, but FAM cannot find %s after it", t.Binary, t.bin(env))
 	}
-	u := Update{Ran: true, Checked: t.Pin == ""}
+	u := Update{Ran: true, Checked: true}
 	switch {
 	case before != after:
 		u.Changed, u.Detail = true, fmt.Sprintf("updated %s -> %s", before, after)
 	case after == "":
-		u.Unknown, u.Detail = true, "update ran"
+		u.Detail = "update ran"
 	default:
 		u.Detail = "up to date (" + after + ")"
+	}
+	if t.Pin != "" && !versionIs(after, t.Pin) {
+		u.Diff = fmt.Sprintf("installed %q, pinned %s", after, t.Pin)
 	}
 	return u, nil
 }

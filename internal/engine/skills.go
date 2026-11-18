@@ -142,7 +142,16 @@ func (s *SkillSource) tarball() ([]byte, error) {
 // the SHA-256 of the content (read from stdin, so the hash tool never escapes the name), and
 // the exec bit of the owner.
 func remoteDigest(ctx context.Context, env *Env, dir string) (string, error) {
-	script := fmt.Sprintf(`set -e
+	r, err := env.ShOK(ctx, digestScript(env, dir), false, "digest of "+dir)
+	if err != nil {
+		return "", err
+	}
+	return parseDigest(dir, r.Out())
+}
+
+// digestScript prints the digest lines of remoteDigest.
+func digestScript(env *Env, dir string) string {
+	return fmt.Sprintf(`set -e
 cd %s
 find . -type f ! -path ./%s -exec sh -c '
 set -e
@@ -152,12 +161,12 @@ for f do
   x=false; [ -z "$(find "$f" -prune -perm -u+x)" ] || x=true
   printf "%%s %%s %%s\n" "$n" "$h" "$x"
 done' sh {} +`, transport.Quote(dir), managedMarker, env.T.SHA256Cmd())
-	r, err := env.ShOK(ctx, script, false, "digest of "+dir)
-	if err != nil {
-		return "", err
-	}
+}
+
+// parseDigest reads the output of digestScript. It skips lines without three fields.
+func parseDigest(dir, out string) (string, error) {
 	var lines []string
-	for _, l := range strings.Split(strings.TrimSpace(r.Out()), "\n") {
+	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
 		f := strings.Fields(l)
 		if len(f) != 3 {
 			continue
@@ -189,27 +198,42 @@ func (t *SkillTask) Name() string { return t.Skill.Name + " (" + t.Skill.Origin 
 
 func (t *SkillTask) dir(env *Env) string { return env.Home(agentsSkills + "/" + t.Skill.Name) }
 
-// Check implements Task.
+// Check implements Task. One command finds the folder, its FAM marker, and the digest of its
+// files.
 func (t *SkillTask) Check(ctx context.Context, env *Env) (Check, error) {
 	d := t.dir(env)
-	fi, err := env.T.Stat(ctx, d, false)
+	script := fmt.Sprintf(`p=%[1]s
+if [ -L "$p" ]; then echo state=other; exit 0
+elif [ -d "$p" ]; then
+  if [ -e "$p/%[2]s" ] || [ -L "$p/%[2]s" ]; then echo state=managed; else echo state=foreign; exit 0; fi
+elif [ -e "$p" ]; then echo state=other; exit 0
+else
+  # A path that does not exist, or a path that FAM cannot see: a folder on the way is not searchable.
+  d=$(dirname -- "$p")
+  while [ ! -e "$d" ] && [ "$d" != / ]; do d=$(dirname -- "$d"); done
+  if [ -d "$d" ] && [ ! -x "$d" ]; then echo "cannot look into $d: permission denied" >&2; exit 5; fi
+  echo state=none; exit 0
+fi
+(
+%[3]s
+)`, transport.Quote(d), managedMarker, digestScript(env, d))
+	r, err := env.ShOK(ctx, script, false, "check skill "+t.Skill.Name)
 	if err != nil {
 		return Check{}, err
 	}
-	if !fi.Exists {
+	state, _, _ := strings.Cut(r.Out(), "\n")
+	switch strings.TrimSpace(state) {
+	case "state=none":
 		return Check{Status: Change, Detail: "copy"}, nil
-	}
-	if fi.Type != "dir" {
+	case "state=other":
 		return Check{}, conflict(fmt.Sprintf("%s exists and FAM did not make it. Remove or rename it, or rename the skill", d))
-	}
-	m, err := env.T.Stat(ctx, d+"/"+managedMarker, false)
-	if err != nil {
-		return Check{}, err
-	}
-	if !m.Exists {
+	case "state=foreign":
 		return Check{}, conflict(fmt.Sprintf("the skill folder %s exists and FAM did not make it. Remove or rename it, or rename the skill", d))
+	case "state=managed":
+	default:
+		return Check{}, fmt.Errorf("check skill %s: unexpected output %q", t.Skill.Name, state)
 	}
-	got, err := remoteDigest(ctx, env, d)
+	got, err := parseDigest(d, r.Out())
 	if err != nil {
 		return Check{}, err
 	}

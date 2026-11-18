@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
@@ -371,46 +372,43 @@ const parallelCommands = 8
 type checked struct {
 	c   Check
 	err error
-	// ran is false when FAM did not run the check (or stopped it) after a connection error of
-	// another check.
+	// ran is false when FAM did not start the check after a connection error of another check.
 	ran bool
 }
 
 // checkAll runs the checks of tasks at the same time and returns the results in the order of
-// tasks. After a connection error it starts no more checks; connErr is the first connection
-// error. done runs after each check that ran.
-func checkAll(ctx context.Context, env *Env, ts []Task, done func(Task)) (out []checked, connErr error) {
+// tasks. After a connection error it starts no more checks, and lets the running checks end:
+// a check can wait for a download that other machines share. FAM starts the checks in order, so
+// a check that did not start comes after a check with a connection error. connErr is the first
+// connection error. done runs after each check.
+func checkAll(ctx context.Context, env *Env, ts []Task, done func()) (out []checked, connErr error) {
 	out = make([]checked, len(ts))
-	cctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	var mu sync.Mutex
+	var stop atomic.Bool
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, parallelCommands)
 	for i, t := range ts {
 		sem <- struct{}{}
+		if stop.Load() {
+			<-sem
+			break
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
-			// A stop after a connection error of another check: not a result of this task.
-			stopped := func() bool { return cctx.Err() != nil && ctx.Err() == nil }
-			if stopped() {
-				return
-			}
-			c, err := check(cctx, env, t)
-			isConn := transport.IsConnError(err)
-			if stopped() && !isConn {
-				return
-			}
+			c, err := check(ctx, env, t)
 			mu.Lock()
 			out[i] = checked{c: c, err: err, ran: true}
-			if isConn && connErr == nil {
-				connErr = err
-				cancel()
+			if transport.IsConnError(err) {
+				stop.Store(true)
+				if connErr == nil {
+					connErr = err
+				}
 			}
 			mu.Unlock()
 			if done != nil {
-				done(t)
+				done()
 			}
 		}()
 	}
@@ -418,15 +416,16 @@ func checkAll(ctx context.Context, env *Env, ts []Task, done func(Task)) (out []
 	return out, connErr
 }
 
-// progressDone returns a done function for checkAll that counts the finished checks.
-func progressDone(mr *machineRun) func(Task) {
+// progressDone returns a done function for checkAll that counts the finished checks. It gives
+// no task name: several checks run, and the name of a finished check is not the slow one.
+func progressDone(mr *machineRun) func() {
 	var mu sync.Mutex
 	n := 0
-	return func(t Task) {
+	return func() {
 		mu.Lock()
 		defer mu.Unlock()
 		n++
-		mr.p.Task(n, taskLabel(t))
+		mr.p.Task(n, "")
 	}
 }
 
@@ -524,9 +523,44 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	stopped := false
 	mr.p.Count("applying", countTasks(mr.sects, true))
 	n := 0
-	// touched is true when a task may have changed the machine. Then the results of pre can be
-	// old, and each task checks again.
-	touched := false
+	// From here, the checks of packages with an update command also read the version.
+	env.probeVersions = true
+	// order is the run order of the tasks of the apply loop. pos is the position of each task.
+	var order []Task
+	pos := map[Task]int{}
+	for _, s := range mr.sects {
+		if s.SkipReason == "" {
+			for _, t := range s.Tasks {
+				pos[t] = len(order)
+				order = append(order, t)
+			}
+		}
+	}
+	// pre holds check results that are still current. A task with a satisfied result in pre
+	// needs no new check. After a task changes the machine, FAM clears pre:
+	//   - after an apply or a restart, each next task checks again before it runs, as before.
+	//   - after an update, FAM checks the next tasks at the same time, up to and including the
+	//     next task with an update. An update can change files of other tasks, so the results of
+	//     before the update are not current.
+	refresh := false
+	refreshFrom := func(t Task) {
+		refresh = false
+		var seg []Task
+		for _, x := range order[pos[t]:] {
+			seg = append(seg, x)
+			if _, ok := x.(Updater); ok {
+				break
+			}
+		}
+		results, _ := checkAll(ctx, env, seg, nil)
+		pre = make(map[Task]checked, len(seg))
+		for i, x := range seg {
+			// A connection error or another error: the task checks again itself.
+			if results[i].ran && results[i].err == nil {
+				pre[x] = results[i]
+			}
+		}
+	}
 	// The position of each task in r.Tasks.
 	index := map[Task]int{}
 	// A change of the sshd configuration applies only to new connections.
@@ -546,14 +580,22 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			}
 			n++
 			mr.p.Task(n, taskLabel(t))
-			var p *checked
-			if !touched {
-				if res, ok := pre[t]; ok && res.err == nil {
-					p = &res
-				}
+			if _, ok := pre[t]; !ok && refresh {
+				refreshFrom(t)
 			}
-			st, detail, err, changes := applyTask(ctx, env, t, p)
-			touched = touched || changes
+			// Only a satisfied result skips the check. A task that changes the machine always
+			// checks right before its apply, for example a removal that checks the owner.
+			var p *checked
+			if res, ok := pre[t]; ok && res.err == nil && res.c.Status == Satisfied {
+				p = &res
+			}
+			st, detail, err, touch := applyTask(ctx, env, t, p)
+			switch touch {
+			case touchApply:
+				pre, refresh = nil, false
+			case touchUpdate:
+				pre, refresh = nil, true
+			}
 			index[t] = len(r.Tasks)
 			r.Tasks = append(r.Tasks, taskResult(t, st, detail, err))
 			r.Counts.Add(string(st))
@@ -601,7 +643,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 				}
 				seen[u] = true
 				mr.p.Stage("restarting " + u.Name)
-				touched = true
+				pre, refresh = nil, false
 				rr := output.RestartResult{Unit: u.Name, Scope: u.Scope, Status: "restarted"}
 				if err := restartUnit(ctx, env, u); err != nil {
 					rr.Status = "failed"
@@ -666,12 +708,22 @@ func restoreBlocks(ctx context.Context, env *Env, mr *machineRun, index map[Task
 	}
 	// The checks of the blocks run at the same time. Most blocks are still in place.
 	results, connErr := checkAll(ctx, env, blocks, nil)
+	if connErr != nil {
+		// Change no file after a connection error. Report the first block that lost it.
+		for k, t := range blocks {
+			if res := results[k]; transport.IsConnError(res.err) {
+				i := index[t]
+				prev := r.Tasks[i].Status
+				r.Tasks[i] = taskResult(t, Failed, "check failed", res.err)
+				r.Counts.Move(prev, string(Failed))
+				break
+			}
+		}
+		setError(r, connErr)
+		return true
+	}
 	for k, t := range blocks {
 		res := results[k]
-		if !res.ran {
-			setError(r, connErr)
-			return true
-		}
 		if res.err == nil && res.c.Status == Satisfied {
 			continue
 		}
@@ -704,10 +756,18 @@ func restoreBlocks(ctx context.Context, env *Env, mr *machineRun, index map[Task
 	return false
 }
 
-// applyTask runs check, apply, and check again. pre is a check result of this task from
-// earlier in the run; FAM uses it instead of a new check when it is not nil. touched is true
-// when the task may have changed the machine.
-func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, detail string, err error, touched bool) {
+// touch tells how a task may have changed the machine.
+type touch int
+
+const (
+	touchNone   touch = iota
+	touchApply        // an apply, or a failure
+	touchUpdate       // an update script ran
+)
+
+// applyTask runs check, apply, and check again. pre is a current, satisfied check result of
+// this task; FAM uses it instead of a new check when it is not nil.
+func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, detail string, err error, tc touch) {
 	var c Check
 	if pre != nil {
 		c, err = pre.c, pre.err
@@ -716,50 +776,53 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 	}
 	if err != nil {
 		if c.Status == Conflict {
-			return Conflict, "", err, false
+			return Conflict, "", err, touchNone
 		}
 		// Never run apply after an error.
-		return Failed, "check failed", err, false
+		return Failed, "check failed", err, touchNone
 	}
 	if c.Status == Satisfied {
 		u, ok := t.(Updater)
 		if !ok {
-			return Unchanged, "", nil, false
+			return Unchanged, "", nil, touchNone
 		}
 		up, err := u.Update(ctx, env, c)
 		if err != nil {
-			return Failed, "update failed", err, true
+			return Failed, "update failed", err, touchApply
 		}
 		if !up.Ran {
-			return Unchanged, "", nil, false
+			return Unchanged, "", nil, touchNone
 		}
-		touched = up.Changed || up.Unknown
+		diff := up.Diff
 		if !up.Checked {
 			if c2, err := check(ctx, env, t); err != nil {
-				return Failed, "check after update failed", err, true
+				return Failed, "check after update failed", err, touchApply
 			} else if c2.Status != Satisfied {
-				return Failed, up.Detail, fmt.Errorf("the check finds a difference after the update: %s", c2.Detail), true
+				diff = c2.Detail
 			}
 		}
-		if up.Changed {
-			return Changed, up.Detail, nil, touched
+		if diff != "" {
+			return Failed, up.Detail, fmt.Errorf("the check finds a difference after the update: %s", diff), touchApply
 		}
-		return Unchanged, up.Detail, nil, touched
+		if up.Changed {
+			return Changed, up.Detail, nil, touchUpdate
+		}
+		return Unchanged, up.Detail, nil, touchUpdate
 	}
 	detail, err = t.Apply(ctx, env)
 	if err != nil {
-		return Failed, c.Detail, err, true
+		return Failed, c.Detail, err, touchApply
 	}
 	c2, err := check(ctx, env, t)
 	if err != nil {
-		return Failed, "check after apply failed", err, true
+		return Failed, "check after apply failed", err, touchApply
 	}
 	if c2.Status != Satisfied {
 		msg := "the check still finds a difference after apply"
 		if c2.Detail != "" {
 			msg += ": " + c2.Detail
 		}
-		return Failed, c.Detail, errors.New(msg), true
+		return Failed, c.Detail, errors.New(msg), touchApply
 	}
 	switch detail {
 	case "", "written", "linked", "copied", "applied", "configured", "removed", "merged", "no change":
@@ -769,7 +832,7 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 			detail = c.Detail + ": " + detail
 		}
 	}
-	return Changed, detail, nil, true
+	return Changed, detail, nil, touchApply
 }
 
 // countTasks counts the tasks of the sections. withoutSkipped leaves out the skipped sections.
