@@ -2,5 +2,5 @@ amends "pkl:Project"
 
 // The schema and the standard bundles of FAM. `fam migrate` changes the version.
 dependencies {
-  ["fam"] { uri = "package://github.com/gregor-tokarev/fam/releases/download/v0.18.0/fam@0.18.0" }
+  ["fam"] { uri = "package://github.com/gregor-tokarev/fam/releases/download/v0.19.0/fam@0.19.0" }
 }
