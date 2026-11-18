@@ -152,11 +152,19 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		return env.T.Run(ctx, transport.Cmd{Script: v.Script, LoginShell: true, Interactive: interactive, Timeout: 5 * time.Minute, Label: "verify " + v.Name})
 	}
 	var reconnect []VerifySpec
-	mr.p.Count("verifying", len(mr.verify))
-	for i, v := range mr.verify {
-		mr.p.Task(i+1, "verify "+v.Name)
+	runnable := 0
+	for _, v := range mr.verify {
+		if v.Event == "fresh_shell" || v.Event == "reconnect" {
+			runnable++
+		}
+	}
+	mr.p.Count("verifying", runnable)
+	done := 0
+	for _, v := range mr.verify {
 		switch v.Event {
 		case "fresh_shell":
+			done++
+			mr.p.Task(done, "verify "+v.Name)
 			res, err := run(v, false)
 			add(v, "noninteractive", res, err)
 			if transport.IsConnError(err) {
@@ -182,6 +190,8 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 			return
 		}
 		for _, v := range reconnect {
+			done++
+			mr.p.Task(done, "verify "+v.Name)
 			res, err := run(v, false)
 			add(v, "new connection", res, err)
 			if transport.IsConnError(err) {

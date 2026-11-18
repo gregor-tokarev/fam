@@ -138,6 +138,7 @@ func Run(ctx context.Context, opts Options) *output.Run {
 		secretMu.Lock()
 		defer secretMu.Unlock()
 		hidden = append(hidden, values...)
+		opts.Reporter.SetSecrets(hidden)
 		if opts.OnSecrets != nil {
 			opts.OnSecrets(append([]string{}, hidden...))
 		}

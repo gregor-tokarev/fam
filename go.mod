@@ -9,6 +9,7 @@ require (
 	github.com/toon-format/toon-go v1.0.1
 	github.com/ulikunitz/xz v0.5.17
 	golang.org/x/term v0.48.0
+	golang.org/x/text v0.44.0
 )
 
 require (

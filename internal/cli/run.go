@@ -126,18 +126,19 @@ func newReporter(machineOutput bool) *progress.Reporter {
 		return nil
 	}
 	live := tty && os.Getenv("TERM") != "dumb" && os.Getenv("CI") == ""
-	return progress.New(os.Stderr, live, func() int {
-		w, _, err := term.GetSize(fd)
+	return progress.New(os.Stderr, live, func() (int, int) {
+		w, h, err := term.GetSize(fd)
 		if err != nil {
-			return 0
+			return 0, 0
 		}
-		return w
+		return w, h
 	})
 }
 
 func progressWriter(rep *progress.Reporter) io.Writer {
+	// --no-progress also hides the download messages.
 	if rep == nil {
-		return os.Stderr
+		return io.Discard
 	}
 	return rep
 }
