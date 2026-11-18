@@ -1,5 +1,5 @@
 <!-- fam:begin -->
-FAM project: the tools, skills, and agent instructions of a fleet of machines (FAM 0.17.2).
+FAM project: the tools, skills, and agent instructions of a fleet of machines (FAM 0.18.0).
 
 Where things go:
 - Every machine: `bundles` in `config.pkl`. A role: `roles { ["worker"] { bundles {...} } }`. One machine: `bundles` of its entry in `machines.pkl` (add `import "@fam/std.pkl"` there for std bundles).
