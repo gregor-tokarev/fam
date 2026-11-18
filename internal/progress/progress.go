@@ -222,6 +222,22 @@ func (m *Machine) Task(i int, label string) {
 	m.stage, m.index, m.task, m.taskAt, m.logged = m.count, i, label, time.Now(), false
 }
 
+// TaskSince is Task for steps that run at the same time: label is the step that runs for the
+// longest time, since since. "" means that no step runs.
+func (m *Machine) TaskSince(i int, label string, since time.Time) {
+	if m == nil {
+		return
+	}
+	m.r.mu.Lock()
+	defer m.r.mu.Unlock()
+	m.begin()
+	same := m.task == label && m.taskAt.Equal(since)
+	m.stage, m.index = m.count, i
+	if !same {
+		m.task, m.taskAt, m.logged = label, since, false
+	}
+}
+
 // Done shows the result of the machine.
 func (m *Machine) Done(status string) {
 	if m == nil {

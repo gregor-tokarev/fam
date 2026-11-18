@@ -377,11 +377,11 @@ type checked struct {
 }
 
 // checkAll runs the checks of tasks at the same time and returns the results in the order of
-// tasks. After a connection error it starts no more checks, and lets the running checks end:
+// tasks. After a connection error it starts no new checks, and lets the running checks end:
 // a check can wait for a download that other machines share. FAM starts the checks in order, so
 // a check that did not start comes after a check with a connection error. connErr is the first
-// connection error. done runs after each check.
-func checkAll(ctx context.Context, env *Env, ts []Task, done func()) (out []checked, connErr error) {
+// connection error. rp shows the progress; it can be nil.
+func checkAll(ctx context.Context, env *Env, ts []Task, rp *running) (out []checked, connErr error) {
 	out = make([]checked, len(ts))
 	var mu sync.Mutex
 	var stop atomic.Bool
@@ -394,10 +394,16 @@ func checkAll(ctx context.Context, env *Env, ts []Task, done func()) (out []chec
 			break
 		}
 		wg.Add(1)
+		rp.begin(i, taskLabel(t))
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
 			c, err := check(ctx, env, t)
+			if err != nil && !transport.IsConnError(err) {
+				// Keep only the message (an ExitError holds all output of the script): all
+				// results stay in memory until the last check ends.
+				err = &CheckError{Conflict: c.Status == Conflict, Msg: err.Error()}
+			}
 			mu.Lock()
 			out[i] = checked{c: c, err: err, ran: true}
 			if transport.IsConnError(err) {
@@ -407,26 +413,61 @@ func checkAll(ctx context.Context, env *Env, ts []Task, done func()) (out []chec
 				}
 			}
 			mu.Unlock()
-			if done != nil {
-				done()
-			}
+			rp.end(i)
 		}()
 	}
 	wg.Wait()
 	return out, connErr
 }
 
-// progressDone returns a done function for checkAll that counts the finished checks. It gives
-// no task name: several checks run, and the name of a finished check is not the slow one.
-func progressDone(mr *machineRun) func() {
-	var mu sync.Mutex
-	n := 0
-	return func() {
-		mu.Lock()
-		defer mu.Unlock()
-		n++
-		mr.p.Task(n, "")
+// running shows the progress of steps that run at the same time: the number of finished steps,
+// and the step that runs for the longest time, so that a slow step has its own name.
+type running struct {
+	mu    sync.Mutex
+	p     *progress.Machine
+	done  int
+	steps map[int]runningStep
+}
+
+type runningStep struct {
+	label string
+	at    time.Time
+}
+
+func newRunning(p *progress.Machine) *running {
+	return &running{p: p, steps: map[int]runningStep{}}
+}
+
+func (r *running) begin(id int, label string) {
+	if r == nil {
+		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.steps[id] = runningStep{label: label, at: time.Now()}
+	r.show()
+}
+
+func (r *running) end(id int) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.steps, id)
+	r.done++
+	r.show()
+}
+
+// show names the oldest running step. The caller holds the lock.
+func (r *running) show() {
+	var oldest runningStep
+	for _, st := range r.steps {
+		if oldest.at.IsZero() || st.at.Before(oldest.at) {
+			oldest = st
+		}
+	}
+	r.p.TaskSince(r.done, oldest.label, oldest.at)
 }
 
 // recordSkippedSection reports an unsupported bundle in every output format.
@@ -450,7 +491,7 @@ func planMachine(ctx context.Context, mr *machineRun) {
 			ts = append(ts, s.Tasks...)
 		}
 	}
-	results, connErr := checkAll(ctx, mr.env, ts, progressDone(mr))
+	results, connErr := checkAll(ctx, mr.env, ts, newRunning(mr.p))
 	i := 0
 	for _, s := range mr.sects {
 		if recordSkippedSection(r, s) {
@@ -493,7 +534,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	for _, s := range mr.sects {
 		all = append(all, s.Tasks...)
 	}
-	results, connErr := checkAll(ctx, env, all, progressDone(mr))
+	results, connErr := checkAll(ctx, env, all, newRunning(mr.p))
 	// pre holds the result of this check for each task. The apply loop uses it while no task
 	// before has changed the machine, so that a task that needs nothing costs one check, not two.
 	pre := make(map[Task]checked, len(all))

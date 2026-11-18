@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -181,49 +182,48 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 
 	// The fresh_shell runs. Different scripts run at the same time. The two shells of one script
 	// run one after the other, so that a script that uses a fixed port or file does not meet a
-	// copy of itself. After a connection error FAM starts no more scripts and lets the running
-	// ones end.
+	// copy of itself. After a connection error of the script at position j, FAM starts no script
+	// after j, and no second shell of a script after j: the report ends at j, as when the scripts
+	// ran one after the other. Scripts before j run both shells.
 	runs := make([][2]shellRun, len(mr.verify))
 	{
 		var mu sync.Mutex
-		var stop atomic.Bool
+		var stopAt atomic.Int64
+		stopAt.Store(math.MaxInt64)
 		var wg sync.WaitGroup
 		sem := make(chan struct{}, parallelCommands)
-		done := 0
+		rp := newRunning(mr.p)
 		for i, v := range mr.verify {
 			if v.Event != "fresh_shell" {
 				continue
 			}
 			sem <- struct{}{}
-			if stop.Load() {
+			if int64(i) > stopAt.Load() {
 				<-sem
 				break
 			}
 			wg.Add(1)
+			rp.begin(i, "verify "+v.Name)
 			go func() {
 				defer wg.Done()
 				defer func() { <-sem }()
+				defer rp.end(i)
 				for k, interactive := range []bool{false, true} {
-					if k > 0 && stop.Load() {
-						// Another script lost the connection: start no new shell.
+					if k > 0 && int64(i) > stopAt.Load() {
 						return
 					}
 					res, err := run(ctx, v, interactive)
 					mu.Lock()
 					runs[i][k] = shellRun{row: verifyRow(v, verifyShells[k], res, err), err: err, ran: true}
 					conn := transport.IsConnError(err)
-					if conn {
-						stop.Store(true)
+					if conn && int64(i) < stopAt.Load() {
+						stopAt.Store(int64(i))
 					}
 					mu.Unlock()
 					if conn {
 						return
 					}
 				}
-				mu.Lock()
-				done++
-				mr.p.Task(done, "")
-				mu.Unlock()
 			}()
 		}
 		wg.Wait()
