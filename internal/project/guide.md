@@ -7,7 +7,7 @@ Where things go:
 - Agent settings: `agents.pkl`, `["claude"] { settings { key = value } }`.
 - `instructions/AGENTS.md` goes to every agent on every machine. This file is only for this folder.
 - `skills/<name>/SKILL.md` (front matter `name`, `description`) goes to every machine.
-- Secrets: `KEY=value` lines in the file of `secrets` in `config.pkl`. Bundles name theirs in `requiredSecrets`. Never print values.
+- Secrets: `KEY=value` lines in the file of `secrets` in `config.pkl`, or an Infisical folder (`secrets { infisical { projectId; environment } }`). Bundles name theirs in `requiredSecrets`. Never print values.
 
 Bundles:
 - Standard: `std.<group>.<name>()`. Find with `fam std list`. Details and secrets: `fam std show <group>.<name>`.

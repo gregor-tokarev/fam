@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
@@ -258,9 +259,12 @@ func environmentSection(env *Env, spec *config.Spec, secretList []secrets.Secret
 	g := base{group: "environment"}
 	sec := Section{Name: "environment"}
 	if spec.Secrets != nil && env.Machine.IsCockpit() {
-		src, err := secrets.ExpandHome(spec.Secrets.File)
-		if err == nil && path.Clean(src) == env.Home(secretsFile) {
-			return sec, fmt.Errorf("the secrets file of the config is %s, the file that FAM writes on each machine. Keep the source file in another path, for example ~/.config/fam-secrets/secrets.env", src)
+		target := env.Home(secretsFile)
+		if f := spec.Secrets.File; f != nil && samePath(*f, target) {
+			return sec, fmt.Errorf("the secrets file of the config is %s, the file that FAM writes on each machine. Keep the source file in another path, for example ~/.config/fam-secrets/secrets.env", target)
+		}
+		if inf := spec.Secrets.Infisical; inf != nil && inf.Credentials != nil && samePath(*inf.Credentials, target) {
+			return sec, fmt.Errorf("the Infisical credentials file of the config is %s, the file that FAM writes on each machine. Keep it in another path, for example ~/.config/fam-secrets/infisical.env", target)
 		}
 	}
 	if spec.Secrets != nil {
@@ -466,4 +470,18 @@ func instructionsSection(env *Env, spec *config.Spec) (Section, error) {
 		&SymlinkTask{base: g, Path: "~/.codex/AGENTS.md", Target: "~/.agents/AGENTS.md", Backup: true},
 		&SymlinkTask{base: g, Path: "~/.claude/CLAUDE.md", Target: "~/.agents/CLAUDE.md", Backup: true},
 	}}, nil
+}
+
+// samePath reports whether the cockpit path p (with `~/`) is target, also through links.
+func samePath(p, target string) bool {
+	src, err := secrets.ExpandHome(p)
+	if err != nil {
+		return false
+	}
+	if path.Clean(src) == path.Clean(target) {
+		return true
+	}
+	a, err1 := filepath.EvalSymlinks(src)
+	b, err2 := filepath.EvalSymlinks(target)
+	return err1 == nil && err2 == nil && a == b
 }

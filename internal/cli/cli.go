@@ -31,6 +31,7 @@ type Options struct {
 	SSHConfig        string
 	InstructionsDir  string
 	SkillsDir        string
+	RefreshSecrets   bool
 }
 
 // ExitError carries an exit code without an extra message.

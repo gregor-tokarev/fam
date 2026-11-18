@@ -28,14 +28,16 @@ func addRunCommands(root *cobra.Command, opts *Options) {
 		{engine.ModeVerify, "Run the verify scripts only"},
 	} {
 		mode := c.mode
-		root.AddCommand(&cobra.Command{
+		cmd := &cobra.Command{
 			Use:   string(mode),
 			Short: c.short,
 			Args:  cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				return runMode(cmd, opts, mode)
 			},
-		})
+		}
+		cmd.Flags().BoolVar(&opts.RefreshSecrets, "refresh-secrets", false, "read the secrets from Infisical, also when the cache is fresh")
+		root.AddCommand(cmd)
 	}
 }
 
@@ -53,14 +55,15 @@ func runMode(cmd *cobra.Command, opts *Options, mode engine.Mode) error {
 	src := &sudo.Source{PasswordFile: opts.SudoPasswordFile}
 	runID := time.Now().UTC().Format("20060102T150405Z") + fmt.Sprintf("-%s-%d", mode, os.Getpid())
 	eo := engine.Options{
-		Mode:         mode,
-		Project:      proj,
-		Machines:     opts.Machines,
-		Serial:       opts.Serial,
-		SSHConfig:    opts.SSHConfig,
-		SudoPassword: src.Password,
-		Progress:     os.Stderr,
-		RunID:        runID,
+		Mode:           mode,
+		Project:        proj,
+		Machines:       opts.Machines,
+		Serial:         opts.Serial,
+		SSHConfig:      opts.SSHConfig,
+		SudoPassword:   src.Password,
+		Progress:       os.Stderr,
+		RunID:          runID,
+		RefreshSecrets: opts.RefreshSecrets,
 	}
 	log, logErr := runlog.Open(runID)
 	if logErr == nil {
