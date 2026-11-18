@@ -30,80 +30,80 @@ tasks {
     }
   }
   packages.cargo("coralogix-cli", "cx", systemPackage)
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/coralogix-docs"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-ai-center"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-alerts"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-cases"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-cli"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-cost-optimization"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-dashboards"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-data-pipeline"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-infra"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-observability-setup"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-olly"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-platform-admin"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-profiling"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-rum-setup"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-search-dashboard"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-service-catalog"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-slos"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-telemetry-querying"
   }
-  new fam.GitHubSkill {
-    repo = "coralogix/cx-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/coralogix/cx-cli"
     path = "skills/cx-coding-agents"
   }
 }

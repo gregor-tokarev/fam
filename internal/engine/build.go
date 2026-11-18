@@ -3,8 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"path"
-	"path/filepath"
 	"regexp"
 
 	"github.com/gregor-tokarev/fam/internal/config"
@@ -127,51 +125,37 @@ func convert(t tasks.Task, group string, absent bool, pm map[string]string, f fa
 
 // bundleSkillName resolves a skill name without reading or downloading its source.
 func bundleSkillName(t tasks.Task, u config.BundleUse) (string, bool) {
-	switch x := t.(type) {
-	case tasks.GitHubSkill:
-		if n := x.GetName(); n != nil {
-			return *n, true
-		}
-		return path.Base(x.GetPath()), true
-	case tasks.Skill:
-		if n := x.GetName(); n != nil {
-			return *n, true
-		}
-		name := filepath.Base(filepath.Join(u.Dir, x.GetPath()))
-		if name == "skill" || name == "." {
-			name = u.Bundle.Name
-		}
-		return name, true
+	x, ok := t.(tasks.AgentSkill)
+	if !ok {
+		return "", false
 	}
-	return "", false
+	if n := x.GetName(); n != nil {
+		return *n, true
+	}
+	spec, err := parseSkillSource(x, u.Dir, u.Bundle.Name)
+	if err != nil {
+		return "", true
+	}
+	return spec.name, true
 }
 
-// skillTasks turns a Skill or GitHubSkill task into engine tasks: the copy and the Claude link,
-// or the removal when the task or the bundle is absent. ok is false for other task types.
+// skillTasks turns an AgentSkill task into engine tasks: the copy and the Claude link, or the
+// removal when the task or the bundle is absent. ok is false for other task types.
 func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group string, absent bool, staticOnly bool) (out []Task, ok bool, err error) {
-	g := base{group: group}
-	name, _ := bundleSkillName(t, u)
-	origin := "bundle " + u.Bundle.Name
-	var load func(name string) (*SkillSource, error)
-	switch x := t.(type) {
-	// GitHubSkill first: its interface also matches tasks.Skill (GetPath, GetName).
-	case tasks.GitHubSkill:
-		absent = absent || x.GetState() == "absent"
-		load = func(name string) (*SkillSource, error) {
-			if staticOnly {
-				return &SkillSource{Name: name, Dir: x.GetRepo() + "/" + x.GetPath(), Origin: origin}, nil
-			}
-			return loadGitHubSkill(ctx, x.GetRepo(), x.GetPath(), x.GetRef(), name, origin)
-		}
-	case tasks.Skill:
-		absent = absent || x.GetState() == "absent"
-		if u.Dir == "" {
-			return nil, true, fmt.Errorf("%s: the bundle comes from a package, so it has no folder for the skill %q. Use fam.GitHubSkill", group, x.GetPath())
-		}
-		dir := filepath.Join(u.Dir, x.GetPath())
-		load = func(name string) (*SkillSource, error) { return loadSkill(name, dir, origin) }
-	default:
+	x, ok := t.(tasks.AgentSkill)
+	if !ok {
 		return nil, false, nil
+	}
+	g := base{group: group}
+	origin := "bundle " + u.Bundle.Name
+	absent = absent || x.GetState() == "absent"
+	spec, err := parseSkillSource(x, u.Dir, u.Bundle.Name)
+	if err != nil {
+		return nil, true, fmt.Errorf("%s: %w", group, err)
+	}
+	name := spec.name
+	if n := x.GetName(); n != nil {
+		name = *n
 	}
 	// Skills live in the home folder of the SSH user, so FAM never copies them with sudo.
 	if t.GetSudo() {
@@ -187,8 +171,11 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 	if absent {
 		return []Task{&SkillRemoveTask{base: g, Name_: name, units: units}}, true, nil
 	}
-	src, err := load(name)
-	if err != nil {
+	var src *SkillSource
+	if staticOnly && spec.kind != skillLocal {
+		// fam check does not download skills.
+		src = &SkillSource{Name: name, Dir: spec.String(), Origin: origin}
+	} else if src, err = spec.load(ctx, name, origin); err != nil {
 		return nil, true, err
 	}
 	return []Task{&SkillTask{base: g, Skill: src, units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil

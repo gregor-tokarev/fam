@@ -21,8 +21,8 @@ tasks {
     }
     binary = "modal"
   }
-  new fam.GitHubSkill {
-    repo = "modal-labs/modal-client"
+  new fam.AgentSkill {
+    source = "https://github.com/modal-labs/modal-client"
     path = "py/modal/skills/modal"
     ref = "main"
   }

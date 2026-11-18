@@ -17,56 +17,56 @@ tasks {
     binary = "firecrawl"
     versionCommand = "FIRECRAWL_NO_UPDATE_CHECK=1 firecrawl --version"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-agent"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-alexandria"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-crawl"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-developer-index"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-download"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-interact"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-map"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-monitor"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-parse"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-research-index"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-scrape"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl-search"
   }
-  new fam.GitHubSkill {
-    repo = "firecrawl/cli"
+  new fam.AgentSkill {
+    source = "https://github.com/firecrawl/cli"
     path = "skills/firecrawl"
   }
 }

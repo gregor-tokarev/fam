@@ -15,8 +15,8 @@ tasks {
     package = "@playwright/cli"
     binary = "playwright-cli"
   }
-  new fam.GitHubSkill {
-    repo = "microsoft/playwright-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/microsoft/playwright-cli"
     path = "skills/playwright-cli"
   }
 }

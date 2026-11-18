@@ -18,8 +18,8 @@ version = "@FAM_VERSION@"
 tasks {
   packages.retireRelease("usage", "jdx/usage")
   packages.cargo("usage-cli", "usage", systemPackage)
-  new fam.GitHubSkill {
-    repo = "jdx/usage"
+  new fam.AgentSkill {
+    source = "https://github.com/jdx/usage"
     path = "skills/usage"
   }
 }

@@ -24,8 +24,8 @@ tasks {
       ["darwin-arm64"] { name = "linear-release-darwin-arm64" }
     }
   }
-  new fam.GitHubSkill {
-    repo = "linear/linear-release"
+  new fam.AgentSkill {
+    source = "https://github.com/linear/linear-release"
     path = "skills/linear-release-setup"
   }
 }

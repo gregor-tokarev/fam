@@ -11,6 +11,7 @@ bundles {
   import("bundles/bun.pkl")
   import("bundles/opencode.pkl")
   import("bundles/typescript.pkl")
+  import("bundles/agent-skills.pkl")
   std.computer.agentBrowser()
 }
 

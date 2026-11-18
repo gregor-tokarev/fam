@@ -19,19 +19,19 @@ tasks {
   new fam.Package {
     package = "agent-desktop"
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/agent-desktop"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/agent-desktop"
     path = "skills/agent-desktop"
   }
   when (facts.os == "linux") {
-    new fam.GitHubSkill {
-      repo = "vercel-labs/agent-desktop"
+    new fam.AgentSkill {
+      source = "https://github.com/vercel-labs/agent-desktop"
       path = "skills/agent-desktop-linux"
     }
   }
   when (facts.os == "darwin") {
-    new fam.GitHubSkill {
-      repo = "vercel-labs/agent-desktop"
+    new fam.AgentSkill {
+      source = "https://github.com/vercel-labs/agent-desktop"
       path = "skills/agent-desktop-macos"
     }
   }

@@ -26,8 +26,8 @@ tasks {
       }
     }
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/zerolang"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/zerolang"
     path = "skills/zero"
   }
 }

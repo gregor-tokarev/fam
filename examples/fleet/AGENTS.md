@@ -7,7 +7,7 @@ Where things go:
 - Machines: `machines.pkl`, `["name"] { role = "worker"; address = "host"; user = "me" }`. Roles: `"cockpit"` (this machine), `"worker"`.
 - Agent settings: `agents.pkl`, `["claude"] { settings { key = value } }`.
 - `instructions/AGENTS.md` goes to every agent on every machine. This file is only for this folder.
-- `skills/<name>/SKILL.md` (front matter `name`, `description`) goes to every machine.
+- Skills: `new fam.AgentSkill { source }` tasks in bundles, so a bundle for every machine, a role, or one machine selects them. `source` is a folder relative to the bundle file (with `SKILL.md`, front matter `name`, `description`), a GitHub repository URL (with `path` and `ref`), a `/tree/<ref>/<folder>` URL, a `.tar.gz` or `.zip` URL, or a `.md` URL.
 - Secrets: `KEY=value` lines in the file of `secrets` in `config.pkl`, or an Infisical folder (`secrets { infisical { projectId; environment } }`). Bundles name theirs in `requiredSecrets`. Never print values.
 
 Bundles:
@@ -21,10 +21,10 @@ Bundles:
   tasks {
     new fam.File { path = "~/.config/tool/config.toml"; content = "key = 1\n" }
     new fam.Package { package = new { package = "htop"; manager = "system" } }
-    new fam.GitHubSkill { repo = "owner/repo"; path = "skills/name" }
+    new fam.AgentSkill { source = "https://github.com/owner/repo"; path = "skills/name" }
   }
   ```
-- Other tasks in `@fam/tasks.pkl`: `Merge`, `Symlink`, `GitHubRelease`, `Skill`, `Service`, `Linger`, `Script`.
+- Other tasks in `@fam/tasks.pkl`: `Merge`, `Symlink`, `GitHubRelease`, `Service`, `Linger`, `Script`.
 - Uninstall: keep the entry as `new { bundle = std.networking.cloudflared(); state = "absent" }`. A deleted line stays installed.
 
 Commands: `fam check` after each edit (no network). `fam plan` is read only. Do not run `fam apply` unless the user asks. `fam doctor` for setup and editor problems. After `fam migrate`, restart the editor language server.

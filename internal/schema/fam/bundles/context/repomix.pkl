@@ -14,8 +14,8 @@ tasks {
     package = "repomix"
     binary = "repomix"
   }
-  new fam.GitHubSkill {
-    repo = "yamadashy/repomix"
+  new fam.AgentSkill {
+    source = "https://github.com/yamadashy/repomix"
     path = "skills/repomix-explorer"
   }
 }

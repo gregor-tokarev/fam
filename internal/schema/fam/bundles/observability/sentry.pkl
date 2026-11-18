@@ -18,8 +18,8 @@ tasks {
     binary = "sentry"
     versionCommand = "SENTRY_CLI_NO_UPDATE_CHECK=1 SENTRY_CLI_NO_TELEMETRY=1 sentry --version"
   }
-  new fam.GitHubSkill {
-    repo = "getsentry/toolkit"
+  new fam.AgentSkill {
+    source = "https://github.com/getsentry/toolkit"
     path = "packages/cli/plugins/sentry-cli/skills/sentry-cli"
   }
 }

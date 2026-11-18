@@ -39,7 +39,6 @@ type Project struct {
 	Base            string
 	ConfigPath      string
 	InstructionsDir string
-	SkillsDir       string
 }
 
 // FAM-owned paths on each machine, relative to the home directory.

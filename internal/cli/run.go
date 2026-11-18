@@ -22,7 +22,6 @@ import (
 func addRunCommands(root *cobra.Command, opts *Options) {
 	pf := root.PersistentFlags()
 	pf.StringVar(&opts.InstructionsDir, "instructions", "", "instructions directory (default <base>/instructions)")
-	pf.StringVar(&opts.SkillsDir, "skills", "", "skills directory (default <base>/skills)")
 	for _, c := range []struct {
 		mode  engine.Mode
 		short string
@@ -50,12 +49,9 @@ func runMode(cmd *cobra.Command, opts *Options, mode engine.Mode) error {
 	if err := opts.resolve(); err != nil {
 		return err
 	}
-	proj := &engine.Project{Base: opts.Base, ConfigPath: opts.Config, InstructionsDir: opts.InstructionsDir, SkillsDir: opts.SkillsDir}
+	proj := &engine.Project{Base: opts.Base, ConfigPath: opts.Config, InstructionsDir: opts.InstructionsDir}
 	if proj.InstructionsDir == "" {
 		proj.InstructionsDir = filepath.Join(opts.Base, "instructions")
-	}
-	if proj.SkillsDir == "" {
-		proj.SkillsDir = filepath.Join(opts.Base, "skills")
 	}
 	src := &sudo.Source{PasswordFile: opts.SudoPasswordFile}
 	var rep *progress.Reporter

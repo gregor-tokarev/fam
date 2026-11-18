@@ -16,32 +16,32 @@ tasks {
     binary = "agents-cli"
     versionCommand = "agents-cli --version"
   }
-  new fam.GitHubSkill {
-    repo = "google/agents-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/google/agents-cli"
     path = "skills/google-agents-cli-adk-code"
   }
-  new fam.GitHubSkill {
-    repo = "google/agents-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/google/agents-cli"
     path = "skills/google-agents-cli-deploy"
   }
-  new fam.GitHubSkill {
-    repo = "google/agents-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/google/agents-cli"
     path = "skills/google-agents-cli-eval"
   }
-  new fam.GitHubSkill {
-    repo = "google/agents-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/google/agents-cli"
     path = "skills/google-agents-cli-observability"
   }
-  new fam.GitHubSkill {
-    repo = "google/agents-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/google/agents-cli"
     path = "skills/google-agents-cli-publish"
   }
-  new fam.GitHubSkill {
-    repo = "google/agents-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/google/agents-cli"
     path = "skills/google-agents-cli-scaffold"
   }
-  new fam.GitHubSkill {
-    repo = "google/agents-cli"
+  new fam.AgentSkill {
+    source = "https://github.com/google/agents-cli"
     path = "skills/google-agents-cli-workflow"
   }
 }

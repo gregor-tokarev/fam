@@ -13,32 +13,32 @@ tasks {
   new fam.Package {
     package = "nx"
   }
-  new fam.GitHubSkill {
-    repo = "nrwl/nx"
+  new fam.AgentSkill {
+    source = "https://github.com/nrwl/nx"
     path = ".github/skills/link-workspace-packages"
   }
-  new fam.GitHubSkill {
-    repo = "nrwl/nx"
+  new fam.AgentSkill {
+    source = "https://github.com/nrwl/nx"
     path = ".github/skills/monitor-ci"
   }
-  new fam.GitHubSkill {
-    repo = "nrwl/nx"
+  new fam.AgentSkill {
+    source = "https://github.com/nrwl/nx"
     path = ".github/skills/nx-generate"
   }
-  new fam.GitHubSkill {
-    repo = "nrwl/nx"
+  new fam.AgentSkill {
+    source = "https://github.com/nrwl/nx"
     path = ".github/skills/nx-import"
   }
-  new fam.GitHubSkill {
-    repo = "nrwl/nx"
+  new fam.AgentSkill {
+    source = "https://github.com/nrwl/nx"
     path = ".github/skills/nx-plugins"
   }
-  new fam.GitHubSkill {
-    repo = "nrwl/nx"
+  new fam.AgentSkill {
+    source = "https://github.com/nrwl/nx"
     path = ".github/skills/nx-run-tasks"
   }
-  new fam.GitHubSkill {
-    repo = "nrwl/nx"
+  new fam.AgentSkill {
+    source = "https://github.com/nrwl/nx"
     path = ".github/skills/nx-workspace"
   }
 }

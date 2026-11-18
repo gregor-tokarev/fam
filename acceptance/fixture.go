@@ -35,6 +35,7 @@ import "@fam/std.pkl"
 bundles {
   import("bundles/tool/bundle.pkl")
   import("bundles/global.pkl")
+  import("bundles/fleet-skills.pkl")
 }
 
 machines = import("machines.pkl").machines
@@ -129,8 +130,8 @@ tasks {
     content = read("fam-tool.sh").text
     mode = "0755"
   }
-  new fam.Skill { path = "tool-skill" }
-  new fam.Skill { path = "notes"; name = "tool-notes" }
+  new fam.AgentSkill { source = "tool-skill" }
+  new fam.AgentSkill { source = "notes"; name = "tool-notes" }
   new fam.Symlink { path = "~/.local/bin/fam-tool-link"; target = "~/.local/bin/fam-tool" }
   new fam.Merge {
     path = "~/.config/fam-tool/config.json"
@@ -150,6 +151,14 @@ verify {
 		"bundles/tool/tool-skill/SKILL.md":       "---\nname: tool-skill\ndescription: The skill of the test tool.\n---\n\nRun `fam-tool`.\n",
 		"bundles/tool/tool-skill/scripts/run.sh": "#!/bin/sh\nfam-tool\n",
 		"bundles/tool/notes/SKILL.md":            "---\nname: tool-notes\ndescription: A second skill of the test tool.\n---\n\nNotes.\n",
+		"bundles/fleet-skills.pkl": `amends "@fam/Bundle.pkl"
+import "@fam/tasks.pkl" as fam
+
+name = "fleet-skills"
+tasks {
+  new fam.AgentSkill { source = "../skills/fleet-skill" }
+}
+`,
 		"bundles/global.pkl": `amends "@fam/Bundle.pkl"
 import "@fam/tasks.pkl" as fam
 

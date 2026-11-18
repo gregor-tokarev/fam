@@ -291,6 +291,9 @@ func (t *SkillLinkTask) Apply(ctx context.Context, env *Env) (string, error) {
 type SkillPruneTask struct {
 	base
 	Keep map[string]bool
+	// Legacy holds the folders of skills/ in the project that no bundle of the machine lists.
+	// Earlier FAM versions copied them to every machine, so FAM does not remove them silently.
+	Legacy map[string]bool
 }
 
 // Kind implements Task.
@@ -311,6 +314,9 @@ for m in "$d"/*/%s; do [ -f "$m" ] && basename "$(dirname "$m")"; done; exit 0`,
 	for _, n := range strings.Split(r.Out(), "\n") {
 		n = strings.TrimSpace(n)
 		if n != "" && !t.Keep[n] {
+			if t.Legacy[n] {
+				return nil, conflict(fmt.Sprintf("FAM no longer copies the folders of skills/ to every machine, and no bundle of this machine lists the skill %[1]q. Add `new fam.AgentSkill { source = \"../skills/%[1]s\" }` to a bundle in bundles/ to keep it, or add it with `state = \"absent\"` to remove it", n))
+			}
 			out = append(out, n)
 		}
 	}
@@ -348,44 +354,24 @@ func (t *SkillPruneTask) Apply(ctx context.Context, env *Env) (string, error) {
 	return "removed " + strings.Join(s, ", "), err
 }
 
-// skillsSection copies the project skills (the folders of skills/) and removes the managed
-// skills that the config no longer lists. bundleSkills are the skills of the bundle tasks:
-// name -> source, for the name check and for the list of skills to keep.
-func skillsSection(env *Env, bundleSkills map[string]string, preserved map[string]bool) (Section, error) {
+// skillsSection removes the managed skills that the config no longer lists. keep holds the
+// skills of the bundles; listed holds every skill name that a bundle of the machine lists, also
+// an absent or skipped one.
+func skillsSection(env *Env, keep, listed map[string]bool) (Section, error) {
 	g := base{group: "skills"}
 	sec := Section{Name: "skills"}
-	keep := map[string]bool{}
-	for n := range preserved {
-		keep[n] = true
+	legacy := map[string]bool{}
+	dir := filepath.Join(env.Project.Base, "skills")
+	entries, err := os.ReadDir(dir)
+	if err != nil && !os.IsNotExist(err) {
+		return sec, err
 	}
-	for n := range bundleSkills {
-		keep[n] = true
-	}
-	if env.Project.SkillsDir != "" {
-		entries, err := os.ReadDir(env.Project.SkillsDir)
-		if err != nil && !os.IsNotExist(err) {
-			return sec, err
-		}
-		for _, e := range entries {
-			if strings.HasPrefix(e.Name(), ".") {
-				continue
-			}
-			// os.Stat follows a symbolic link to a folder.
-			if st, err := os.Stat(filepath.Join(env.Project.SkillsDir, e.Name())); err != nil || !st.IsDir() {
-				continue
-			}
-			s, err := loadSkill(e.Name(), filepath.Join(env.Project.SkillsDir, e.Name()), "skills/")
-			if err != nil {
-				return sec, err
-			}
-			if src, ok := bundleSkills[s.Name]; ok {
-				return sec, fmt.Errorf("two skills have the name %q: %s and %s", s.Name, s.Dir, src)
-			}
-			keep[s.Name] = true
-			sec.Tasks = append(sec.Tasks, &SkillTask{base: g, Skill: s}, &SkillLinkTask{base: g, Name_: s.Name})
+	for _, e := range entries {
+		if _, err := os.Stat(filepath.Join(dir, e.Name(), "SKILL.md")); err == nil && !listed[e.Name()] {
+			legacy[e.Name()] = true
 		}
 	}
-	sec.Tasks = append(sec.Tasks, &SkillPruneTask{base: g, Keep: keep})
+	sec.Tasks = append(sec.Tasks, &SkillPruneTask{base: g, Keep: keep, Legacy: legacy})
 	return sec, nil
 }
 

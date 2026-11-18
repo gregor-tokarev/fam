@@ -22,8 +22,8 @@ tasks {
     package = "agent-browser"
   }
   // The skill of the latest release, from GitHub.
-  new fam.GitHubSkill {
-    repo = "vercel-labs/agent-browser"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/agent-browser"
     path = "skills/agent-browser"
   }
 }

@@ -13,8 +13,8 @@ tasks {
   new fam.Package {
     package = "turbo"
   }
-  new fam.GitHubSkill {
-    repo = "vercel/turborepo"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel/turborepo"
     path = "skills/turborepo"
   }
 }

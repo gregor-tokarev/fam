@@ -2,10 +2,10 @@ package cli
 
 import (
 	"fmt"
-	"path"
 	"sort"
 	"strings"
 
+	"github.com/gregor-tokarev/fam/internal/engine"
 	"github.com/gregor-tokarev/fam/internal/output"
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
 	"github.com/gregor-tokarev/fam/internal/stdlib"
@@ -159,25 +159,11 @@ func stdCmd(o *Options) *cobra.Command {
 					for _, t := range b.Tasks {
 						var n string
 						switch x := t.(type) {
-						case tasks.GitHubSkill:
+						case tasks.AgentSkill:
 							if x.GetState() == "absent" {
 								continue
 							}
-							n = path.Base(x.GetPath())
-							if x.GetName() != nil {
-								n = *x.GetName()
-							}
-						case tasks.Skill:
-							if x.GetState() == "absent" {
-								continue
-							}
-							n = path.Base(x.GetPath())
-							if n == "skill" {
-								n = b.Name
-							}
-							if x.GetName() != nil {
-								n = *x.GetName()
-							}
+							n = engine.AgentSkillName(x, b.Name)
 						}
 						if n != "" {
 							d.Skills = appendUnique(d.Skills, n)

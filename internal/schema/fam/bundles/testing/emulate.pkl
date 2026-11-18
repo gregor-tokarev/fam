@@ -12,8 +12,8 @@ tasks {
   new fam.Package {
     package = "emulate"
   }
-  new fam.GitHubSkill {
-    repo = "vercel-labs/emulate"
+  new fam.AgentSkill {
+    source = "https://github.com/vercel-labs/emulate"
     path = "skills/emulate"
   }
 }

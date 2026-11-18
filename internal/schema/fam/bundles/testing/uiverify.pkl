@@ -17,53 +17,53 @@ tasks {
     binary = "uiverify"
     versionCommand = "uiverify --help"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/check-visual-changes"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/economical-visual-tests"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/setup-visual-testing"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/triage-visual-changes"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/playwright-visual-testing"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/vitest-visual-testing"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/bun-visual-testing"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/storybook-visual-testing"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/implement-figma-design"
     ref = "main"
   }
-  new fam.GitHubSkill {
-    repo = "uiverify/uiverify"
+  new fam.AgentSkill {
+    source = "https://github.com/uiverify/uiverify"
     path = "skills/making-ui-changes"
     ref = "main"
   }
