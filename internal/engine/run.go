@@ -196,15 +196,14 @@ func Run(ctx context.Context, opts Options) *output.Run {
 	for i, m := range machines {
 		machineProgress[i] = opts.Reporter.Machine(m.Name)
 	}
-	var evalMu sync.Mutex
 	work := func(i int) {
 		m := machines[i]
 		mr := &machineRun{m: m, p: machineProgress[i], res: &output.MachineResult{Name: m.Name, Cockpit: m.Cockpit, Tags: m.Tags, Tasks: []output.TaskResult{}}}
 		mr.res.Warnings = append(mr.res.Warnings, secretWarnings...)
 		runs[i] = mr
+		// pkl-go sends the requests of all evaluators over one channel, so machines can evaluate
+		// at the same time.
 		runMachine(ctx, opts, mr, secretList, addSecrets, func(props map[string]string) (*pklconfig.Config, error) {
-			evalMu.Lock()
-			defer evalMu.Unlock()
 			return ev.Eval(ctx, props)
 		})
 		mr.p.Done(mr.res.Status)
@@ -362,6 +361,75 @@ func check(ctx context.Context, env *Env, t Task) (Check, error) {
 	return c, nil
 }
 
+// parallelCommands is the number of checks or verify shells that run at the same time on one
+// machine. Checks change nothing, so their order does not matter. The number stays below the
+// default MaxSessions (10) of sshd, so that all of them share the one SSH connection. When sshd
+// refuses a session, ssh opens its own connection for it, so a lower limit is slower, not an error.
+const parallelCommands = 8
+
+// checked is the result of one check of checkAll.
+type checked struct {
+	c   Check
+	err error
+	// ran is false when FAM did not run the check (or stopped it) after a connection error of
+	// another check.
+	ran bool
+}
+
+// checkAll runs the checks of tasks at the same time and returns the results in the order of
+// tasks. After a connection error it starts no more checks; connErr is the first connection
+// error. done runs after each check that ran.
+func checkAll(ctx context.Context, env *Env, ts []Task, done func(Task)) (out []checked, connErr error) {
+	out = make([]checked, len(ts))
+	cctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, parallelCommands)
+	for i, t := range ts {
+		sem <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			// A stop after a connection error of another check: not a result of this task.
+			stopped := func() bool { return cctx.Err() != nil && ctx.Err() == nil }
+			if stopped() {
+				return
+			}
+			c, err := check(cctx, env, t)
+			isConn := transport.IsConnError(err)
+			if stopped() && !isConn {
+				return
+			}
+			mu.Lock()
+			out[i] = checked{c: c, err: err, ran: true}
+			if isConn && connErr == nil {
+				connErr = err
+				cancel()
+			}
+			mu.Unlock()
+			if done != nil {
+				done(t)
+			}
+		}()
+	}
+	wg.Wait()
+	return out, connErr
+}
+
+// progressDone returns a done function for checkAll that counts the finished checks.
+func progressDone(mr *machineRun) func(Task) {
+	var mu sync.Mutex
+	n := 0
+	return func(t Task) {
+		mu.Lock()
+		defer mu.Unlock()
+		n++
+		mr.p.Task(n, taskLabel(t))
+	}
+}
+
 // recordSkippedSection reports an unsupported bundle in every output format.
 func recordSkippedSection(r *output.MachineResult, s Section) bool {
 	if s.SkipReason == "" {
@@ -372,24 +440,34 @@ func recordSkippedSection(r *output.MachineResult, s Section) bool {
 	return true
 }
 
-// 4. Plan: run every check.
+// 4. Plan: run every check. The checks run at the same time.
 func planMachine(ctx context.Context, mr *machineRun) {
 	r := mr.res
 	r.Status = "ok"
 	mr.p.Count("checking", countTasks(mr.sects, true))
-	n := 0
+	var ts []Task
+	for _, s := range mr.sects {
+		if s.SkipReason == "" {
+			ts = append(ts, s.Tasks...)
+		}
+	}
+	results, connErr := checkAll(ctx, mr.env, ts, progressDone(mr))
+	i := 0
 	for _, s := range mr.sects {
 		if recordSkippedSection(r, s) {
 			continue
 		}
 		for _, t := range s.Tasks {
-			n++
-			mr.p.Task(n, taskLabel(t))
-			c, err := check(ctx, mr.env, t)
-			r.Tasks = append(r.Tasks, taskResult(t, c.Status, c.Detail, err))
-			r.Counts.Add(string(c.Status))
-			if transport.IsConnError(err) {
-				setError(r, err)
+			res := results[i]
+			i++
+			if !res.ran {
+				setError(r, connErr)
+				return
+			}
+			r.Tasks = append(r.Tasks, taskResult(t, res.c.Status, res.c.Detail, res.err))
+			r.Counts.Add(string(res.c.Status))
+			if transport.IsConnError(res.err) {
+				setError(r, res.err)
 				return
 			}
 		}
@@ -410,22 +488,30 @@ func planMachine(ctx context.Context, mr *machineRun) {
 func applyMachine(ctx context.Context, mr *machineRun) {
 	r := mr.res
 	env := mr.env
-	// The plan stops with a conflict before any change.
+	// The plan stops with a conflict before any change. The checks run at the same time.
 	mr.p.Count("checking", countTasks(mr.sects, false))
-	n := 0
+	var all []Task
 	for _, s := range mr.sects {
-		for _, t := range s.Tasks {
-			n++
-			mr.p.Task(n, taskLabel(t))
-			c, err := check(ctx, env, t)
-			if transport.IsConnError(err) {
-				setError(r, err)
-				return
-			}
-			if c.Status == Conflict {
-				r.Tasks = append(r.Tasks, taskResult(t, Conflict, "", err))
-				r.Counts.Add(string(Conflict))
-			}
+		all = append(all, s.Tasks...)
+	}
+	results, connErr := checkAll(ctx, env, all, progressDone(mr))
+	// pre holds the result of this check for each task. The apply loop uses it while no task
+	// before has changed the machine, so that a task that needs nothing costs one check, not two.
+	pre := make(map[Task]checked, len(all))
+	for i, t := range all {
+		res := results[i]
+		if !res.ran {
+			setError(r, connErr)
+			return
+		}
+		if transport.IsConnError(res.err) {
+			setError(r, res.err)
+			return
+		}
+		pre[t] = res
+		if res.c.Status == Conflict {
+			r.Tasks = append(r.Tasks, taskResult(t, Conflict, "", res.err))
+			r.Counts.Add(string(Conflict))
 		}
 	}
 	if r.Counts.Conflict > 0 {
@@ -437,7 +523,10 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	r.Status = "ok"
 	stopped := false
 	mr.p.Count("applying", countTasks(mr.sects, true))
-	n = 0
+	n := 0
+	// touched is true when a task may have changed the machine. Then the results of pre can be
+	// old, and each task checks again.
+	touched := false
 	// The position of each task in r.Tasks.
 	index := map[Task]int{}
 	// A change of the sshd configuration applies only to new connections.
@@ -457,7 +546,14 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			}
 			n++
 			mr.p.Task(n, taskLabel(t))
-			st, detail, err := applyTask(ctx, env, t)
+			var p *checked
+			if !touched {
+				if res, ok := pre[t]; ok && res.err == nil {
+					p = &res
+				}
+			}
+			st, detail, err, changes := applyTask(ctx, env, t, p)
+			touched = touched || changes
 			index[t] = len(r.Tasks)
 			r.Tasks = append(r.Tasks, taskResult(t, st, detail, err))
 			r.Counts.Add(string(st))
@@ -505,6 +601,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 				}
 				seen[u] = true
 				mr.p.Stage("restarting " + u.Name)
+				touched = true
 				rr := output.RestartResult{Unit: u.Name, Scope: u.Scope, Status: "restarted"}
 				if err := restartUnit(ctx, env, u); err != nil {
 					rr.Status = "failed"
@@ -556,86 +653,113 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 // so that the next plan is satisfied. It returns true when a block fails.
 func restoreBlocks(ctx context.Context, env *Env, mr *machineRun, index map[Task]int) bool {
 	r := mr.res
+	var blocks []Task
 	for _, s := range mr.sects {
 		for _, t := range s.Tasks {
-			bt, ok := t.(*BlockTask)
-			if !ok {
+			if _, ok := t.(*BlockTask); !ok {
 				continue
 			}
-			i, ok := index[t]
-			if !ok {
-				continue
+			if _, ok := index[t]; ok {
+				blocks = append(blocks, t)
 			}
-			c, err := check(ctx, env, bt)
-			if err == nil && c.Status == Satisfied {
-				continue
-			}
-			st, detail, err := applyTask(ctx, env, bt)
-			if st == Unchanged {
-				continue
-			}
-			if detail == "" {
-				detail = c.Detail
-			}
-			if st == Changed {
-				detail += " (again: a later task changed the file)"
-			}
-			prev := r.Tasks[i].Status
-			r.Tasks[i] = taskResult(t, st, detail, err)
-			r.Counts.Move(prev, string(st))
-			if transport.IsConnError(err) {
-				setError(r, err)
-			}
-			if st == Failed || err != nil {
-				return true
-			}
+		}
+	}
+	// The checks of the blocks run at the same time. Most blocks are still in place.
+	results, connErr := checkAll(ctx, env, blocks, nil)
+	for k, t := range blocks {
+		res := results[k]
+		if !res.ran {
+			setError(r, connErr)
+			return true
+		}
+		if res.err == nil && res.c.Status == Satisfied {
+			continue
+		}
+		// A check without an error is still valid: the tasks before changed only other files.
+		var p *checked
+		if res.err == nil {
+			p = &res
+		}
+		st, detail, err, _ := applyTask(ctx, env, t, p)
+		if st == Unchanged {
+			continue
+		}
+		if detail == "" {
+			detail = res.c.Detail
+		}
+		if st == Changed {
+			detail += " (again: a later task changed the file)"
+		}
+		i := index[t]
+		prev := r.Tasks[i].Status
+		r.Tasks[i] = taskResult(t, st, detail, err)
+		r.Counts.Move(prev, string(st))
+		if transport.IsConnError(err) {
+			setError(r, err)
+		}
+		if st == Failed || err != nil {
+			return true
 		}
 	}
 	return false
 }
 
-// applyTask runs check, apply, and check again.
-func applyTask(ctx context.Context, env *Env, t Task) (Status, string, error) {
-	c, err := check(ctx, env, t)
+// applyTask runs check, apply, and check again. pre is a check result of this task from
+// earlier in the run; FAM uses it instead of a new check when it is not nil. touched is true
+// when the task may have changed the machine.
+func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, detail string, err error, touched bool) {
+	var c Check
+	if pre != nil {
+		c, err = pre.c, pre.err
+	} else {
+		c, err = check(ctx, env, t)
+	}
 	if err != nil {
 		if c.Status == Conflict {
-			return Conflict, "", err
+			return Conflict, "", err, false
 		}
 		// Never run apply after an error.
-		return Failed, "check failed", err
+		return Failed, "check failed", err, false
 	}
 	if c.Status == Satisfied {
-		if u, ok := t.(Updater); ok {
-			changed, detail, err := u.Update(ctx, env)
-			if err != nil {
-				return Failed, "update failed", err
-			}
-			if c2, err := check(ctx, env, t); err != nil {
-				return Failed, "check after update failed", err
-			} else if c2.Status != Satisfied {
-				return Failed, detail, fmt.Errorf("the check finds a difference after the update: %s", c2.Detail)
-			}
-			if changed {
-				return Changed, detail, nil
-			}
-			return Unchanged, detail, nil
+		u, ok := t.(Updater)
+		if !ok {
+			return Unchanged, "", nil, false
 		}
-		return Unchanged, "", nil
+		up, err := u.Update(ctx, env, c)
+		if err != nil {
+			return Failed, "update failed", err, true
+		}
+		if !up.Ran {
+			return Unchanged, "", nil, false
+		}
+		touched = up.Changed || up.Unknown
+		if !up.Checked {
+			if c2, err := check(ctx, env, t); err != nil {
+				return Failed, "check after update failed", err, true
+			} else if c2.Status != Satisfied {
+				return Failed, up.Detail, fmt.Errorf("the check finds a difference after the update: %s", c2.Detail), true
+			}
+		}
+		if up.Changed {
+			return Changed, up.Detail, nil, touched
+		}
+		return Unchanged, up.Detail, nil, touched
 	}
-	detail, err := t.Apply(ctx, env)
+	detail, err = t.Apply(ctx, env)
 	if err != nil {
-		return Failed, c.Detail, err
+		return Failed, c.Detail, err, true
 	}
 	c2, err := check(ctx, env, t)
 	if err != nil {
-		return Failed, "check after apply failed", err
+		return Failed, "check after apply failed", err, true
 	}
 	if c2.Status != Satisfied {
 		msg := "the check still finds a difference after apply"
 		if c2.Detail != "" {
 			msg += ": " + c2.Detail
 		}
-		return Failed, c.Detail, errors.New(msg)
+		return Failed, c.Detail, errors.New(msg), true
 	}
 	switch detail {
 	case "", "written", "linked", "copied", "applied", "configured", "removed", "merged", "no change":
@@ -645,7 +769,7 @@ func applyTask(ctx context.Context, env *Env, t Task) (Status, string, error) {
 			detail = c.Detail + ": " + detail
 		}
 	}
-	return Changed, detail, nil
+	return Changed, detail, nil, true
 }
 
 // countTasks counts the tasks of the sections. withoutSkipped leaves out the skipped sections.

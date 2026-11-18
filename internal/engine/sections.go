@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
@@ -38,6 +39,9 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 	}
 	if len(agentSec.Tasks) > 0 {
 		out = append(out, agentSec)
+	}
+	if !staticOnly {
+		prefetchSkills(ctx, spec.Bundles)
 	}
 	var verify []VerifySpec
 	for _, u := range spec.Bundles {
@@ -120,7 +124,9 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 }
 
 // verifyMachine runs the verify scripts in new shells.
-//   - fresh_shell: a noninteractive and an interactive login shell of the user.
+//   - fresh_shell: a noninteractive and an interactive login shell of the user. These scripts
+//     only prove that the tools work, so they run at the same time. FAM reports them in the
+//     order of the config.
 //   - reconnect: FAM closes the shared SSH connection first, then runs the script in a new one.
 //   - reboot: not in version 0.
 func verifyMachine(ctx context.Context, mr *machineRun) {
@@ -147,10 +153,9 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		}
 		r.Verify = append(r.Verify, vr)
 	}
-	run := func(v VerifySpec, interactive bool) (transport.Result, error) {
+	run := func(ctx context.Context, v VerifySpec, interactive bool) (transport.Result, error) {
 		return env.T.Run(ctx, transport.Cmd{Script: v.Script, LoginShell: true, Interactive: interactive, Timeout: 5 * time.Minute, Label: "verify " + v.Name})
 	}
-	var reconnect []VerifySpec
 	runnable := 0
 	for _, v := range mr.verify {
 		if v.Event == "fresh_shell" || v.Event == "reconnect" {
@@ -158,23 +163,76 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		}
 	}
 	mr.p.Count("verifying", runnable)
-	done := 0
-	for _, v := range mr.verify {
+
+	// The fresh_shell runs: two shells for each script, at the same time.
+	type shellRun struct {
+		res transport.Result
+		err error
+		ran bool
+	}
+	runs := make([][2]shellRun, len(mr.verify))
+	var connErr error
+	{
+		cctx, cancel := context.WithCancel(ctx)
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, parallelCommands)
+		left := make([]int, len(mr.verify))
+		done := 0
+		for i, v := range mr.verify {
+			if v.Event != "fresh_shell" {
+				continue
+			}
+			left[i] = 2
+			for k, interactive := range []bool{false, true} {
+				sem <- struct{}{}
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					defer func() { <-sem }()
+					// A stop after a connection error of another shell: no result.
+					stopped := func() bool { return cctx.Err() != nil && ctx.Err() == nil }
+					if stopped() {
+						return
+					}
+					res, err := run(cctx, v, interactive)
+					conn := transport.IsConnError(err)
+					if stopped() && !conn {
+						return
+					}
+					mu.Lock()
+					defer mu.Unlock()
+					runs[i][k] = shellRun{res: res, err: err, ran: true}
+					if conn && connErr == nil {
+						connErr = err
+						cancel()
+					}
+					if left[i]--; left[i] == 0 {
+						done++
+						mr.p.Task(done, "verify "+v.Name)
+					}
+				}()
+			}
+		}
+		wg.Wait()
+		cancel()
+	}
+
+	var reconnect []VerifySpec
+	for i, v := range mr.verify {
 		switch v.Event {
 		case "fresh_shell":
-			done++
-			mr.p.Task(done, "verify "+v.Name)
-			res, err := run(v, false)
-			add(v, "noninteractive", res, err)
-			if transport.IsConnError(err) {
-				setError(r, err)
-				return
-			}
-			res, err = run(v, true)
-			add(v, "interactive", res, err)
-			if transport.IsConnError(err) {
-				setError(r, err)
-				return
+			for k, shell := range []string{"noninteractive", "interactive"} {
+				sr := runs[i][k]
+				if !sr.ran {
+					setError(r, connErr)
+					return
+				}
+				add(v, shell, sr.res, sr.err)
+				if transport.IsConnError(sr.err) {
+					setError(r, sr.err)
+					return
+				}
 			}
 		case "reconnect":
 			reconnect = append(reconnect, v)
@@ -188,10 +246,11 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 			setError(r, err)
 			return
 		}
+		done := runnable - len(reconnect)
 		for _, v := range reconnect {
 			done++
 			mr.p.Task(done, "verify "+v.Name)
-			res, err := run(v, false)
+			res, err := run(ctx, v, false)
 			add(v, "new connection", res, err)
 			if transport.IsConnError(err) {
 				setError(r, err)
