@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -179,6 +180,25 @@ func (t *PackageTask) version(ctx context.Context, env *Env) string {
 	return firstLine(r.Out())
 }
 
+// versionConn is version, but it returns a connection error instead of an unknown version.
+func (t *PackageTask) versionConn(ctx context.Context, env *Env) (string, error) {
+	if t.VersionCmd == "" {
+		return "", nil
+	}
+	cmd := t.VersionCmd
+	if b := t.bin(env); b != t.Binary && strings.HasPrefix(cmd, t.Binary+" ") {
+		cmd = transport.Quote(b) + cmd[len(t.Binary):]
+	}
+	r, err := env.UserScript(ctx, cmd, t.sudo, "version of "+t.Binary, 2*time.Minute)
+	if transport.IsConnError(err) {
+		return "", err
+	}
+	if err != nil || r.Code != 0 {
+		return "", nil
+	}
+	return firstLine(r.Out()), nil
+}
+
 func firstLine(s string) string {
 	s = strings.TrimSpace(s)
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
@@ -244,15 +264,25 @@ func (t *PackageTask) Apply(ctx context.Context, env *Env) (string, error) {
 	return verb, nil
 }
 
-// Update implements Updater. FAM compares the version before and after the update.
-func (t *PackageTask) Update(ctx context.Context, env *Env) (bool, string, error) {
-	if t.Absent || t.UpdateSh == "" {
-		return false, "", nil
+// Updates implements Updater.
+func (t *PackageTask) Updates() bool { return !t.Absent && t.UpdateSh != "" }
+
+// Before implements Updater: the version before the update.
+func (t *PackageTask) Before(ctx context.Context, env *Env) (string, error) {
+	if !t.Updates() {
+		return "", nil
 	}
-	before := t.version(ctx, env)
+	return t.versionConn(ctx, env)
+}
+
+// Update implements Updater. FAM compares the version before and after the update.
+func (t *PackageTask) Update(ctx context.Context, env *Env, before string) (Update, error) {
+	if t.Absent || t.UpdateSh == "" {
+		return Update{}, nil
+	}
 	r, err := env.UserScript(ctx, t.UpdateSh, t.applySudo(), "update "+t.Name(), scriptTimeout)
 	if err != nil {
-		return false, "", err
+		return Update{Ran: true}, err
 	}
 	// Exit code 42 with "FAM-ROOT: <command>": the update needs root (an OS package). FAM runs
 	// the command with its own sudo (sudo -n on workers, the password on the cockpit).
@@ -264,30 +294,54 @@ func (t *PackageTask) Update(ctx context.Context, env *Env) (bool, string, error
 			}
 		}
 		if cmd == "" {
-			return false, "", fmt.Errorf("update %s: exit code 42 without a FAM-ROOT command", t.Name())
+			return Update{Ran: true}, fmt.Errorf("update %s: exit code 42 without a FAM-ROOT command", t.Name())
 		}
 		r, err = env.UserScript(ctx, cmd, true, "update "+t.Name()+" as root", scriptTimeout)
 		if err != nil {
-			return false, "", err
+			return Update{Ran: true}, err
 		}
 	}
 	if r.Code != 0 {
-		return false, "", sudoHint(&ExitError{Label: "update", Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, t.applySudo(), "package")
+		return Update{Ran: true}, sudoHint(&ExitError{Label: "update", Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, t.applySudo(), "package")
 	}
-	// Check again: an update must leave the program installed.
-	if ok, err := t.installed(ctx, env); err != nil {
-		return false, "", err
+	// Check again: an update must leave the program installed. The search and the version are
+	// two separate commands, as before, but they run at the same time: both only read.
+	var ok bool
+	var after string
+	var verErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		after, verErr = t.versionConn(ctx, env)
+	}()
+	ok, err = t.installed(ctx, env)
+	wg.Wait()
+	if err == nil && verErr != nil {
+		// The version command lost the connection, or exited with code 255. Then the version
+		// is unknown, and FAM looks for the program once more, as the check after the update
+		// did before: a lost connection is then a connection error.
+		ok, err = t.installed(ctx, env)
+	}
+	if err != nil {
+		return Update{Ran: true}, err
 	} else if !ok {
-		return true, "", fmt.Errorf("the update of %s ran, but FAM cannot find %s after it", t.Binary, t.bin(env))
+		return Update{Ran: true, Changed: true}, fmt.Errorf("the update of %s ran, but FAM cannot find %s after it", t.Binary, t.bin(env))
 	}
-	after := t.version(ctx, env)
-	if before == after {
-		if after == "" {
-			return false, "update ran", nil
-		}
-		return false, "up to date (" + after + ")", nil
+	// The search and the version are the full check of the task, so the apply needs no other check.
+	u := Update{Ran: true, Checked: true}
+	switch {
+	case before != after:
+		u.Changed, u.Detail = true, fmt.Sprintf("updated %s -> %s", before, after)
+	case after == "":
+		u.Detail = "update ran"
+	default:
+		u.Detail = "up to date (" + after + ")"
 	}
-	return true, fmt.Sprintf("updated %s -> %s", before, after), nil
+	if t.Pin != "" && !versionIs(after, t.Pin) {
+		u.Diff = fmt.Sprintf("installed %q, pinned %s", after, t.Pin)
+	}
+	return u, nil
 }
 
 // releaseVersion removes a tag's path prefix and leading v.

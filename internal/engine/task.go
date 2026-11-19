@@ -45,8 +45,27 @@ type Task interface {
 
 // Updater is a task that also runs on apply when its check is satisfied, for example a package update.
 type Updater interface {
-	// Update returns changed=true when the machine changed.
-	Update(ctx context.Context, env *Env) (changed bool, detail string, err error)
+	// Before reads what Update compares, for example the version. It changes nothing. FAM runs it
+	// only after a satisfied check. err is only a connection error: an unknown value is "".
+	Before(ctx context.Context, env *Env) (string, error)
+	// Updates is true when Update runs a command. Else Update changes nothing.
+	Updates() bool
+	// Update runs after a satisfied check. before is the result of Before.
+	Update(ctx context.Context, env *Env, before string) (Update, error)
+}
+
+// Update is the result of an update. FAM treats each update that ran as a possible change of the
+// machine: an update script can change files that other tasks own, also without a new version.
+type Update struct {
+	// Ran is false when the task has no update command: FAM ran nothing.
+	Ran bool
+	// Changed is true when the version changed.
+	Changed bool
+	// Checked is true when the update already did the full check of the task after it. Diff is
+	// then the difference that this check found, or "".
+	Checked bool
+	Diff    string
+	Detail  string
 }
 
 // Restarter is a task that restarts units at the end of its bundle when it changed.

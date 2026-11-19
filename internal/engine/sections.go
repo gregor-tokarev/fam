@@ -3,7 +3,10 @@ package engine
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
@@ -119,27 +122,44 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 	return out, verify, nil
 }
 
+// shellRun is one verify shell of verifyMachine. It keeps only the report row, not the output.
+// For a connection error it keeps only the error, and the report makes the row from it.
+type shellRun struct {
+	row output.VerifyResult
+	err error
+	ran bool
+}
+
+// verifyRow is the report row of one verify shell.
+func verifyRow(v VerifySpec, shell string, res transport.Result, err error) output.VerifyResult {
+	vr := output.VerifyResult{Bundle: v.Bundle, Name: v.Name, Event: v.Event, Shell: shell, Code: res.Code}
+	switch {
+	case err != nil:
+		vr.Status = "failed"
+		vr.Code = -1
+		vr.Output = err.Error()
+	case res.Code == 0:
+		vr.Status = "passed"
+	default:
+		vr.Status = "failed"
+		vr.Output = tail(strings.TrimSpace(string(res.Stdout)+"\n"+string(res.Stderr)), 5)
+	}
+	return vr
+}
+
+// verifyShells are the two shells of each fresh_shell script.
+var verifyShells = [2]string{"noninteractive", "interactive"}
+
 // verifyMachine runs the verify scripts in new shells.
-//   - fresh_shell: a noninteractive and an interactive login shell of the user.
+//   - fresh_shell: a noninteractive and an interactive login shell of the user. These scripts
+//     only prove that the tools work, so they run at the same time. FAM reports them in the
+//     order of the config.
 //   - reconnect: FAM closes the shared SSH connection first, then runs the script in a new one.
 //   - reboot: not in version 0.
 func verifyMachine(ctx context.Context, mr *machineRun) {
 	r := mr.res
 	env := mr.env
-	add := func(v VerifySpec, shell string, res transport.Result, err error) {
-		vr := output.VerifyResult{Bundle: v.Bundle, Name: v.Name, Event: v.Event, Shell: shell, Code: res.Code}
-		out := strings.TrimSpace(string(res.Stdout) + "\n" + string(res.Stderr))
-		switch {
-		case err != nil:
-			vr.Status = "failed"
-			vr.Code = -1
-			vr.Output = err.Error()
-		case res.Code == 0:
-			vr.Status = "passed"
-		default:
-			vr.Status = "failed"
-			vr.Output = tail(out, 5)
-		}
+	addRow := func(vr output.VerifyResult) {
 		if vr.Status == "passed" {
 			r.Counts.VerifyOK++
 		} else {
@@ -147,10 +167,12 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		}
 		r.Verify = append(r.Verify, vr)
 	}
-	run := func(v VerifySpec, interactive bool) (transport.Result, error) {
+	add := func(v VerifySpec, shell string, res transport.Result, err error) {
+		addRow(verifyRow(v, shell, res, err))
+	}
+	run := func(ctx context.Context, v VerifySpec, interactive bool) (transport.Result, error) {
 		return env.T.Run(ctx, transport.Cmd{Script: v.Script, LoginShell: true, Interactive: interactive, Timeout: 5 * time.Minute, Label: "verify " + v.Name})
 	}
-	var reconnect []VerifySpec
 	runnable := 0
 	for _, v := range mr.verify {
 		if v.Event == "fresh_shell" || v.Event == "reconnect" {
@@ -158,23 +180,78 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		}
 	}
 	mr.p.Count("verifying", runnable)
-	done := 0
-	for _, v := range mr.verify {
+
+	// The fresh_shell runs. Different scripts run at the same time. The two shells of one script
+	// run one after the other, so that a script that uses a fixed port or file does not meet a
+	// copy of itself. After a connection error of the script at position j, FAM starts no script
+	// after j, and no second shell of a script after j: the report ends at j, as when the scripts
+	// ran one after the other. Scripts before j run both shells.
+	runs := make([][2]shellRun, len(mr.verify))
+	{
+		var mu sync.Mutex
+		var stopAt atomic.Int64
+		stopAt.Store(math.MaxInt64)
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, parallelCommands)
+		rp := newRunning(mr.p)
+		for i, v := range mr.verify {
+			if v.Event != "fresh_shell" {
+				continue
+			}
+			sem <- struct{}{}
+			if int64(i) > stopAt.Load() {
+				<-sem
+				break
+			}
+			wg.Add(1)
+			rp.begin(i, "verify "+v.Name)
+			go func() {
+				defer wg.Done()
+				defer func() { <-sem }()
+				defer rp.end(i)
+				for k, interactive := range []bool{false, true} {
+					if k > 0 && int64(i) > stopAt.Load() {
+						return
+					}
+					res, err := run(ctx, v, interactive)
+					mu.Lock()
+					conn := transport.IsConnError(err)
+					if conn {
+						runs[i][k] = shellRun{err: err, ran: true}
+					} else {
+						runs[i][k] = shellRun{row: verifyRow(v, verifyShells[k], res, err), ran: true}
+					}
+					if conn && int64(i) < stopAt.Load() {
+						stopAt.Store(int64(i))
+					}
+					mu.Unlock()
+					if conn {
+						return
+					}
+				}
+			}()
+		}
+		wg.Wait()
+	}
+
+	// Report the shells in config order, as if they ran one after the other: up to and
+	// including the first shell, in config order, that lost the connection. A shell that did not
+	// start after a connection error has no row.
+	var reconnect []VerifySpec
+	for i, v := range mr.verify {
 		switch v.Event {
 		case "fresh_shell":
-			done++
-			mr.p.Task(done, "verify "+v.Name)
-			res, err := run(v, false)
-			add(v, "noninteractive", res, err)
-			if transport.IsConnError(err) {
-				setError(r, err)
-				return
-			}
-			res, err = run(v, true)
-			add(v, "interactive", res, err)
-			if transport.IsConnError(err) {
-				setError(r, err)
-				return
+			for k := range verifyShells {
+				sr := runs[i][k]
+				if !sr.ran {
+					continue
+				}
+				if transport.IsConnError(sr.err) {
+					addRow(verifyRow(v, verifyShells[k], transport.Result{}, sr.err))
+					setError(r, sr.err)
+					return
+				}
+				addRow(sr.row)
 			}
 		case "reconnect":
 			reconnect = append(reconnect, v)
@@ -188,10 +265,11 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 			setError(r, err)
 			return
 		}
+		done := runnable - len(reconnect)
 		for _, v := range reconnect {
 			done++
 			mr.p.Task(done, "verify "+v.Name)
-			res, err := run(v, false)
+			res, err := run(ctx, v, false)
 			add(v, "new connection", res, err)
 			if transport.IsConnError(err) {
 				setError(r, err)

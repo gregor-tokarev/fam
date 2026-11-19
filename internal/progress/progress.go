@@ -38,10 +38,12 @@ type Reporter struct {
 	machines []*Machine
 	drawn    int
 	frame    int
-	paused   bool
-	stopped  bool
-	stop     chan struct{}
-	done     chan struct{}
+	// paused counts the pauses that did not end yet: checks that run at the same time can wait
+	// for the same password prompt.
+	paused  int
+	stopped bool
+	stop    chan struct{}
+	done    chan struct{}
 }
 
 // Machine is the progress of one machine.
@@ -133,11 +135,14 @@ func (r *Reporter) Pause() func() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.clear()
-	r.paused = true
+	r.paused++
+	var once sync.Once
 	return func() {
-		r.mu.Lock()
-		defer r.mu.Unlock()
-		r.paused = false
+		once.Do(func() {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			r.paused--
+		})
 	}
 }
 
@@ -217,6 +222,22 @@ func (m *Machine) Task(i int, label string) {
 	m.stage, m.index, m.task, m.taskAt, m.logged = m.count, i, label, time.Now(), false
 }
 
+// TaskSince is Task for steps that run at the same time: label is the step that runs for the
+// longest time, since since. "" means that no step runs.
+func (m *Machine) TaskSince(i int, label string, since time.Time) {
+	if m == nil {
+		return
+	}
+	m.r.mu.Lock()
+	defer m.r.mu.Unlock()
+	m.begin()
+	same := m.task == label && m.taskAt.Equal(since)
+	m.stage, m.index = m.count, i
+	if !same {
+		m.task, m.taskAt, m.logged = label, since, false
+	}
+}
+
 // Done shows the result of the machine.
 func (m *Machine) Done(status string) {
 	if m == nil {
@@ -258,10 +279,11 @@ func (r *Reporter) logSlow() {
 // progress is the stage, the counter, and the task of the machine.
 func (m *Machine) progress() string {
 	s := m.stage
+	// Steps that run at the same time report only the count, without a task name.
+	if m.total > 0 && m.stage == m.count && (m.task != "" || m.index > 0) {
+		s += fmt.Sprintf(" %d/%d", m.index, m.total)
+	}
 	if m.task != "" {
-		if m.total > 0 {
-			s += fmt.Sprintf(" %d/%d", m.index, m.total)
-		}
 		s += ": " + m.task
 	}
 	return s
@@ -279,7 +301,7 @@ func (r *Reporter) clear() {
 // draw draws the live lines again. Only the timer calls it, so that the number of writes does
 // not grow with the number of tasks. The caller holds the lock.
 func (r *Reporter) draw() {
-	if !r.live || r.paused || r.stopped {
+	if !r.live || r.paused > 0 || r.stopped {
 		return
 	}
 	cols, rows := 0, 0
