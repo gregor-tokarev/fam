@@ -18,9 +18,10 @@ The old apply did these steps one after the other:
 ## What changed
 
 - **Checks run at the same time.** A check changes nothing. Plan, the check before the apply loop, and the check of the shell blocks run up to 8 checks of a machine at the same time. The default `MaxSessions` of sshd is 10. When sshd refuses a session, `ssh` opens a separate connection for it, so the command is slower but does not fail. After a connection error, FAM starts no more checks and lets the running checks end. A check must not depend on another check, for example through a lock that only one check can hold.
-- **One check for a satisfied task.** A task with a satisfied check before the apply loop does not check again until a task changes the machine. A task that changes the machine (an apply or an update) always checks right before it.
-- **Updates make FAM check again.** An update script can change files of other tasks, also without a new version. After an update, FAM checks the next tasks again at the same time, up to the next package with an update command or the next task that was not satisfied in the first pass. Each of these results, also an error, is the check of its task until a task changes the machine. After an apply or a restart, each next task checks again before it runs.
-- **Fewer waits for each package update.** The commands are the same as before, and each has its own timeout. After the update, the search for the program and its version run at the same time: both only read. Together they are the full check of the task, so the third search is not necessary. An update now waits for four round trips, not six.
+- **One check for a satisfied task.** A task with a satisfied check before the apply loop does not check again until a task changes the machine. This is also true for a package that then runs its update command. A task that applies a change always checks right before it.
+- **Updates make FAM check again.** An update script can change files of other tasks, also without a new version. After an update, FAM checks the next tasks again at the same time, up to and including the next package with an update command, or up to the next task that was not satisfied in the first pass. For that package, FAM also reads the version before its update in the same step. Each of these results, also an error, is the check of its task until a task changes the machine. After an apply or a restart, each next task checks again before it runs.
+- **Fewer waits for each package update.** The commands are the same as before, and each has its own timeout. Before the update, FAM uses the check and the version of the step above. After the update, the search for the program and its version run at the same time: both only read. Together they are the full check of the task, so the third search is not necessary. An update now waits for two round trips, not six.
+- **Risk.** FAM does not look for the package again right before its update. When another program removes the package during the apply, the update fails. The next apply installs the package again.
 - **Verify scripts run at the same time.** Up to 8 `fresh_shell` scripts of a machine run at the same time. The two shells of one script run one after the other. The report keeps the order of the config. The `reconnect` scripts run after them, one at a time. Two verify scripts must not share a fixed port or a file.
 - **Machines evaluate the Pkl config at the same time.**
 
@@ -32,9 +33,9 @@ Test setup: one Ubuntu 26.04 VM of the acceptance harness (3 vCPU, 4 GB) with th
 
 | Command | Network | Before | After |
 |---|---|---|---|
-| `fam apply` | 100 ms round trip | 45.3 s, 45.2 s, 45.2 s | 22.9 s, 21.6 s, 21.3 s |
+| `fam apply` | 100 ms round trip | 45.5 s, 45.2 s, 44.9 s | 19.2 s, 18.5 s, 18.7 s |
 | `fam plan` | 100 ms round trip | 12.1 s, 11.9 s, 11.8 s, 12.1 s, 11.9 s | 3.5 s, 3.6 s, 3.6 s, 3.5 s |
-| SSH commands in one apply | | 160 | 144 |
+| SSH commands in one apply | | 160 | 143 |
 | SSH commands in one plan | | 46 | 46 |
 
 One more plan run of the new binary took 7.9 s: the skill download from GitHub took 5.4 s in that run. Both binaries do this download in the same way.
@@ -46,11 +47,11 @@ Time of each step of one apply with a 100 ms round trip:
 | Facts and Pkl evaluation | 1.4 s | 1.2 s |
 | Skill downloads and task build | 1.1 s | 1.0 s |
 | Checks before the apply loop | 9.5 s | 1.4 s |
-| Apply loop (updates and checks) | 25.7 s | 16.5 s |
+| Apply loop (updates and checks) | 25.7 s | 13.4 s |
 | Shell blocks | 1.1 s | 0.2 s |
 | Verify | 6.5 s | 1.4 s |
 
-The update commands themselves (`claude update`, `rustup update`, `vp upgrade`, and others) take approximately 8 s of the apply loop, one update after the other. The other 8.6 s of the loop is the network wait of the checks and version commands around them (17.8 s before). Their time changes from run to run with the network and the package registries.
+The update commands themselves (`claude update`, `rustup update`, `vp upgrade`, and others) take approximately 8 s of the apply loop, one update after the other. The other 5.5 s of the loop is the network wait of the checks and version commands around them (17.8 s before). Their time changes from run to run with the network and the package registries.
 
 The first apply of a new machine takes approximately 28 minutes in the VM. The downloads inside the VM take almost all of that time, for example 17 minutes for rustup. The change does not make these downloads faster.
 

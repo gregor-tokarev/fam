@@ -45,9 +45,11 @@ type Task interface {
 
 // Updater is a task that also runs on apply when its check is satisfied, for example a package update.
 type Updater interface {
-	// Before reads what Update compares, for example the version. It changes nothing, so FAM
-	// runs it at the same time as the check before the update.
-	Before(ctx context.Context, env *Env) string
+	// Before reads what Update compares, for example the version. It changes nothing. FAM runs it
+	// only after a satisfied check. err is only a connection error: an unknown value is "".
+	Before(ctx context.Context, env *Env) (string, error)
+	// Updates is true when Update runs a command. Else Update changes nothing.
+	Updates() bool
 	// Update runs after a satisfied check. before is the result of Before.
 	Update(ctx context.Context, env *Env, before string) (Update, error)
 }

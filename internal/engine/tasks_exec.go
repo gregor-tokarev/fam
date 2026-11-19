@@ -264,12 +264,15 @@ func (t *PackageTask) Apply(ctx context.Context, env *Env) (string, error) {
 	return verb, nil
 }
 
+// Updates implements Updater.
+func (t *PackageTask) Updates() bool { return !t.Absent && t.UpdateSh != "" }
+
 // Before implements Updater: the version before the update.
-func (t *PackageTask) Before(ctx context.Context, env *Env) string {
-	if t.Absent || t.UpdateSh == "" {
-		return ""
+func (t *PackageTask) Before(ctx context.Context, env *Env) (string, error) {
+	if !t.Updates() {
+		return "", nil
 	}
-	return t.version(ctx, env)
+	return t.versionConn(ctx, env)
 }
 
 // Update implements Updater. FAM compares the version before and after the update.

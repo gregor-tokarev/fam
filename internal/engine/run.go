@@ -374,14 +374,20 @@ type checked struct {
 	err error
 	// ran is false when FAM did not start the check after a connection error of another check.
 	ran bool
+	// before is the result of Updater.Before after a satisfied check, when hasBefore is true.
+	before    string
+	hasBefore bool
 }
 
 // checkAll runs the checks of tasks at the same time and returns the results in the order of
 // tasks. After a connection error it starts no new checks, and lets the running checks end:
 // a check can wait for a download that other machines share. FAM starts the checks in order, so
 // a check that did not start comes after a check with a connection error. connErr is the first
-// connection error. rp shows the progress; it can be nil.
-func checkAll(ctx context.Context, env *Env, ts []Task, rp *running) (out []checked, connErr error) {
+// connection error. rp shows the progress; it can be nil. With before, an Updater with an
+// update command also runs its Before at the same time as its check. FAM keeps that value only
+// when the check is satisfied. The caller sets before only for tasks that an earlier check found
+// satisfied, so the program is installed, and Before only reads.
+func checkAll(ctx context.Context, env *Env, ts []Task, rp *running, before bool) (out []checked, connErr error) {
 	out = make([]checked, len(ts))
 	var mu sync.Mutex
 	var stop atomic.Bool
@@ -398,7 +404,20 @@ func checkAll(ctx context.Context, env *Env, ts []Task, rp *running) (out []chec
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
+			var b string
+			var berr error
+			var bwg sync.WaitGroup
+			u, isUpdater := t.(Updater)
+			withBefore := before && isUpdater && u.Updates()
+			if withBefore {
+				bwg.Add(1)
+				go func() {
+					defer bwg.Done()
+					b, berr = u.Before(ctx, env)
+				}()
+			}
 			c, err := check(ctx, env, t)
+			bwg.Wait()
 			// A detail can be a part of the full output of a script: keep only a copy of the
 			// detail, so that the output does not stay in memory.
 			c.Detail = strings.Clone(c.Detail)
@@ -407,8 +426,14 @@ func checkAll(ctx context.Context, env *Env, ts []Task, rp *running) (out []chec
 				// results stay in memory until the last check ends.
 				err = &CheckError{Conflict: c.Status == Conflict, Msg: err.Error()}
 			}
+			res := checked{c: c, err: err, ran: true}
+			// A lost connection in Before leaves hasBefore false: the update then reads the value
+			// itself, right before it runs.
+			if withBefore && err == nil && c.Status == Satisfied && berr == nil {
+				res.before, res.hasBefore = b, true
+			}
 			mu.Lock()
-			out[i] = checked{c: c, err: err, ran: true}
+			out[i] = res
 			if transport.IsConnError(err) {
 				stop.Store(true)
 				if connErr == nil {
@@ -500,7 +525,7 @@ func planMachine(ctx context.Context, mr *machineRun) {
 			ts = append(ts, s.Tasks...)
 		}
 	}
-	results, connErr := checkAll(ctx, mr.env, ts, newRunning(mr.p))
+	results, connErr := checkAll(ctx, mr.env, ts, newRunning(mr.p), false)
 	i := 0
 	for _, s := range mr.sects {
 		if recordSkippedSection(r, s) {
@@ -543,7 +568,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	for _, s := range mr.sects {
 		all = append(all, s.Tasks...)
 	}
-	results, connErr := checkAll(ctx, env, all, newRunning(mr.p))
+	results, connErr := checkAll(ctx, env, all, newRunning(mr.p), false)
 	// pre holds the result of this check for each task. The apply loop uses it while no task
 	// before has changed the machine, so that a task that needs nothing costs one check, not two.
 	pre := make(map[Task]checked, len(all))
@@ -597,13 +622,14 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		}
 	}
 	// pre holds check results that are still current. A task with a satisfied result in pre
-	// needs no new check. A task that changes the machine (an apply or an update) always checks
-	// right before it. After a task changes the machine, FAM clears pre:
+	// needs no new check, also a package that then runs its update. A task with a result that is
+	// not satisfied checks again right before its apply. After a task changes the machine, FAM
+	// clears pre:
 	//   - after an apply or a restart, each next task checks again before it runs, as before.
-	//   - after an update, FAM checks the next tasks again at the same time, up to the next task
-	//     with an update. An update can change files of other tasks, so the results of before
-	//     the update are not current.
-	isUpdater := func(t Task) bool { _, ok := t.(Updater); return ok }
+	//   - after an update, FAM checks the next tasks again at the same time, up to and including
+	//     the next task with an update, and reads its version before the update. An update can
+	//     change files of other tasks, so the results of before the update are not current.
+	updates := func(t Task) bool { u, ok := t.(Updater); return ok && u.Updates() }
 	refresh := false
 	// fresh is true while pre holds results of a refresh: each result there is the check of its
 	// task, as if the task checked itself at its turn, because no task changed the machine
@@ -620,15 +646,19 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		}
 		var seg []Task
 		for _, x := range order[pos[t]:end] {
-			if isUpdater(x) || !satisfied[x] {
+			if !satisfied[x] {
 				break
 			}
 			seg = append(seg, x)
+			// The update of x can change the machine, so the results after it would be old.
+			if updates(x) {
+				break
+			}
 		}
 		// The progress keeps the number of the apply step and names the slowest check.
 		rp := newRunning(mr.p)
 		rp.index = n
-		results, _ := checkAll(ctx, env, seg, rp)
+		results, _ := checkAll(ctx, env, seg, rp, true)
 		pre = make(map[Task]checked, len(seg))
 		for i, x := range seg {
 			if results[i].ran {
@@ -657,15 +687,14 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			n++
 			// After an update, a task that the first pass found satisfied starts a refresh. Any
 			// other task checks itself, and the refresh waits for the next satisfied task.
-			if _, ok := pre[t]; !ok && refresh && !isUpdater(t) && satisfied[t] {
+			if _, ok := pre[t]; !ok && refresh && satisfied[t] {
 				refreshFrom(t, n, s.RestartUnits && len(units) > 0)
 			}
 			mr.p.Task(n, taskLabel(t))
-			// A satisfied result skips the check. A task that changes the machine always checks
-			// right before, for example a removal that checks the owner, or an update that needs
-			// the program.
+			// A satisfied result skips the check. A task that applies a change always checks right
+			// before, for example a removal that checks the owner.
 			var p *checked
-			if res, ok := pre[t]; ok && !isUpdater(t) {
+			if res, ok := pre[t]; ok {
 				switch {
 				case res.err == nil && res.c.Status == Satisfied:
 					p = &res
@@ -791,7 +820,7 @@ func restoreBlocks(ctx context.Context, env *Env, mr *machineRun, index map[Task
 		}
 	}
 	// The checks of the blocks run at the same time. Most blocks are still in place.
-	results, connErr := checkAll(ctx, env, blocks, nil)
+	results, connErr := checkAll(ctx, env, blocks, nil, false)
 	if connErr != nil {
 		// Change no file after a connection error. Report the first block that lost it.
 		for k, t := range blocks {
@@ -868,7 +897,15 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 		if !ok {
 			return Unchanged, "", nil, touchNone
 		}
-		up, err := u.Update(ctx, env, u.Before(ctx, env))
+		// The value before the update: from the refresh after the last update, else read now.
+		// A lost connection gives "", and the update then reports the connection error.
+		var before string
+		if pre != nil && pre.hasBefore {
+			before = pre.before
+		} else {
+			before, _ = u.Before(ctx, env)
+		}
+		up, err := u.Update(ctx, env, before)
 		if err != nil {
 			return Failed, "update failed", err, touchApply
 		}
