@@ -107,7 +107,10 @@ type PackageTask struct {
 	PackageName string
 	// ApplySudo runs install, update, and uninstall with sudo (OS package managers).
 	ApplySudo bool
-	units     []Unit
+	// SkipUpdate turns the update off for this run, with this detail. FAM sets it before the
+	// apply loop when the verify scripts of the bundle pass.
+	SkipUpdate string
+	units      []Unit
 }
 
 func (t *PackageTask) applySudo() bool { return t.sudo || t.ApplySudo }
@@ -265,7 +268,7 @@ func (t *PackageTask) Apply(ctx context.Context, env *Env) (string, error) {
 }
 
 // Updates implements Updater.
-func (t *PackageTask) Updates() bool { return !t.Absent && t.UpdateSh != "" }
+func (t *PackageTask) Updates() bool { return !t.Absent && t.UpdateSh != "" && t.SkipUpdate == "" }
 
 // Before implements Updater: the version before the update.
 func (t *PackageTask) Before(ctx context.Context, env *Env) (string, error) {
@@ -277,8 +280,8 @@ func (t *PackageTask) Before(ctx context.Context, env *Env) (string, error) {
 
 // Update implements Updater. FAM compares the version before and after the update.
 func (t *PackageTask) Update(ctx context.Context, env *Env, before string) (Update, error) {
-	if t.Absent || t.UpdateSh == "" {
-		return Update{}, nil
+	if !t.Updates() {
+		return Update{Detail: t.SkipUpdate}, nil
 	}
 	r, err := env.UserScript(ctx, t.UpdateSh, t.applySudo(), "update "+t.Name(), scriptTimeout)
 	if err != nil {

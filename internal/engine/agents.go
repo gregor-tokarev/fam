@@ -171,8 +171,10 @@ func agentVerify(name string, skills []string) []VerifySpec {
 		return nil
 	}
 	return []VerifySpec{
-		{Bundle: "agent " + name, Name: def.versionCmd, Event: "fresh_shell", Script: def.versionCmd},
-		{Bundle: "agent " + name, Name: "instructions and skills visible", Event: "fresh_shell", Script: agentPathsScript(name, skills)},
+		{Bundle: "agent " + name, Name: def.versionCmd, Event: "fresh_shell", Script: def.versionCmd, Group: "agent " + name, Gate: true},
+		// The instructions and skills come from other sections, so this script does not decide
+		// the update of the agent.
+		{Bundle: "agent " + name, Name: "instructions and skills visible", Event: "fresh_shell", Script: agentPathsScript(name, skills), Group: "agent " + name},
 	}
 }
 

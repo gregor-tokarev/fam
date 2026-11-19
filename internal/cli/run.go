@@ -41,6 +41,9 @@ func addRunCommands(root *cobra.Command, opts *Options) {
 		}
 		cmd.Flags().BoolVar(&opts.NoProgress, "no-progress", false, "do not show the progress on stderr")
 		cmd.Flags().BoolVar(&opts.RefreshSecrets, "refresh-secrets", false, "read the secrets from Infisical, also when the cache is fresh")
+		if mode == engine.ModeApply {
+			cmd.Flags().BoolVar(&opts.Update, "update", false, "run the update command of each package, also when the verify scripts of its bundle pass")
+		}
 		root.AddCommand(cmd)
 	}
 }
@@ -77,6 +80,7 @@ func runMode(cmd *cobra.Command, opts *Options, mode engine.Mode) error {
 		Reporter:       rep,
 		RunID:          runID,
 		RefreshSecrets: opts.RefreshSecrets,
+		Update:         opts.Update,
 	}
 	log, logErr := runlog.Open(runID)
 	if logErr == nil {

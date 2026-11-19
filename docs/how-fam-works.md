@@ -66,7 +66,7 @@ The guide explains project edits, bundle discovery, validation, and when to use 
 2. **Collect facts.** FAM runs one shell script on each machine: over SSH for workers, locally for the cockpit. Machines run in parallel. `--serial` runs them one at a time. Use `--serial` when two machine entries are the same host and their tasks change the same files: a machine can use the result of a check from before another machine changed such a file. FAM stops on a Windows machine.
 3. **Evaluate.** FAM evaluates the full config for each machine, with the facts of that machine as the Pkl properties `fam.<name>`, and checks the rules that Pkl cannot check: bundle names and scripts with a check.
 4. **Plan.** FAM runs the check of every task. A check changes nothing, so FAM runs up to 8 checks of a machine at the same time over the one SSH connection. The result keeps the order of the tasks. A check must not depend on another check: do not use a lock, a fixed port, or a file that only one check at a time can use.
-5. **Apply** (`fam apply` only). FAM stops on a machine with a conflict before it changes anything. Then for each task, in order: check, apply when the check finds a difference, and check again. A task with a satisfied check in step 4 does not check again until a task changes the machine. This is also true for a package that then runs its `update` command. A task that applies a change always checks right before it. After an apply, each next task checks again before it runs. After an update, FAM checks the next tasks again at the same time, up to and including the next package with an `update` command, or up to the next task that was not satisfied in step 4. For that package, FAM also reads the version before its update. Each of these results, also an error, is the check of its task until a task changes the machine. A task that fails stops the tasks after it on that machine. FAM never runs apply after a check error.
+5. **Apply** (`fam apply` only). FAM stops on a machine with a conflict before it changes anything. Then FAM decides which package updates run (see [Updates](#updates)). Then for each task, in order: check, apply when the check finds a difference, and check again. A task with a satisfied check in step 4 does not check again until a task changes the machine. This is also true for a package that then runs its `update` command. A task that applies a change always checks right before it. After an apply, each next task checks again before it runs. After an update, FAM checks the next tasks again at the same time, up to and including the next package with an `update` command, or up to the next task that was not satisfied in step 4. For that package, FAM also reads the version before its update. Each of these results, also an error, is the check of its task until a task changes the machine. A task that fails stops the tasks after it on that machine. FAM never runs apply after a check error.
 6. **Restart.** At the end of each present bundle, FAM restarts each unit that a changed task names in `restarts` once. FAM does not restart units after a failure, and not for a bundle with `state = "absent"`.
 7. **Verify.** FAM runs the verify scripts of the bundles and the agent checks in new shells. Up to 8 `fresh_shell` scripts of a machine run at the same time. The two shells of one script run one after the other. The result keeps the order of the config. The `reconnect` scripts run after them, one at a time. A verify script must not depend on another verify script: do not use a fixed port or a shared file in two scripts.
 
@@ -290,6 +290,16 @@ FAM asks the package manager, not `PATH`, whether the package is installed. When
 
 Cargo uses `--root ~/.local`. Go uses `GOBIN=~/.local/bin`. A `PackageRef` can give `names` for each manager, for example `names { ["apt"] = "fd-find" }`. FAM uses the generic `package` name when no name matches the selected manager.
 
+### Updates
+
+A package with an `update` command (or a `package` of a manager with an update) can update on each apply. An update can take minutes, for example a Cargo package that builds from source. So before the apply loop, `fam apply` runs the `fresh_shell` verify scripts of each bundle and agent with such a package, in both shells, up to 8 at the same time:
+
+- All scripts pass: the tools work, and FAM skips the updates of the bundle. The result shows `verify passed, update skipped`.
+- A script fails: the updates of the bundle run, as before.
+- The bundle has no verify script: FAM skips its updates. The result shows `update skipped (no verify script; --update runs it)`.
+
+The other tasks of the bundle do not change: a task with a difference applies, and a missing package installs. After the apply loop, FAM runs all verify scripts again (step 7). `fam apply --update` runs the update of each package, without the verify scripts before the loop.
+
 A `GitHubRelease` task installs a release binary into `~/.local/bin`, without sudo. It supports bare binaries, tar.gz, tar.xz, tar.bz2, and zip. Plan compares the installed version with the latest tag, or a pinned `tag`. FAM checks SHA-256 checksum files when present. See [Package tasks](development.md#package-tasks) for the schema and an example.
 
 On Linux, FAM detects glibc or musl from the machine. On musl, `assets` uses `linux-amd64-musl` or `linux-arm64-musl` when present. Otherwise, FAM uses the plain Linux key. Prefer static or musl builds for the plain Linux keys when available, because they run everywhere.
@@ -301,7 +311,7 @@ On Linux, FAM detects glibc or musl from the machine. On musl, `assets` uses `li
 | Claude Code | `curl -fsSL https://claude.ai/install.sh \| bash` | `claude update` | `bash -s <version>`, then `claude install <version>` | `~/.claude/settings.json` (JSON merge) |
 | Codex | `curl -fsSL https://chatgpt.com/codex/install.sh \| CODEX_NON_INTERACTIVE=1 sh` | the install command again | `sh -s -- --release <version>` | `~/.codex/config.toml` (TOML merge) |
 
-Sources: https://code.claude.com/docs/en/setup and https://developers.openai.com/codex/cli. Both install into `~/.local/bin`. An update that does not change the output of `--version` is "unchanged".
+Sources: https://code.claude.com/docs/en/setup and https://developers.openai.com/codex/cli. Both install into `~/.local/bin`. An update that does not change the output of `--version` is "unchanged". The agent updates follow the rules of [Updates](#updates): the `--version` command is the verify script that decides the update.
 
 A TOML merge writes the file again with sorted keys and without comments. A JSON merge keeps the key order.
 

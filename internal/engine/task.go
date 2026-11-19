@@ -57,7 +57,8 @@ type Updater interface {
 // Update is the result of an update. FAM treats each update that ran as a possible change of the
 // machine: an update script can change files that other tasks own, also without a new version.
 type Update struct {
-	// Ran is false when the task has no update command: FAM ran nothing.
+	// Ran is false when the task has no update command, or FAM skipped it: FAM ran nothing.
+	// Detail then tells why FAM skipped it, or is "".
 	Ran bool
 	// Changed is true when the version changed.
 	Changed bool
