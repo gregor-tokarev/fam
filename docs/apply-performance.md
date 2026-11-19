@@ -55,6 +55,19 @@ The update commands themselves (`claude update`, `rustup update`, `vp upgrade`, 
 
 The first apply of a new machine takes approximately 28 minutes in the VM. The downloads inside the VM take almost all of that time, for example 17 minutes for rustup. The change does not make these downloads faster.
 
+## Updates only when a verify script fails (0.21.0)
+
+In 0.20.1, each apply ran each package update. The update of a Cargo package (for example `uv`, `difftastic`, `hurl`) is `cargo install`, which builds the program from source again. On a machine with some Cargo packages, an apply with a small change took more than 5 minutes.
+
+From 0.21.0, apply runs the verify scripts of a bundle before the apply loop, and runs its updates only when a script fails (see [Updates](how-fam-works.md#updates)). `fam apply --update` runs all updates.
+
+Test: the acceptance VM `ubuntu-26.04`, three bundles with a 5 s update each, nothing to change.
+
+| Command | Time |
+|---|---|
+| `fam apply` (all verify scripts pass) | 0.4 s |
+| `fam apply --update` | 15.5 s |
+
 ## Measure again
 
 Prerequisites:

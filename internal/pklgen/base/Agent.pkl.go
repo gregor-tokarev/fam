@@ -13,6 +13,7 @@ type Agent struct {
 
 	// A pinned CLI version, for example `"2.0.14"`.
 	//
-	// When it is `null`, FAM installs the latest version and updates the CLI on each `fam apply`.
+	// When it is `null`, FAM installs the latest version. `fam apply` updates the CLI when
+	// `<cli> --version` fails, and `fam apply --update` always updates it.
 	Version *string `pkl:"version"`
 }

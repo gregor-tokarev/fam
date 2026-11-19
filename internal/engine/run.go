@@ -51,6 +51,9 @@ type Options struct {
 	OnSecrets func(values []string)
 	// RefreshSecrets reads the secrets from Infisical also when the cache is fresh.
 	RefreshSecrets bool
+	// Update runs the update command of each package. Without it, apply skips the updates of a
+	// bundle or agent whose verify scripts pass before the apply loop.
+	Update bool
 }
 
 // machineRun holds the state of one machine during a run.
@@ -62,6 +65,8 @@ type machineRun struct {
 	spec   *config.Spec
 	sects  []Section
 	verify []VerifySpec
+	// update runs all updates (--update).
+	update bool
 }
 
 // Run runs plan, apply, or verify.
@@ -199,7 +204,7 @@ func Run(ctx context.Context, opts Options) *output.Run {
 	}
 	work := func(i int) {
 		m := machines[i]
-		mr := &machineRun{m: m, p: machineProgress[i], res: &output.MachineResult{Name: m.Name, Cockpit: m.Cockpit, Tags: m.Tags, Tasks: []output.TaskResult{}}}
+		mr := &machineRun{m: m, p: machineProgress[i], update: opts.Update, res: &output.MachineResult{Name: m.Name, Cockpit: m.Cockpit, Tags: m.Tags, Tasks: []output.TaskResult{}}}
 		mr.res.Warnings = append(mr.res.Warnings, secretWarnings...)
 		runs[i] = mr
 		// pkl-go sends the requests of all evaluators over one channel, so machines can evaluate
@@ -601,6 +606,12 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		r.ErrorKind = "task"
 		return
 	}
+	if !mr.update {
+		if err := gateUpdates(ctx, mr); err != nil {
+			setError(r, err)
+			return
+		}
+	}
 	r.Status = "ok"
 	stopped := false
 	mr.p.Count("applying", countTasks(mr.sects, true))
@@ -910,7 +921,7 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 			return Failed, "update failed", err, touchApply
 		}
 		if !up.Ran {
-			return Unchanged, "", nil, touchNone
+			return Unchanged, up.Detail, nil, touchNone
 		}
 		diff := up.Diff
 		if !up.Checked {

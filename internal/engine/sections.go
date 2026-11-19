@@ -21,6 +21,10 @@ type VerifySpec struct {
 	Name   string
 	Event  string
 	Script string
+	// Group is the task group that the script proves, for example "bundle rustup".
+	Group string
+	// Gate is true when a pass of the script before apply makes the updates of Group unnecessary.
+	Gate bool
 }
 
 // buildSections returns the task sections of one machine in run order:
@@ -59,7 +63,7 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 			if v.Name != nil {
 				name = *v.Name
 			}
-			verify = append(verify, VerifySpec{Bundle: u.Bundle.Name, Name: name, Event: string(v.Event), Script: v.Script})
+			verify = append(verify, VerifySpec{Bundle: u.Bundle.Name, Name: name, Event: string(v.Event), Script: v.Script, Group: "bundle " + u.Bundle.Name, Gate: true})
 		}
 	}
 	// The skills of the bundle tasks: each name once, across all bundles.
@@ -147,6 +151,98 @@ func verifyRow(v VerifySpec, shell string, res transport.Result, err error) outp
 	return vr
 }
 
+// runVerify runs one verify script in a new login shell.
+func runVerify(ctx context.Context, env *Env, v VerifySpec, interactive bool) (transport.Result, error) {
+	return env.T.Run(ctx, transport.Cmd{Script: v.Script, LoginShell: true, Interactive: interactive, Timeout: 5 * time.Minute, Label: "verify " + v.Name})
+}
+
+// gateUpdates runs, before the apply loop, the verify scripts of each bundle and agent with a
+// package update. When all these scripts pass in both shells, the tools of the group work, and
+// FAM skips the updates of its packages: an update can take minutes (for example a Cargo build).
+// A group without such scripts also skips its updates. A failed script lets the updates run.
+// Other tasks of the group still apply their changes. `fam apply --update` runs all updates.
+// It returns only a connection error.
+func gateUpdates(ctx context.Context, mr *machineRun) error {
+	pkgs := map[string][]*PackageTask{}
+	for _, s := range mr.sects {
+		if s.SkipReason != "" {
+			continue
+		}
+		for _, t := range s.Tasks {
+			if pt, ok := t.(*PackageTask); ok && pt.Updates() {
+				pkgs[pt.Group()] = append(pkgs[pt.Group()], pt)
+			}
+		}
+	}
+	if len(pkgs) == 0 {
+		return nil
+	}
+	var scripts []VerifySpec
+	verified := map[string]bool{}
+	for _, v := range mr.verify {
+		if v.Gate && v.Event == "fresh_shell" && len(pkgs[v.Group]) > 0 {
+			scripts = append(scripts, v)
+			verified[v.Group] = true
+		}
+	}
+	failed := map[string]bool{}
+	if len(scripts) > 0 {
+		mr.p.Count("verifying before updates", len(scripts))
+		var mu sync.Mutex
+		var connErr error
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, parallelCommands)
+		rp := newRunning(mr.p)
+		for i, v := range scripts {
+			sem <- struct{}{}
+			mu.Lock()
+			stop := connErr != nil
+			mu.Unlock()
+			if stop {
+				<-sem
+				break
+			}
+			wg.Add(1)
+			rp.begin(i, "verify "+v.Name)
+			go func() {
+				defer wg.Done()
+				defer func() { <-sem }()
+				defer rp.end(i)
+				// The two shells run one after the other, as in verifyMachine.
+				for _, interactive := range []bool{false, true} {
+					res, err := runVerify(ctx, mr.env, v, interactive)
+					if err != nil || res.Code != 0 {
+						mu.Lock()
+						failed[v.Group] = true
+						if transport.IsConnError(err) && connErr == nil {
+							connErr = err
+						}
+						mu.Unlock()
+						return
+					}
+				}
+			}()
+		}
+		wg.Wait()
+		if connErr != nil {
+			return connErr
+		}
+	}
+	for g, list := range pkgs {
+		if failed[g] {
+			continue
+		}
+		detail := "update skipped (no verify script; --update runs it)"
+		if verified[g] {
+			detail = "verify passed, update skipped"
+		}
+		for _, pt := range list {
+			pt.SkipUpdate = detail
+		}
+	}
+	return nil
+}
+
 // verifyShells are the two shells of each fresh_shell script.
 var verifyShells = [2]string{"noninteractive", "interactive"}
 
@@ -171,7 +267,7 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		addRow(verifyRow(v, shell, res, err))
 	}
 	run := func(ctx context.Context, v VerifySpec, interactive bool) (transport.Result, error) {
-		return env.T.Run(ctx, transport.Cmd{Script: v.Script, LoginShell: true, Interactive: interactive, Timeout: 5 * time.Minute, Label: "verify " + v.Name})
+		return runVerify(ctx, env, v, interactive)
 	}
 	runnable := 0
 	for _, v := range mr.verify {

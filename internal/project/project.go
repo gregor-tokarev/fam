@@ -162,7 +162,7 @@ func DetectAgents() []string {
 func agentsPkl(agents []string) string {
 	var b strings.Builder
 	b.WriteString("amends \"@fam/Agents.pkl\"\n\n")
-	b.WriteString("// FAM installs each agent CLI, updates it on each `fam apply`,\n")
+	b.WriteString("// FAM installs each agent CLI, updates it with `fam apply --update`,\n")
 	b.WriteString("// and merges `settings` into the settings file of the agent.\n")
 	b.WriteString("agents {\n")
 	if len(agents) == 0 {

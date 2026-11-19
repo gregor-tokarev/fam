@@ -32,7 +32,8 @@ var _ Package = PackageImpl{}
 //
 // Or give your own commands: [install], [update], [uninstall].
 //
-// FAM installs the program when it is missing, and updates it on each `fam apply`.
+// FAM installs the program when it is missing. `fam apply` runs the update only when a verify
+// script of the bundle fails before the apply loop. `fam apply --update` runs each update.
 // An update changes nothing in the result when the output of [versionCommand] stays the same.
 type PackageImpl struct {
 	// The package. A string is an npm package. An object (`new { package = …; manager = … }`
