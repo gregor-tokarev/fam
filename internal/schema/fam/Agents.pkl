@@ -6,6 +6,7 @@
 /// agents {
 ///   ["claude"] { settings { autoMemoryEnabled = false } }
 ///   ["codex"] {}
+///   ["antigravity"] {}
 /// }
 /// ```
 ///
@@ -15,5 +16,6 @@ module fam.Agents
 
 import "base.pkl"
 
-/// The agents. Supported keys: `"claude"` (Claude Code) and `"codex"` (Codex).
+/// The agents. Supported keys: `"claude"` (Claude Code), `"codex"` (Codex), and `"antigravity"`
+/// (Google Antigravity CLI, `agy`).
 agents: Mapping<base.AgentName, base.Agent>

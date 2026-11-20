@@ -133,8 +133,10 @@ User scripts (`Script`, `Package`) run in Bash when the machine has Bash, else i
 | `~/.agents/CLAUDE.md` | The same content, then the rendered `instructions/CLAUDE.md`. |
 | `~/.codex/AGENTS.md` | A link to `~/.agents/AGENTS.md`. |
 | `~/.claude/CLAUDE.md` | A link to `~/.agents/CLAUDE.md`. |
+| `~/.gemini/AGENTS.md` | A link to `~/.agents/AGENTS.md`, only with the agent `antigravity`. |
 | `~/.agents/skills/<name>/` | A copy of each skill, with a `.fam-managed` marker file. |
 | `~/.claude/skills/<name>` | A link to `~/.agents/skills/<name>`. |
+| `~/.gemini/config/skills` | A link to `~/.agents/skills`, only with the agent `antigravity`. |
 | `~/.local/bin/<binary>` | A binary from a `GitHubRelease` task. |
 | `~/.local/state/fam/releases/<binary>.json` | The repository and SHA-256 of a binary that FAM installed. |
 
@@ -310,8 +312,11 @@ On Linux, FAM detects glibc or musl from the machine. On musl, `assets` uses `li
 |---|---|---|---|---|
 | Claude Code | `curl -fsSL https://claude.ai/install.sh \| bash` | `claude update` | `bash -s <version>`, then `claude install <version>` | `~/.claude/settings.json` (JSON merge) |
 | Codex | `curl -fsSL https://chatgpt.com/codex/install.sh \| CODEX_NON_INTERACTIVE=1 sh` | the install command again | `sh -s -- --release <version>` | `~/.codex/config.toml` (TOML merge) |
+| Antigravity CLI (`agy`) | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` | `agy update`, or `brew upgrade --cask antigravity-cli` for the Homebrew cask | none: `version` is an error | `~/.gemini/antigravity-cli/settings.json` (JSON merge) |
 
-Sources: https://code.claude.com/docs/en/setup and https://developers.openai.com/codex/cli. Both install into `~/.local/bin`. An update that does not change the output of `--version` is "unchanged". The agent updates follow the rules of [Updates](#updates): the `--version` command is the verify script that decides the update.
+Sources: https://code.claude.com/docs/en/setup, https://developers.openai.com/codex/cli, and https://antigravity.google/product/antigravity-cli. All install into `~/.local/bin`.
+
+The Antigravity CLI does not read `~/.agents/AGENTS.md` or `~/.agents/skills`. With the agent `antigravity`, FAM links `~/.gemini/AGENTS.md` to `~/.agents/AGENTS.md` and `~/.gemini/config/skills` to `~/.agents/skills`. FAM does not replace a folder at `~/.gemini/config/skills`: move its skills into a bundle, then remove the folder. An update that does not change the output of `--version` is "unchanged". The agent updates follow the rules of [Updates](#updates): the `--version` command is the verify script that decides the update.
 
 A TOML merge writes the file again with sorted keys and without comments. A JSON merge keeps the key order.
 

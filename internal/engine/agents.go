@@ -18,6 +18,10 @@ import (
 // Codex: https://developers.openai.com/codex/cli — standalone installer into ~/.local/bin; the same
 // command updates it; `--release <version>` pins it. Homebrew: `brew upgrade --cask codex`;
 // npm: `npm install -g @openai/codex@latest`.
+//
+// Antigravity CLI: https://antigravity.google/product/antigravity-cli — installer into
+// ~/.local/bin/agy, which updates itself, and `agy update`. Homebrew: `brew upgrade --cask
+// antigravity-cli`. The installer gives only the latest version, so FAM cannot pin one.
 type agentDef struct {
 	binary     string
 	settings   string
@@ -27,6 +31,16 @@ type agentDef struct {
 	versionCmd string
 	// pinSettings are settings that keep a pinned version (no automatic update).
 	pinSettings func() *omap
+	// noPin is true when the official installer gives only the latest version.
+	noPin bool
+	// links are the links that let the agent find the instructions and the skills, when the
+	// instructions section does not make them for every machine.
+	links []agentLink
+}
+
+// agentLink is a link from a path of the agent to a file or folder that FAM manages.
+type agentLink struct {
+	path, target string
 }
 
 // download runs an installer script only after a complete download. `curl … | sh` would
@@ -124,6 +138,32 @@ esac`
 			return m
 		},
 	},
+	"antigravity": {
+		binary:   "agy",
+		settings: "~/.gemini/antigravity-cli/settings.json",
+		format:   "json",
+		install: func(string) string {
+			return download("https://antigravity.google/cli/install.sh", "bash", "")
+		},
+		// The Homebrew cask installs a wrapper script, not a link into the Caskroom, so
+		// installMethod cannot find it.
+		update: func(string) string {
+			return `if command -v brew >/dev/null 2>&1 && brew list --cask antigravity-cli >/dev/null 2>&1; then
+  brew upgrade --cask antigravity-cli
+else
+  agy update
+fi`
+		},
+		versionCmd: "agy --version",
+		noPin:      true,
+		links: []agentLink{
+			// agy reads ~/.gemini/AGENTS.md and ~/.gemini/GEMINI.md. Gemini CLI also reads
+			// GEMINI.md, so FAM uses AGENTS.md.
+			{path: "~/.gemini/AGENTS.md", target: "~/.agents/AGENTS.md"},
+			// The global skills folder of the Antigravity CLI and app.
+			{path: "~/.gemini/config/skills", target: "~/" + agentsSkills},
+		},
+	},
 }
 
 func agentsSection(env *Env, spec *config.Spec) (Section, error) {
@@ -137,6 +177,9 @@ func agentsSection(env *Env, spec *config.Spec) (Section, error) {
 		v := ""
 		if a.Agent.Version != nil {
 			v = *a.Agent.Version
+		}
+		if v != "" && def.noPin {
+			return sec, fmt.Errorf("agent %s: FAM cannot pin a version, because its installer gives only the latest version. Remove `version`", a.Name)
 		}
 		sec.Tasks = append(sec.Tasks, &PackageTask{base: g, Binary: def.binary, Install: def.install(v), UpdateSh: def.update(v), VersionCmd: def.versionCmd, Pin: v})
 		settings := newOmap()
@@ -160,6 +203,9 @@ func agentsSection(env *Env, spec *config.Spec) (Section, error) {
 		}
 		if len(settings.keys) > 0 {
 			sec.Tasks = append(sec.Tasks, &MergeTask{base: g, Path: def.settings, Format: def.format, Values: settings, Mode: 0o644, Label: def.settings + " (settings)"})
+		}
+		for _, l := range def.links {
+			sec.Tasks = append(sec.Tasks, &SymlinkTask{base: g, Path: l.path, Target: l.target, Backup: true})
 		}
 	}
 	return sec, nil
@@ -192,6 +238,11 @@ func agentPathsScript(name string, skills []string) string {
 		b.WriteString(`test -r "$HOME/.codex/AGENTS.md" || { echo "no ~/.codex/AGENTS.md" >&2; exit 1; }` + "\n")
 		for _, n := range skills {
 			fmt.Fprintf(&b, `test -r "$HOME/.agents/skills/"%[1]s/SKILL.md || { echo "Codex cannot read the skill "%[1]s >&2; exit 1; }`+"\n", transport.Quote(n))
+		}
+	case "antigravity":
+		b.WriteString(`test -r "$HOME/.gemini/AGENTS.md" || { echo "no ~/.gemini/AGENTS.md" >&2; exit 1; }` + "\n")
+		for _, n := range skills {
+			fmt.Fprintf(&b, `test -r "$HOME/.gemini/config/skills/"%[1]s/SKILL.md || { echo "Antigravity cannot read the skill "%[1]s >&2; exit 1; }`+"\n", transport.Quote(n))
 		}
 	default:
 		b.WriteString("true\n")

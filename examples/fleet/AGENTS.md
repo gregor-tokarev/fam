@@ -1,11 +1,11 @@
 <!-- fam:begin -->
-FAM project: the tools, skills, and agent instructions of a fleet of machines (FAM 0.21.0).
+FAM project: the tools, skills, and agent instructions of a fleet of machines (FAM 0.22.0).
 
 Where things go:
 - Every machine: `bundles` in `config.pkl`. Machines with a tag: `tags { ["gpu"] { bundles {...} } }` in `config.pkl`. One machine: `bundles` of its entry in `machines.pkl` (add `import "@fam/std.pkl"` there for std bundles).
 - An entry with the name of an earlier bundle replaces it, so a tag or a machine can change or remove a bundle of every machine. Tag bundles come in the order of the machine's `tags`.
 - Machines: `machines.pkl`, `["name"] { tags { "worker"; "gpu" }; address = "host"; user = "me" }`. A machine can have any number of tags, and each tag must be in `tags` of `config.pkl` (`["name"] {}` for a tag without bundles). This machine: `["name"] { cockpit = true }`.
-- Agent settings: `agents.pkl`, `["claude"] { settings { key = value } }`.
+- Agents: `agents.pkl` with the keys `"claude"`, `"codex"`, `"antigravity"`. Settings: `["claude"] { settings { key = value } }`.
 - `instructions/AGENTS.md` goes to every agent on every machine. This file is only for this folder.
 - Skills: `new fam.AgentSkill { source }` tasks in bundles, so a bundle for every machine, a tag, or one machine selects them. `source` is a folder relative to the bundle file (with `SKILL.md`, front matter `name`, `description`), a GitHub repository URL (with `path` and `ref`), a `/tree/<ref>/<folder>` URL, a `.tar.gz` or `.zip` URL, or a `.md` URL.
 - Secrets: `KEY=value` lines in the file of `secrets` in `config.pkl`, or an Infisical folder (`secrets { infisical { projectId; environment } }`). Bundles name theirs in `requiredSecrets`. Never print values.

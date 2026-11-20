@@ -10,8 +10,9 @@ import (
 type AgentName string
 
 const (
-	Claude AgentName = "claude"
-	Codex  AgentName = "codex"
+	Claude      AgentName = "claude"
+	Codex       AgentName = "codex"
+	Antigravity AgentName = "antigravity"
 )
 
 // String returns the string representation of AgentName
@@ -28,6 +29,8 @@ func (rcv *AgentName) UnmarshalBinary(data []byte) error {
 		*rcv = Claude
 	case "codex":
 		*rcv = Codex
+	case "antigravity":
+		*rcv = Antigravity
 	default:
 		return fmt.Errorf(`illegal: "%s" is not a valid AgentName`, str)
 	}

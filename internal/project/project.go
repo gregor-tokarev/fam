@@ -156,6 +156,7 @@ func DetectAgents() []string {
 	}
 	check("claude", "claude", ".claude")
 	check("codex", "codex", ".codex")
+	check("antigravity", "agy", filepath.Join(".gemini", "antigravity-cli"))
 	return found
 }
 

@@ -17,6 +17,7 @@ import (
 //	agents {
 //	  ["claude"] { settings { autoMemoryEnabled = false } }
 //	  ["codex"] {}
+//	  ["antigravity"] {}
 //	}
 //
 // ```
@@ -24,7 +25,8 @@ import (
 // `config.pkl` uses it with `agents = import("agents.pkl").agents`.
 // FAM knows the paths of each agent. Write settings only.
 type Agents struct {
-	// The agents. Supported keys: `"claude"` (Claude Code) and `"codex"` (Codex).
+	// The agents. Supported keys: `"claude"` (Claude Code), `"codex"` (Codex), and `"antigravity"`
+	// (Google Antigravity CLI, `agy`).
 	Agents map[agentname.AgentName]base.Agent `pkl:"agents"`
 }
 

@@ -1,11 +1,11 @@
 {
   "resolvedDependencies": {
-    "package://github.com/gregor-tokarev/fam/releases/download/v0.21.0/fam@0": {
+    "package://github.com/gregor-tokarev/fam/releases/download/v0.22.0/fam@0": {
       "checksums": {
-        "sha256": "44d98cddcbf901054976f96191fb491b71817112aab70f897ad6ed9d6fa35456"
+        "sha256": "df085088e0d502eacc261c04c21f658698538a6e4d5bfcf4959e715a82785bfc"
       },
       "type": "remote",
-      "uri": "projectpackage://github.com/gregor-tokarev/fam/releases/download/v0.21.0/fam@0.21.0"
+      "uri": "projectpackage://github.com/gregor-tokarev/fam/releases/download/v0.22.0/fam@0.22.0"
     }
   },
   "schemaVersion": 1

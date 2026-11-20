@@ -10,7 +10,7 @@ import "tasks.pkl" as t
 typealias Tag = String(matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
 
 /// The coding agents that FAM manages.
-typealias AgentName = "claude"|"codex"
+typealias AgentName = "claude"|"codex"|"antigravity"
 
 /// A bundle with an explicit state.
 ///
@@ -74,12 +74,15 @@ class Agent {
   ///
   /// FAM keeps all other keys of the file.
   /// Claude Code: `~/.claude/settings.json`. Codex: `~/.codex/config.toml`.
+  /// Antigravity CLI: `~/.gemini/antigravity-cli/settings.json`.
   settings: Dynamic
 
   /// A pinned CLI version, for example `"2.0.14"`.
   ///
   /// When it is `null`, FAM installs the latest version. `fam apply` updates the CLI when
   /// `<cli> --version` fails, and `fam apply --update` always updates it.
+  ///
+  /// The Antigravity CLI has no pinned versions: its installer gives only the latest version.
   version: String?
 }
 
