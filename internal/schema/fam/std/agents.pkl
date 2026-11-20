@@ -6,14 +6,8 @@ import "../Bundle.pkl"
 /// skills: the agent skills tool, with the find-skills skill.
 function skills(): Bundle = import("../bundles/agents/skills.pkl")
 
-/// daytona: Create and manage Daytona sandboxes, snapshots, and remote command execution.
-function daytona(): Bundle = import("../bundles/agents/daytona.pkl")
-
 /// e2b: Manage E2B cloud sandboxes and build sandbox templates.
 function e2b(): Bundle = import("../bundles/agents/e2b.pkl")
 
 /// modal: Deploy serverless jobs and manage Modal functions, sandboxes, volumes, and secrets.
 function modal(): Bundle = import("../bundles/agents/modal.pkl")
-
-/// promptfoo: Evaluate model prompts and agents, and run adversarial evaluations.
-function promptfoo(): Bundle = import("../bundles/agents/promptfoo.pkl")

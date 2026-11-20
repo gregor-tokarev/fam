@@ -26,7 +26,7 @@ import "std/devtools.pkl" as devtoolsGroup
 /// Tools that let agents use a computer: browsers and desktop apps.
 computer: computerGroup = import("std/computer.pkl")
 
-/// Tools that give agents context: source code of packages, a knowledge graph of a codebase, related issues.
+/// Tools that give agents context: code search, documentation, web content, and packed repositories.
 context: contextGroup = import("std/context.pkl")
 
 /// Tools that make media: video, images, and text.

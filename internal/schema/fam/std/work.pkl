@@ -3,14 +3,8 @@ module fam.std.work
 
 import "../Bundle.pkl"
 
-/// lark-cli: Use Lark and Feishu chat, documents, spreadsheets, calendars, and tasks.
-function larkCli(): Bundle = import("../bundles/work/lark-cli.pkl")
-
 /// linear-cli: Manage Linear issues, projects, cycles, documents, and comments.
 function linearCli(): Bundle = import("../bundles/work/linear-cli.pkl")
-
-/// linear-release: Report CI deployments and release changes to Linear.
-function linearRelease(): Bundle = import("../bundles/work/linear-release.pkl")
 
 /// slack-cli: Call Slack APIs and develop, run, and deploy Slack applications.
 function slackCli(): Bundle = import("../bundles/work/slack-cli.pkl")

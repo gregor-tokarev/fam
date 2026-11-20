@@ -1,5 +1,5 @@
 <!-- fam:begin -->
-FAM project: the tools, skills, and agent instructions of a fleet of machines (FAM 0.22.0).
+FAM project: the tools, skills, and agent instructions of a fleet of machines (FAM 0.23.0).
 
 Where things go:
 - Every machine: `bundles` in `config.pkl`. Machines with a tag: `tags { ["gpu"] { bundles {...} } }` in `config.pkl`. One machine: `bundles` of its entry in `machines.pkl` (add `import "@fam/std.pkl"` there for std bundles).
