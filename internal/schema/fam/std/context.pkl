@@ -1,16 +1,7 @@
-/// Tools that give agents context: source code of packages, a knowledge graph of a codebase, related issues.
+/// Tools that give agents context: code search, documentation, web content, and packed repositories.
 module fam.std.context
 
 import "../Bundle.pkl"
-
-/// issue-graph: related issues and changes before work starts, with its skill.
-function issueGraph(): Bundle = import("../bundles/context/issue-graph.pkl")
-
-/// lat.md: a Markdown knowledge graph of a codebase, with its skill.
-function latMd(): Bundle = import("../bundles/context/lat-md.pkl")
-
-/// opensrc: the source code of npm packages for agents, with its skill.
-function opensrc(): Bundle = import("../bundles/context/opensrc.pkl")
 
 /// ast-grep: Search and rewrite source code with syntax-tree patterns.
 function astGrep(): Bundle = import("../bundles/context/ast-grep.pkl")
@@ -29,12 +20,3 @@ function repomix(): Bundle = import("../bundles/context/repomix.pkl")
 
 /// ripgrep: Search source trees with fast regular expressions and ignore-file support.
 function ripgrep(): Bundle = import("../bundles/context/ripgrep.pkl")
-
-/// scc: Count source lines and estimate code complexity with structured output.
-function scc(): Bundle = import("../bundles/context/scc.pkl")
-
-/// tavily: Search the web and extract content with the official Tavily CLI.
-function tavily(): Bundle = import("../bundles/context/tavily.pkl")
-
-/// tokei: Count source lines, comments, and language totals across a repository.
-function tokei(): Bundle = import("../bundles/context/tokei.pkl")

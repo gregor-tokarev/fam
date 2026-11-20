@@ -9,9 +9,6 @@ function direnv(): Bundle = import("../bundles/devtools/direnv.pkl")
 /// fzf: Filter and rank text candidates through fuzzy matching.
 function fzf(): Bundle = import("../bundles/devtools/fzf.pkl")
 
-/// glow: Render Markdown files and standard input in a terminal.
-function glow(): Bundle = import("../bundles/devtools/glow.pkl")
-
 /// hyperfine: Benchmark shell commands and export machine-readable timing results.
 function hyperfine(): Bundle = import("../bundles/devtools/hyperfine.pkl")
 
@@ -23,21 +20,6 @@ function just(): Bundle = import("../bundles/devtools/just.pkl")
 
 /// mise: Manage developer tools, project environments, and task execution.
 function mise(): Bundle = import("../bundles/devtools/mise.pkl")
-
-/// nx: Inspect monorepos, generate projects, and execute dependency-aware build tasks.
-function nx(): Bundle = import("../bundles/devtools/nx.pkl")
-
-/// pitchfork: Start, inspect, and stop project services with readiness and dependency checks.
-function pitchfork(): Bundle = import("../bundles/devtools/pitchfork.pkl")
-
-/// shfmt: Format shell scripts and validate their syntax.
-function shfmt(): Bundle = import("../bundles/devtools/shfmt.pkl")
-
-/// turborepo: Execute monorepo tasks with dependency ordering and build caching.
-function turborepo(): Bundle = import("../bundles/devtools/turborepo.pkl")
-
-/// usage: Validate CLI specifications and generate command help, documentation, and completions.
-function usage(): Bundle = import("../bundles/devtools/usage.pkl")
 
 /// watchexec: Run commands after files change, with debounce and process control.
 function watchexec(): Bundle = import("../bundles/devtools/watchexec.pkl")

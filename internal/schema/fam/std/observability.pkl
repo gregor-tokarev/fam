@@ -3,29 +3,5 @@ module fam.std.observability
 
 import "../Bundle.pkl"
 
-/// axiom: Query Axiom datasets, logs, and traces from the command line.
-function axiom(): Bundle = import("../bundles/observability/axiom.pkl")
-
-/// cx: Query Coralogix telemetry and manage observability resources.
-function cx(): Bundle = import("../bundles/observability/cx.pkl")
-
-/// dtctl: Query Dynatrace telemetry and manage dashboards, workflows, and SLOs.
-function dtctl(): Bundle = import("../bundles/observability/dtctl.pkl")
-
-/// honeymarker: Manage Honeycomb deployment markers and annotations.
-function honeymarker(): Bundle = import("../bundles/observability/honeymarker.pkl")
-
-/// langsmith: Inspect LangSmith traces, runs, datasets, and evaluations.
-function langsmith(): Bundle = import("../bundles/observability/langsmith.pkl")
-
-/// newrelic: Query New Relic data and manage observability resources.
-function newrelic(): Bundle = import("../bundles/observability/newrelic.pkl")
-
-/// pup: Query Datadog logs, traces, monitors, and service metadata.
-function pup(): Bundle = import("../bundles/observability/pup.pkl")
-
-/// sentry: Inspect Sentry issues, events, and projects from an agent shell.
-function sentry(): Bundle = import("../bundles/observability/sentry.pkl")
-
 /// sentry-cli: Upload Sentry source maps, debug symbols, and release artifacts.
 function sentryCli(): Bundle = import("../bundles/observability/sentry-cli.pkl")

@@ -3,38 +3,11 @@ module fam.std.data
 
 import "../Bundle.pkl"
 
-/// drizzle-kit: generate and apply Drizzle database migrations.
-function drizzleKit(): Bundle = import("../bundles/data/drizzle-kit.pkl")
-
 /// duckdb: query local files and analytical datasets with SQL.
 function duckdb(): Bundle = import("../bundles/data/duckdb.pkl")
-
-/// goose: apply and track database schema migrations.
-function goose(): Bundle = import("../bundles/data/goose.pkl")
-
-/// litestream: replicate SQLite databases to external storage.
-function litestream(): Bundle = import("../bundles/data/litestream.pkl")
-
-/// migrate: run versioned database migrations.
-function migrate(): Bundle = import("../bundles/data/migrate.pkl")
-
-/// neonctl: manage Neon PostgreSQL projects, branches, and database resources.
-function neonctl(): Bundle = import("../bundles/data/neonctl.pkl")
-
-/// pscale: manage PlanetScale databases, branches, and schema changes.
-function pscale(): Bundle = import("../bundles/data/pscale.pkl")
 
 /// rclone: copy and synchronize files across cloud storage services.
 function rclone(): Bundle = import("../bundles/data/rclone.pkl")
 
-/// sqlite-utils: import, transform, and query SQLite databases from the CLI.
-function sqliteUtils(): Bundle = import("../bundles/data/sqlite-utils.pkl")
-
 /// supabase: manage Supabase projects, migrations, functions, and local databases.
 function supabase(): Bundle = import("../bundles/data/supabase.pkl")
-
-/// turso: manage Turso databases, branches, and access tokens.
-function turso(): Bundle = import("../bundles/data/turso.pkl")
-
-/// usql: query many database systems through a common CLI.
-function usql(): Bundle = import("../bundles/data/usql.pkl")

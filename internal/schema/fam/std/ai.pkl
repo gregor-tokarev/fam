@@ -11,9 +11,3 @@ function huggingFace(): Bundle = import("../bundles/ai/hf.pkl")
 
 /// llm: Send model prompts, use tools, and store prompt and response logs.
 function llm(): Bundle = import("../bundles/ai/llm.pkl")
-
-/// openai-cli: Call OpenAI APIs for responses, files, batches, images, audio, and administration.
-function openaiCli(): Bundle = import("../bundles/ai/openai-cli.pkl")
-
-/// wandb: Inspect and synchronize Weights & Biases runs, artifacts, and experiment data.
-function wandb(): Bundle = import("../bundles/ai/wandb.pkl")

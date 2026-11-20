@@ -3,20 +3,8 @@ module fam.std.security
 
 import "../Bundle.pkl"
 
-/// ggshield: Scan source changes and repositories for secrets through GitGuardian.
-function ggshield(): Bundle = import("../bundles/security/ggshield.pkl")
-
-/// osv-scanner: Find vulnerable dependencies in source trees, lockfiles, and container images.
-function osvScanner(): Bundle = import("../bundles/security/osv-scanner.pkl")
-
 /// semgrep: Scan source code for security issues through Semgrep rules.
 function semgrep(): Bundle = import("../bundles/security/semgrep.pkl")
 
-/// snyk: Scan dependencies, source code, containers, and infrastructure with Snyk.
-function snyk(): Bundle = import("../bundles/security/snyk.pkl")
-
 /// trivy: Scan files, images, dependencies, secrets, and infrastructure configuration.
 function trivy(): Bundle = import("../bundles/security/trivy.pkl")
-
-/// trufflehog: Find and verify leaked credentials in files, Git repositories, and remote sources.
-function trufflehog(): Bundle = import("../bundles/security/trufflehog.pkl")
