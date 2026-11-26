@@ -1,4 +1,4 @@
-// Command bench benchmarks all FAM commands comparing a baseline binary
+// Command bench benchmarks FAM commands comparing a baseline binary
 // (typically origin/main) against a candidate binary (typically the PR head)
 // and emits a Markdown table with millisecond timings.
 //
@@ -59,42 +59,6 @@ func allCases() []benchCase {
 	noop := func() {}
 	return []benchCase{
 		{
-			name: "fam version",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"version"}, noop, nil
-			},
-		},
-		{
-			name: "fam help",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"help"}, noop, nil
-			},
-		},
-		{
-			name: "fam completion bash",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"completion", "bash"}, noop, nil
-			},
-		},
-		{
-			name: "fam completion zsh",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"completion", "zsh"}, noop, nil
-			},
-		},
-		{
-			name: "fam completion fish",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"completion", "fish"}, noop, nil
-			},
-		},
-		{
-			name: "fam completion powershell",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"completion", "powershell"}, noop, nil
-			},
-		},
-		{
 			name: "fam new",
 			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
 				dir := filepath.Join(sb.work, fmt.Sprintf("new-%d", iter))
@@ -108,22 +72,10 @@ func allCases() []benchCase {
 			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
 				dir := filepath.Join(sb.work, fmt.Sprintf("migrate-%d", iter))
 				_ = os.RemoveAll(dir)
-				if err := copyTree(sb.project, dir, false); err != nil {
+				if err := copyTree(sb.project, dir); err != nil {
 					return "", "", nil, noop, err
 				}
 				return sb.home, dir, []string{"migrate", "--base", dir}, func() { _ = os.RemoveAll(dir) }, nil
-			},
-		},
-		{
-			name: "fam std list",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"std", "list"}, noop, nil
-			},
-		},
-		{
-			name: "fam std show",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"std", "show", "computer.agentBrowser"}, noop, nil
 			},
 		},
 		{
@@ -149,34 +101,6 @@ func allCases() []benchCase {
 			},
 		},
 		{
-			name:         "fam apply (fresh)",
-			needsProject: true,
-			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
-				freshHome := filepath.Join(sb.work, fmt.Sprintf("apply-fresh-%d", iter))
-				_ = os.RemoveAll(freshHome)
-				if err := sb.prepareFreshHome(freshHome); err != nil {
-					return "", "", nil, noop, err
-				}
-				return freshHome, sb.project, []string{"apply", "--no-progress", "--base", sb.project}, func() { _ = os.RemoveAll(freshHome) }, nil
-			},
-		},
-		{
-			name:         "fam apply (steady)",
-			needsProject: true,
-			needsSteady:  true,
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.project, []string{"apply", "--no-progress", "--base", sb.project}, noop, nil
-			},
-		},
-		{
-			name:         "fam apply --update",
-			needsProject: true,
-			needsSteady:  true,
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.project, []string{"apply", "--update", "--no-progress", "--base", sb.project}, noop, nil
-			},
-		},
-		{
 			name:         "fam verify",
 			needsProject: true,
 			needsSteady:  true,
@@ -189,40 +113,6 @@ func allCases() []benchCase {
 			network: true,
 			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
 				return sb.home, sb.root, []string{"update", "--check"}, noop, nil
-			},
-		},
-		{
-			name: "fam internal std-docs",
-			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
-				dir := filepath.Join(sb.work, fmt.Sprintf("stddocs-%d", iter))
-				_ = os.RemoveAll(dir)
-				if err := os.MkdirAll(dir, 0o755); err != nil {
-					return "", "", nil, noop, err
-				}
-				out := filepath.Join(dir, "std.md")
-				return sb.home, sb.root, []string{"internal", "std-docs", out}, func() { _ = os.RemoveAll(dir) }, nil
-			},
-		},
-		{
-			name: "fam internal package",
-			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
-				dir := filepath.Join(sb.work, fmt.Sprintf("pkg-%d", iter))
-				_ = os.RemoveAll(dir)
-				return sb.home, sb.root, []string{"internal", "package", dir}, func() { _ = os.RemoveAll(dir) }, nil
-			},
-		},
-		{
-			name: "fam internal pkl-path",
-			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
-				return sb.home, sb.root, []string{"internal", "pkl-path"}, noop, nil
-			},
-		},
-		{
-			name: "fam internal install-pkl",
-			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
-				dir := filepath.Join(sb.work, fmt.Sprintf("instpkl-%d", iter))
-				_ = os.RemoveAll(dir)
-				return sb.home, sb.root, []string{"internal", "install-pkl", dir}, func() { _ = os.RemoveAll(dir) }, nil
 			},
 		},
 	}
