@@ -1,14 +1,35 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
+const cockpitMachinesPkl = `amends "@fam/Machines.pkl"
+
+machines {
+  ["cockpit"] {
+    cockpit = true
+    tags { "bench" }
+  }
+}
+`
+
+func sshMachinesPkl(user string, aliases []string) string {
+	var b strings.Builder
+	b.WriteString("amends \"@fam/Machines.pkl\"\n\nmachines {\n")
+	for i, alias := range aliases {
+		fmt.Fprintf(&b, "  [\"worker%d\"] {\n    tags { \"bench\" }\n    address = %q\n    user = %q\n  }\n", i+1, alias, user)
+	}
+	b.WriteString("}\n")
+	return b.String()
+}
+
 // writeFixture populates a benchmark FAM project inside dir and writes its
 // secrets source file outside the project, inside home.
-func writeFixture(dir, home string) error {
+func writeFixture(dir, home, machinesPkl string) error {
 	secretsPath := filepath.Join(home, ".secrets", "bench.env")
 	if err := os.MkdirAll(filepath.Dir(secretsPath), 0o700); err != nil {
 		return err
@@ -22,15 +43,7 @@ func writeFixture(dir, home string) error {
 	}
 
 	files := map[string]string{
-		"machines.pkl": `amends "@fam/Machines.pkl"
-
-machines {
-  ["cockpit"] {
-    cockpit = true
-    tags { "bench" }
-  }
-}
-`,
+		"machines.pkl": machinesPkl,
 		"agents.pkl": `amends "@fam/Agents.pkl"
 
 agents {}

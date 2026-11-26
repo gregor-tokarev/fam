@@ -39,6 +39,13 @@ jobs:
           (cd "$RUNNER_TEMP/base-src" && go build -o "$RUNNER_TEMP/fam-main" ./cmd/fam)
           go build -o "$RUNNER_TEMP/fam-pr" ./cmd/fam
 
+      - name: Ensure sshd is available
+        run: |
+          if [ ! -x /usr/sbin/sshd ]; then
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends openssh-server
+          fi
+          sudo mkdir -p /run/sshd
+
       - name: Run FAM command benchmark
         run: |
           go run ./bench \
@@ -48,8 +55,10 @@ jobs:
             -head-label "PR" \
             -base-sha "$BASE_SHA" \
             -head-sha "$HEAD_SHA" \
-            -runs 5 \
+            -runs 4 \
             -warmup 1 \
+            -workers 3 \
+            -ssh-rtt 60ms \
             -markdown "$RUNNER_TEMP/bench.md"
 
       - name: Publish summary and PR comment

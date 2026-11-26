@@ -13,39 +13,56 @@ import (
 	"time"
 )
 
-// sandbox holds an isolated HOME, project, caches, and working directories for one fam binary.
+// sandbox holds an isolated HOME, projects, caches, and working directories for one fam binary.
 type sandbox struct {
-	name       string
-	bin        string
-	root       string
-	home       string
-	project    string
-	work       string
-	sshConfig  string
-	pklPath    string
-	relPklPath string // path of pkl binary relative to home
-	projectErr string // non-empty when fixture project setup failed
-	steadyErr  string // non-empty when initial steady-state apply failed
+	name            string
+	bin             string
+	root            string
+	home            string
+	project         string
+	sshProject      string
+	sshFreshProject string
+	sshFreshHomes   []string
+	work            string
+	sshConfig       string
+	pklPath         string
+	relPklPath      string // path of pkl binary relative to home
+	projectErr      string // non-empty when fixture project setup failed
+	steadyErr       string // non-empty when initial cockpit steady-state apply failed
+	sshProjectErr   string // non-empty when SSH fixture project setup failed
+	sshSteadyErr    string // non-empty when initial SSH steady-state apply failed
 }
 
-func newSandbox(ctx context.Context, root, name, bin string, pklSeedDirs []string) (*sandbox, error) {
+func newSandbox(ctx context.Context, root, name, bin string, pklSeedDirs []string, cluster *sshCluster, steadyAliases, freshAliases []string) (*sandbox, error) {
 	sb := &sandbox{
-		name:      name,
-		bin:       bin,
-		root:      filepath.Join(root, name),
-		home:      filepath.Join(root, name, "home"),
-		project:   filepath.Join(root, name, "project"),
-		work:      filepath.Join(root, name, "work"),
-		sshConfig: filepath.Join(root, name, "ssh_config"),
+		name:            name,
+		bin:             bin,
+		root:            filepath.Join(root, name),
+		home:            filepath.Join(root, name, "home"),
+		project:         filepath.Join(root, name, "project"),
+		sshProject:      filepath.Join(root, name, "project-ssh"),
+		sshFreshProject: filepath.Join(root, name, "project-ssh-fresh"),
+		work:            filepath.Join(root, name, "work"),
+		sshConfig:       filepath.Join(root, name, "ssh_config"),
 	}
 	for _, d := range []string{sb.home, sb.work} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return nil, err
 		}
 	}
-	// Safety belt: block any accidental SSH connection immediately.
-	if err := os.WriteFile(sb.sshConfig, []byte("Host *\n  HostName 127.0.0.1\n  Port 9\n  ConnectTimeout 2\n  BatchMode yes\n"), 0o644); err != nil {
-		return nil, err
+	if cluster != nil {
+		allAliases := append(append([]string{}, steadyAliases...), freshAliases...)
+		if err := cluster.writeClientConfig(sb.sshConfig, allAliases); err != nil {
+			return nil, err
+		}
+		for _, a := range freshAliases {
+			sb.sshFreshHomes = append(sb.sshFreshHomes, cluster.workers[a].homeDir)
+		}
+	} else {
+		// Safety belt: block any accidental SSH connection immediately.
+		if err := os.WriteFile(sb.sshConfig, []byte("Host *\n  HostName 127.0.0.1\n  Port 9\n  ConnectTimeout 2\n  BatchMode yes\n"), 0o600); err != nil {
+			return nil, err
+		}
 	}
 
 	// Pre-seed cached pkl binaries from the host (or previous sandbox) to avoid redundant downloads.
@@ -73,24 +90,57 @@ func newSandbox(ctx context.Context, root, name, bin string, pklSeedDirs []strin
 	}
 	sb.relPklPath = rel
 
-	// Bootstrap the benchmark project with this binary's own schema & pin.
+	// Bootstrap the cockpit benchmark project with this binary's own schema & pin.
 	// Setup failures are recorded on the sandbox so unaffected commands still run and report.
-	if out, err := sb.run(ctx, sb.home, sb.root, "new", "--base", sb.project); err != nil {
-		sb.projectErr = "setup fam new: " + compactErr(err, out)
+	if err := sb.bootstrapProject(ctx, sb.project, cockpitMachinesPkl); err != nil {
+		sb.projectErr = err.Error()
+		sb.sshProjectErr = err.Error()
 		return sb, nil
-	}
-	// Remove unused starter bundles from `fam new` before writing the benchmark fixture.
-	for _, rm := range []string{"bundles/hello.pkl", "bundles/files", "bundles/worker-setup.pkl"} {
-		_ = os.RemoveAll(filepath.Join(sb.project, rm))
-	}
-	if err := writeFixture(sb.project, sb.home); err != nil {
-		return nil, fmt.Errorf("%s: write fixture: %w", name, err)
 	}
 	// Converge sb.home once so plan, apply (steady), apply --update, and verify run against an applied cockpit.
 	if out, err := sb.run(ctx, sb.home, sb.project, "apply", "--no-progress", "--base", sb.project); err != nil {
 		sb.steadyErr = "setup fam apply: " + compactErr(err, out)
 	}
+
+	if cluster != nil {
+		if err := sb.bootstrapProject(ctx, sb.sshProject, sshMachinesPkl(cluster.user, steadyAliases)); err != nil {
+			sb.sshProjectErr = err.Error()
+			return sb, nil
+		}
+		if err := sb.bootstrapProject(ctx, sb.sshFreshProject, sshMachinesPkl(cluster.user, freshAliases)); err != nil {
+			sb.sshProjectErr = err.Error()
+			return sb, nil
+		}
+		if out, err := sb.run(ctx, sb.home, sb.sshProject, "apply", "--no-progress", "--base", sb.sshProject); err != nil {
+			sb.sshSteadyErr = "setup fam apply (ssh): " + compactErr(err, out)
+		}
+	}
 	return sb, nil
+}
+
+func (sb *sandbox) bootstrapProject(ctx context.Context, dir, machinesPkl string) error {
+	if out, err := sb.run(ctx, sb.home, sb.root, "new", "--base", dir); err != nil {
+		return fmt.Errorf("setup fam new: %s", compactErr(err, out))
+	}
+	for _, rm := range []string{"bundles/hello.pkl", "bundles/files", "bundles/worker-setup.pkl"} {
+		_ = os.RemoveAll(filepath.Join(dir, rm))
+	}
+	if err := writeFixture(dir, sb.home, machinesPkl); err != nil {
+		return fmt.Errorf("write fixture: %w", err)
+	}
+	return nil
+}
+
+func (sb *sandbox) resetSSHFreshHomes() error {
+	for _, h := range sb.sshFreshHomes {
+		if err := os.RemoveAll(h); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(h, 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // pklRoot returns the directory under sb.home containing cached pkl versions.
@@ -122,8 +172,12 @@ func (sb *sandbox) envFor(home string) []string {
 	)
 }
 
+const cmdTimeout = 2 * time.Minute
+
 func (sb *sandbox) run(ctx context.Context, home, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, sb.bin, args...)
+	cctx, cancel := context.WithTimeout(ctx, cmdTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(cctx, sb.bin, args...)
 	cmd.Dir = dir
 	cmd.Env = sb.envFor(home)
 	out, err := cmd.CombinedOutput()
@@ -131,7 +185,9 @@ func (sb *sandbox) run(ctx context.Context, home, dir string, args ...string) (s
 }
 
 func (sb *sandbox) timeRun(ctx context.Context, home, dir string, args ...string) (time.Duration, string, error) {
-	cmd := exec.CommandContext(ctx, sb.bin, args...)
+	cctx, cancel := context.WithTimeout(ctx, cmdTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(cctx, sb.bin, args...)
 	cmd.Dir = dir
 	cmd.Env = sb.envFor(home)
 	start := time.Now()

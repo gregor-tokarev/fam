@@ -24,10 +24,13 @@ import (
 const commentMarker = "<!-- fam-command-benchmark -->"
 
 type benchCase struct {
-	name         string
-	network      bool
-	needsProject bool
-	needsSteady  bool
+	name            string
+	network         bool
+	needsProject    bool
+	needsSteady     bool
+	needsSSH        bool
+	needsSSHProject bool
+	needsSSHSteady  bool
 	// prepare runs before the timer starts and returns (home, workDir, args, cleanup, error).
 	prepare func(sb *sandbox, iter int) (home, dir string, args []string, cleanup func(), err error)
 }
@@ -52,12 +55,14 @@ type report struct {
 	HeadSHA   string       `json:"headSha,omitempty"`
 	Runs      int          `json:"runs"`
 	Warmup    int          `json:"warmup"`
+	Workers   int          `json:"workers,omitempty"`
+	SSHRTTMS  int64        `json:"sshRttMs,omitempty"`
 	Results   []caseResult `json:"results"`
 }
 
-func allCases() []benchCase {
+func allCases(workers int) []benchCase {
 	noop := func() {}
-	return []benchCase{
+	cases := []benchCase{
 		{
 			name: "fam new",
 			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
@@ -144,9 +149,90 @@ func allCases() []benchCase {
 			},
 		},
 	}
+
+	if workers > 0 {
+		workerCount := fmt.Sprintf("%d workers", workers)
+		sshTag := fmt.Sprintf("%d SSH workers", workers)
+		if workers == 1 {
+			workerCount = "1 worker"
+			sshTag = "1 SSH worker"
+		}
+		cases = append(cases,
+			benchCase{
+				name:            fmt.Sprintf("fam check (%s)", workerCount),
+				needsSSH:        true,
+				needsSSHProject: true,
+				prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+					return sb.home, sb.sshProject, []string{"check", "--base", sb.sshProject}, noop, nil
+				},
+			},
+			benchCase{
+				name:            fmt.Sprintf("fam doctor (%s, online)", sshTag),
+				network:         true,
+				needsSSH:        true,
+				needsSSHProject: true,
+				prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+					return sb.home, sb.sshProject, []string{"doctor", "--base", sb.sshProject}, noop, nil
+				},
+			},
+			benchCase{
+				name:            fmt.Sprintf("fam plan (%s)", sshTag),
+				needsSSH:        true,
+				needsSSHProject: true,
+				needsSSHSteady:  true,
+				prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+					return sb.home, sb.sshProject, []string{"plan", "--no-progress", "--base", sb.sshProject}, noop, nil
+				},
+			},
+			benchCase{
+				name:            fmt.Sprintf("fam apply (fresh, %s)", sshTag),
+				needsSSH:        true,
+				needsSSHProject: true,
+				prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+					if err := sb.resetSSHFreshHomes(); err != nil {
+						return "", "", nil, noop, err
+					}
+					return sb.home, sb.sshFreshProject, []string{"apply", "--no-progress", "--base", sb.sshFreshProject}, noop, nil
+				},
+			},
+			benchCase{
+				name:            fmt.Sprintf("fam apply (steady, %s)", sshTag),
+				needsSSH:        true,
+				needsSSHProject: true,
+				needsSSHSteady:  true,
+				prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+					return sb.home, sb.sshProject, []string{"apply", "--no-progress", "--base", sb.sshProject}, noop, nil
+				},
+			},
+			benchCase{
+				name:            fmt.Sprintf("fam apply --update (%s)", sshTag),
+				needsSSH:        true,
+				needsSSHProject: true,
+				needsSSHSteady:  true,
+				prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+					return sb.home, sb.sshProject, []string{"apply", "--update", "--no-progress", "--base", sb.sshProject}, noop, nil
+				},
+			},
+			benchCase{
+				name:            fmt.Sprintf("fam verify (%s)", sshTag),
+				needsSSH:        true,
+				needsSSHProject: true,
+				needsSSHSteady:  true,
+				prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+					return sb.home, sb.sshProject, []string{"verify", "--no-progress", "--base", sb.sshProject}, noop, nil
+				},
+			},
+		)
+	}
+
+	return cases
 }
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	baseBin := flag.String("base-bin", "", "path to baseline fam binary (default: build from -base-ref)")
 	headBin := flag.String("head-bin", "", "path to candidate fam binary (default: build current checkout)")
 	baseRef := flag.String("base-ref", "origin/main", "git ref for baseline when -base-bin is empty")
@@ -154,9 +240,11 @@ func main() {
 	headLabel := flag.String("head-label", "PR", "column label for candidate")
 	baseSHA := flag.String("base-sha", "", "short commit SHA for baseline (shown in header)")
 	headSHA := flag.String("head-sha", "", "short commit SHA for candidate (shown in header)")
-	runs := flag.Int("runs", 5, "measured iterations per command")
+	runs := flag.Int("runs", 4, "measured iterations per command")
 	warmup := flag.Int("warmup", 1, "warmup iterations per command")
-	offline := flag.Bool("offline", false, "skip network commands such as fam update --check")
+	workers := flag.Int("workers", 3, "number of local SSH workers for multi-machine rows (0 disables SSH rows)")
+	sshRTT := flag.Duration("ssh-rtt", 60*time.Millisecond, "emulated round-trip network latency for SSH workers (0 disables delay)")
+	offline := flag.Bool("offline", false, "skip network commands such as fam update --check and online fam doctor")
 	filter := flag.String("filter", "", "run only commands whose name contains this substring")
 	markdownOut := flag.String("markdown", "", "write the Markdown report to this file")
 	jsonOut := flag.String("json", "", "write the JSON report to this file")
@@ -164,11 +252,19 @@ func main() {
 
 	if *runs < 1 {
 		fmt.Fprintln(os.Stderr, "bench: -runs must be >= 1")
-		os.Exit(2)
+		return 2
 	}
 	if *warmup < 0 {
 		fmt.Fprintln(os.Stderr, "bench: -warmup must be >= 0")
-		os.Exit(2)
+		return 2
+	}
+	if *workers < 0 {
+		fmt.Fprintln(os.Stderr, "bench: -workers must be >= 0")
+		return 2
+	}
+	if *sshRTT < 0 {
+		fmt.Fprintln(os.Stderr, "bench: -ssh-rtt must be >= 0")
+		return 2
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -176,13 +272,13 @@ func main() {
 
 	tmpRoot, err := os.MkdirTemp("", "fam-bench-*")
 	if err != nil {
-		fatal(err)
+		return fail(err)
 	}
 	defer os.RemoveAll(tmpRoot)
 
 	repoDir, err := os.Getwd()
 	if err != nil {
-		fatal(err)
+		return fail(err)
 	}
 
 	resolvedBaseBin := *baseBin
@@ -192,7 +288,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "bench: building baseline from %s...\n", *baseRef)
 		sha, err := buildFromRef(ctx, repoDir, *baseRef, filepath.Join(tmpRoot, "base-worktree"), resolvedBaseBin)
 		if err != nil {
-			fatal(err)
+			return fail(err)
 		}
 		if resolvedBaseSHA == "" {
 			resolvedBaseSHA = sha
@@ -200,7 +296,7 @@ func main() {
 	} else {
 		resolvedBaseBin, err = filepath.Abs(resolvedBaseBin)
 		if err != nil {
-			fatal(err)
+			return fail(err)
 		}
 	}
 
@@ -210,7 +306,7 @@ func main() {
 		resolvedHeadBin = filepath.Join(tmpRoot, "fam-head")
 		fmt.Fprintf(os.Stderr, "bench: building candidate from working tree...\n")
 		if err := buildFromDir(ctx, repoDir, resolvedHeadBin); err != nil {
-			fatal(err)
+			return fail(err)
 		}
 		if resolvedHeadSHA == "" {
 			if out, err := exec.CommandContext(ctx, "git", "rev-parse", "--short", "HEAD").Output(); err == nil {
@@ -220,8 +316,39 @@ func main() {
 	} else {
 		resolvedHeadBin, err = filepath.Abs(resolvedHeadBin)
 		if err != nil {
-			fatal(err)
+			return fail(err)
 		}
+	}
+
+	cases := selectCases(allCases(*workers), *offline, *filter)
+	if len(cases) == 0 {
+		return fail(fmt.Errorf("no benchmark cases matched"))
+	}
+
+	needSSH := false
+	for _, c := range cases {
+		if c.needsSSH {
+			needSSH = true
+			break
+		}
+	}
+
+	var cluster *sshCluster
+	var baseSteadyAliases, baseFreshAliases, headSteadyAliases, headFreshAliases []string
+	if needSSH {
+		for i := 1; i <= *workers; i++ {
+			baseSteadyAliases = append(baseSteadyAliases, fmt.Sprintf("base-steady-%d", i))
+			baseFreshAliases = append(baseFreshAliases, fmt.Sprintf("base-fresh-%d", i))
+			headSteadyAliases = append(headSteadyAliases, fmt.Sprintf("head-steady-%d", i))
+			headFreshAliases = append(headFreshAliases, fmt.Sprintf("head-fresh-%d", i))
+		}
+		allAliases := append(append(append([]string{}, baseSteadyAliases...), baseFreshAliases...), append(headSteadyAliases, headFreshAliases...)...)
+		fmt.Fprintf(os.Stderr, "bench: starting local sshd for %d workers per binary (emulated RTT: %s)...\n", *workers, *sshRTT)
+		cluster, err = startSSHCluster(ctx, tmpRoot, allAliases, *sshRTT)
+		if err != nil {
+			return fail(err)
+		}
+		defer cluster.Close()
 	}
 
 	var hostPklDirs []string
@@ -230,19 +357,14 @@ func main() {
 	}
 
 	fmt.Fprintf(os.Stderr, "bench: preparing isolated sandboxes...\n")
-	baseSB, err := newSandbox(ctx, tmpRoot, "base", resolvedBaseBin, hostPklDirs)
+	baseSB, err := newSandbox(ctx, tmpRoot, "base", resolvedBaseBin, hostPklDirs, cluster, baseSteadyAliases, baseFreshAliases)
 	if err != nil {
-		fatal(err)
+		return fail(err)
 	}
 	// Reuse base's cached pkl binary for head if they share the same Pkl version.
-	headSB, err := newSandbox(ctx, tmpRoot, "head", resolvedHeadBin, append([]string{baseSB.pklRoot()}, hostPklDirs...))
+	headSB, err := newSandbox(ctx, tmpRoot, "head", resolvedHeadBin, append([]string{baseSB.pklRoot()}, hostPklDirs...), cluster, headSteadyAliases, headFreshAliases)
 	if err != nil {
-		fatal(err)
-	}
-
-	cases := selectCases(allCases(), *offline, *filter)
-	if len(cases) == 0 {
-		fatal(fmt.Errorf("no benchmark cases matched"))
+		return fail(err)
 	}
 
 	rep := report{
@@ -253,6 +375,10 @@ func main() {
 		Runs:      *runs,
 		Warmup:    *warmup,
 		Results:   make([]caseResult, 0, len(cases)),
+	}
+	if needSSH {
+		rep.Workers = *workers
+		rep.SSHRTTMS = sshRTT.Milliseconds()
 	}
 
 	anyError := false
@@ -270,21 +396,22 @@ func main() {
 
 	if *markdownOut != "" {
 		if err := os.WriteFile(*markdownOut, []byte(md), 0o644); err != nil {
-			fatal(err)
+			return fail(err)
 		}
 	}
 	if *jsonOut != "" {
 		b, err := json.MarshalIndent(rep, "", "  ")
 		if err != nil {
-			fatal(err)
+			return fail(err)
 		}
 		if err := os.WriteFile(*jsonOut, append(b, '\n'), 0o644); err != nil {
-			fatal(err)
+			return fail(err)
 		}
 	}
 	if anyError {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func selectCases(cases []benchCase, offline bool, filter string) []benchCase {
@@ -314,6 +441,14 @@ func measureCase(ctx context.Context, bc benchCase, baseSB, headSB *sandbox, war
 		}
 		if bc.needsSteady && sb.steadyErr != "" {
 			side.Error = sb.steadyErr
+			return
+		}
+		if bc.needsSSHProject && sb.sshProjectErr != "" {
+			side.Error = sb.sshProjectErr
+			return
+		}
+		if bc.needsSSHSteady && sb.sshSteadyErr != "" {
+			side.Error = sb.sshSteadyErr
 			return
 		}
 		home, dir, args, cleanup, err := bc.prepare(sb, iter)
@@ -401,8 +536,12 @@ func renderMarkdown(r report) string {
 	if r.HeadSHA != "" {
 		headDesc += fmt.Sprintf(" (`%s`)", r.HeadSHA)
 	}
-	fmt.Fprintf(&b, "Median wall time across %d runs (%d warmup), interleaved on the same machine: %s vs %s.\n\n",
+	fmt.Fprintf(&b, "Median wall time across %d runs (%d warmup), interleaved on the same machine: %s vs %s.",
 		r.Runs, r.Warmup, baseDesc, headDesc)
+	if r.Workers > 0 {
+		fmt.Fprintf(&b, " Multi-machine rows target %d workers (SSH rows run over local `sshd` with %d ms emulated RTT).", r.Workers, r.SSHRTTMS)
+	}
+	b.WriteString("\n\n")
 
 	fmt.Fprintf(&b, "| Command | `%s` | `%s` | Diff |\n", r.BaseLabel, r.HeadLabel)
 	b.WriteString("|---|---:|---:|---:|\n")
@@ -457,7 +596,7 @@ func formatDiff(base, head sideResult) string {
 	return fmt.Sprintf("%+.1f ms", delta)
 }
 
-func fatal(err error) {
+func fail(err error) int {
 	fmt.Fprintln(os.Stderr, "bench:", err)
-	os.Exit(1)
+	return 1
 }
