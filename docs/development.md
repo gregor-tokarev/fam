@@ -14,6 +14,7 @@
 | `internal/stdlib` | Catalogue reflection, selected bundle evaluation, and generated documentation. |
 | `internal/cli` | Command registration, project diagnostics, and environment checks. |
 | `agentbench` | Agent tasks, guide variants, measured results, and reports. See [the benchmark](agent-benchmark.md). |
+| `bench` | Command timing benchmark comparing a baseline `fam` binary (`origin/main`) against a candidate binary (PR checkout). |
 
 ## Build
 
