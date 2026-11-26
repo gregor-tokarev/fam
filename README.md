@@ -31,6 +31,14 @@ FAM goes to `~/.local/bin`, with `pkl` when you do not have it yet (for the Pkl 
 
 To update FAM, run `fam update`.
 
+## Agent skill
+
+Install the FAM skill for your coding agents:
+
+```sh
+npx skills add gregor-tokarev/fam
+```
+
 ## Use
 
 ```sh
