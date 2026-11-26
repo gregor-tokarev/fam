@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -21,6 +22,8 @@ type sandbox struct {
 	project    string
 	work       string
 	sshConfig  string
+	pklPath    string
+	relPklPath string // path of pkl binary relative to home
 	projectErr string // non-empty when fixture project setup failed
 	steadyErr  string // non-empty when initial steady-state apply failed
 }
@@ -53,14 +56,22 @@ func newSandbox(ctx context.Context, root, name, bin string, pklSeedDirs []strin
 			continue
 		}
 		if st, err := os.Stat(src); err == nil && st.IsDir() {
-			_ = copyTree(src, dstPklRoot)
+			_ = copyTree(src, dstPklRoot, false)
 		}
 	}
 
 	// Ensure the pinned pkl binary for this fam binary exists in the sandbox cache.
-	if out, err := sb.run(ctx, sb.home, sb.root, "internal", "pkl-path"); err != nil {
+	out, err := sb.run(ctx, sb.home, sb.root, "internal", "pkl-path")
+	if err != nil {
 		return nil, fmt.Errorf("%s: fam internal pkl-path: %w\n%s", name, err, out)
 	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	sb.pklPath = strings.TrimSpace(lines[len(lines)-1])
+	rel, err := filepath.Rel(sb.home, sb.pklPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return nil, fmt.Errorf("%s: pkl path %q is outside sandbox home %q", name, sb.pklPath, sb.home)
+	}
+	sb.relPklPath = rel
 
 	// Bootstrap the benchmark project with this binary's own schema & pin.
 	// Setup failures are recorded on the sandbox so unaffected commands still run and report.
@@ -75,7 +86,7 @@ func newSandbox(ctx context.Context, root, name, bin string, pklSeedDirs []strin
 	if err := writeFixture(sb.project, sb.home); err != nil {
 		return nil, fmt.Errorf("%s: write fixture: %w", name, err)
 	}
-	// Converge sb.home once so plan and verify run against an applied cockpit.
+	// Converge sb.home once so plan, apply (steady), apply --update, and verify run against an applied cockpit.
 	if out, err := sb.run(ctx, sb.home, sb.project, "apply", "--no-progress", "--base", sb.project); err != nil {
 		sb.steadyErr = "setup fam apply: " + compactErr(err, out)
 	}
@@ -129,6 +140,46 @@ func (sb *sandbox) timeRun(ctx context.Context, home, dir string, args ...string
 	return dur, string(out), err
 }
 
+// prepareFreshHome creates a clean HOME directory with only the pkl binary cache,
+// seeded fam Pkl package caches, and the secrets source file, ready for a fresh `fam apply`.
+func (sb *sandbox) prepareFreshHome(dir string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	// Hardlink (or copy) the pinned pkl binary and its sha256 stamp.
+	dstPkl := filepath.Join(dir, sb.relPklPath)
+	if err := linkOrCopyFile(sb.pklPath, dstPkl); err != nil {
+		return err
+	}
+	if _, err := os.Stat(sb.pklPath + ".sha256"); err == nil {
+		if err := linkOrCopyFile(sb.pklPath+".sha256", dstPkl+".sha256"); err != nil {
+			return err
+		}
+	}
+	// Seed Pkl package caches so fresh apply does not pay package seeding noise.
+	for _, rel := range []string{filepath.Join(".cache", "pkl"), filepath.Join(".pkl", "cache")} {
+		src := filepath.Join(sb.home, rel)
+		if st, err := os.Stat(src); err == nil && st.IsDir() {
+			if err := copyTree(src, filepath.Join(dir, rel), true); err != nil {
+				return err
+			}
+		}
+	}
+	// Copy secrets source file with strict 0700 / 0600 permissions.
+	secDst := filepath.Join(dir, ".secrets", "bench.env")
+	if err := os.MkdirAll(filepath.Dir(secDst), 0o700); err != nil {
+		return err
+	}
+	b, err := os.ReadFile(filepath.Join(sb.home, ".secrets", "bench.env"))
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(secDst, b, 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(secDst, 0o600)
+}
+
 func userCacheDir(home string) string {
 	if runtime.GOOS == "darwin" {
 		return filepath.Join(home, "Library", "Caches")
@@ -136,7 +187,40 @@ func userCacheDir(home string) string {
 	return filepath.Join(home, ".cache")
 }
 
-func copyTree(src, dst string) error {
+func linkOrCopyFile(src, dst string) error {
+	if _, err := os.Stat(dst); err == nil {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	if err := os.Link(src, dst); err == nil {
+		return nil
+	}
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_EXCL, info.Mode().Perm())
+	if err != nil {
+		if os.IsExist(err) {
+			return nil
+		}
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
+func copyTree(src, dst string, hardlink bool) error {
 	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -165,6 +249,9 @@ func copyTree(src, dst string) error {
 				return err
 			}
 			return os.Symlink(link, target)
+		}
+		if hardlink {
+			return linkOrCopyFile(p, target)
 		}
 		if _, err := os.Stat(target); err == nil {
 			return nil

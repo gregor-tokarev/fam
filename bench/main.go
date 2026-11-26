@@ -72,7 +72,7 @@ func allCases() []benchCase {
 			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
 				dir := filepath.Join(sb.work, fmt.Sprintf("migrate-%d", iter))
 				_ = os.RemoveAll(dir)
-				if err := copyTree(sb.project, dir); err != nil {
+				if err := copyTree(sb.project, dir, false); err != nil {
 					return "", "", nil, noop, err
 				}
 				return sb.home, dir, []string{"migrate", "--base", dir}, func() { _ = os.RemoveAll(dir) }, nil
@@ -98,6 +98,34 @@ func allCases() []benchCase {
 			needsSteady:  true,
 			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
 				return sb.home, sb.project, []string{"plan", "--no-progress", "--base", sb.project}, noop, nil
+			},
+		},
+		{
+			name:         "fam apply (fresh)",
+			needsProject: true,
+			prepare: func(sb *sandbox, iter int) (string, string, []string, func(), error) {
+				freshHome := filepath.Join(sb.work, fmt.Sprintf("apply-fresh-%d", iter))
+				_ = os.RemoveAll(freshHome)
+				if err := sb.prepareFreshHome(freshHome); err != nil {
+					return "", "", nil, noop, err
+				}
+				return freshHome, sb.project, []string{"apply", "--no-progress", "--base", sb.project}, func() { _ = os.RemoveAll(freshHome) }, nil
+			},
+		},
+		{
+			name:         "fam apply (steady)",
+			needsProject: true,
+			needsSteady:  true,
+			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+				return sb.home, sb.project, []string{"apply", "--no-progress", "--base", sb.project}, noop, nil
+			},
+		},
+		{
+			name:         "fam apply --update",
+			needsProject: true,
+			needsSteady:  true,
+			prepare: func(sb *sandbox, _ int) (string, string, []string, func(), error) {
+				return sb.home, sb.project, []string{"apply", "--update", "--no-progress", "--base", sb.project}, noop, nil
 			},
 		},
 		{
