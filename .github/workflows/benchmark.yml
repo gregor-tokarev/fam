@@ -1,0 +1,84 @@
+name: benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: benchmark-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build origin/main and PR binaries
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          BASE_SHA=$(git rev-parse --short origin/main)
+          HEAD_SHA=$(git rev-parse --short HEAD)
+          echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=$HEAD_SHA" >> "$GITHUB_ENV"
+
+          git worktree add --detach "$RUNNER_TEMP/base-src" origin/main
+          trap 'git worktree remove --force "$RUNNER_TEMP/base-src" || true' EXIT
+
+          (cd "$RUNNER_TEMP/base-src" && go build -o "$RUNNER_TEMP/fam-main" ./cmd/fam)
+          go build -o "$RUNNER_TEMP/fam-pr" ./cmd/fam
+
+      - name: Run FAM command benchmark
+        run: |
+          go run ./bench \
+            -base-bin "$RUNNER_TEMP/fam-main" \
+            -head-bin "$RUNNER_TEMP/fam-pr" \
+            -base-label "origin/main" \
+            -head-label "PR" \
+            -base-sha "$BASE_SHA" \
+            -head-sha "$HEAD_SHA" \
+            -runs 5 \
+            -warmup 1 \
+            -markdown "$RUNNER_TEMP/bench.md"
+
+      - name: Publish summary and PR comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          IS_SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          set -euo pipefail
+          BODY_FILE="$RUNNER_TEMP/bench.md"
+          if [ ! -s "$BODY_FILE" ]; then
+            exit 0
+          fi
+          cat "$BODY_FILE" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$IS_SAME_REPO" != "true" ]; then
+            echo "Skipping PR comment for fork pull request."
+            exit 0
+          fi
+
+          MARKER="<!-- fam-command-benchmark -->"
+          COMMENT_ID=$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            | jq -r --arg marker "$MARKER" '(add // []) | map(select(.user.login == "github-actions[bot]" and ((.body // "") | contains($marker))) | .id) | first // empty')
+
+          if [ -n "$COMMENT_ID" ]; then
+            jq -Rs '{body: .}' "$BODY_FILE" | gh api --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" --input - >/dev/null
+          else
+            jq -Rs '{body: .}' "$BODY_FILE" | gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --input - >/dev/null
+          fi
