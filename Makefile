@@ -1,4 +1,4 @@
-VERSION ?= 0.23.3
+VERSION ?= 0.23.4
 LDFLAGS := -X github.com/gregor-tokarev/fam/internal/version.Version=$(VERSION)
 
 .PHONY: build pklgen
