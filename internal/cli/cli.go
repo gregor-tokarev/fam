@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/gregor-tokarev/fam/internal/daemon"
 	"github.com/gregor-tokarev/fam/internal/pklbin"
 	"github.com/gregor-tokarev/fam/internal/project"
 	"github.com/gregor-tokarev/fam/internal/schema"
@@ -221,6 +222,26 @@ func internalCmd() *cobra.Command {
 			return nil
 		},
 	})
+	var daemonSock, daemonWatch string
+	var daemonStop bool
+	daemonCmd := &cobra.Command{
+		Use:   "daemon",
+		Short: "Run or stop the local warm session daemon",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if daemonStop {
+				return daemon.Stop()
+			}
+			if daemonSock == "" {
+				return errors.New("--socket is required")
+			}
+			return daemon.RunServer(cmd.Context(), daemonSock, daemonWatch)
+		},
+	}
+	daemonCmd.Flags().StringVar(&daemonSock, "socket", "", "unix socket path")
+	daemonCmd.Flags().StringVar(&daemonWatch, "watch-dir", "", "exit when this directory disappears")
+	daemonCmd.Flags().BoolVar(&daemonStop, "stop", false, "stop the running daemon for this environment")
+	c.AddCommand(daemonCmd)
 	return c
 }
 

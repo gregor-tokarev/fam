@@ -79,9 +79,11 @@ func convert(t tasks.Task, group string, absent bool, bundleManager string, f fa
 		// Own commands win over the commands of the package manager.
 		if v := x.GetInstall(); v != nil {
 			pt.Install = *v
+			pt.CustomInstall = true
 		}
 		if v := x.GetUpdate(); v != nil {
 			pt.UpdateSh = *v
+			pt.CustomUpdate = true
 		}
 		if v := x.GetUninstall(); v != nil {
 			pt.Uninstall = *v
@@ -170,7 +172,7 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 	if staticOnly && spec.kind != skillLocal {
 		// fam check does not download remote skills.
 		src := &SkillSource{Name: name, Dir: spec.String(), Origin: origin}
-		return []Task{&SkillTask{base: g, Skill: src, units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
+		return []Task{&SkillTask{base: g, loader: resolvedSkill(src), units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
 	}
 	if spec.kind != skillLocal {
 		// Start remote skill download concurrently so multiple skills and remote checks overlap.
@@ -181,7 +183,7 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 	if err != nil {
 		return nil, true, err
 	}
-	return []Task{&SkillTask{base: g, Skill: src, units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
+	return []Task{&SkillTask{base: g, loader: resolvedSkill(src), units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
 }
 
 // skillName is the rule for skill names, as in tasks.pkl.

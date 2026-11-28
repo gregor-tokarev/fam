@@ -103,35 +103,63 @@ func (e *Evaluator) Close() error { return e.manager.Close() }
 
 // Eval evaluates the entrypoint once with the given properties.
 func (e *Evaluator) Eval(ctx context.Context, props map[string]string) (*config.Config, error) {
-	ev, err := e.manager.NewEvaluator(ctx, e.options(props)...)
-	if err != nil {
-		return nil, fmt.Errorf("start the Pkl evaluator: %w", err)
-	}
-	defer ev.Close()
-	var cfg config.Config
-	if err := ev.EvaluateModule(ctx, pkl.FileSource(e.path), &cfg); err != nil {
-		return nil, &EvalError{Path: e.path, Err: err}
-	}
-	return &cfg, nil
+	cfg, _, err := e.EvalRaw(ctx, props)
+	return cfg, err
 }
 
-// Init evaluates both the machines mapping and the secrets property in a single Pkl evaluator
-// session so config.pkl is parsed and initialized only once.
-func (e *Evaluator) Init(ctx context.Context, props map[string]string) ([]Machine, *base.Secrets, error) {
+// EvalRaw evaluates the entrypoint once and returns both the decoded Config and the raw Pkl
+// binary encoding so callers can cache the lossless Pkl output across runs.
+func (e *Evaluator) EvalRaw(ctx context.Context, props map[string]string) (*config.Config, []byte, error) {
 	ev, err := e.manager.NewEvaluator(ctx, e.options(props)...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("start the Pkl evaluator: %w", err)
 	}
 	defer ev.Close()
-	machines, err := evalMachineList(ctx, ev, e.path)
+	raw, err := ev.EvaluateExpressionRaw(ctx, pkl.FileSource(e.path), "")
 	if err != nil {
-		return nil, nil, err
-	}
-	var sec *base.Secrets
-	if err := ev.EvaluateExpression(ctx, pkl.FileSource(e.path), "secrets", &sec); err != nil {
 		return nil, nil, &EvalError{Path: e.path, Err: err}
 	}
-	return machines, sec, nil
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	var cfg config.Config
+	if err := pkl.Unmarshal(raw, &cfg); err != nil {
+		return nil, nil, &EvalError{Path: e.path, Err: err}
+	}
+	return &cfg, raw, nil
+}
+
+// Init evaluates both the machines mapping and the secrets property in a single Pkl evaluator
+// session so config.pkl is parsed and initialized only once.
+func (e *Evaluator) Init(ctx context.Context, props map[string]string) ([]Machine, *base.Secrets, error) {
+	machines, sec, _, err := e.InitRaw(ctx, props)
+	return machines, sec, err
+}
+
+// InitRaw evaluates machines and secrets once and also returns the raw Pkl binary encoding of
+// secrets so callers can cache it losslessly without DTO drift.
+func (e *Evaluator) InitRaw(ctx context.Context, props map[string]string) ([]Machine, *base.Secrets, []byte, error) {
+	ev, err := e.manager.NewEvaluator(ctx, e.options(props)...)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("start the Pkl evaluator: %w", err)
+	}
+	defer ev.Close()
+	machines, err := evalMachineList(ctx, ev, e.path)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	rawSec, err := ev.EvaluateExpressionRaw(ctx, pkl.FileSource(e.path), "secrets")
+	if err != nil {
+		return nil, nil, nil, &EvalError{Path: e.path, Err: err}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
+	var sec *base.Secrets
+	if err := pkl.Unmarshal(rawSec, &sec); err != nil {
+		return nil, nil, nil, &EvalError{Path: e.path, Err: err}
+	}
+	return machines, sec, rawSec, nil
 }
 
 // MachineList evaluates only the machines mapping: name, cockpit, tags, address, and user of each machine.

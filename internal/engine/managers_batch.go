@@ -64,11 +64,7 @@ func newManagerCache(ts []Task) *managerCache {
 }
 
 func supportsBulkManager(mgr string) bool {
-	switch mgr {
-	case "vite", "apt", "dnf", "pacman", "yay", "apk", "uv", "bun", "cargo", "go", "brew":
-		return true
-	}
-	return false
+	return managers[mgr].bulkScript != nil
 }
 
 // lookup checks pkg against a cached bulk manager snapshot. handled is false when the caller
@@ -96,65 +92,23 @@ func (c *managerCache) lookup(ctx context.Context, env *Env, mgr, pkg string, su
 	return false, true, nil
 }
 
-func queryManagerBulk(ctx context.Context, env *Env, mgr string, pkgs []string, sudo bool) (map[string]bool, bool, error) {
+func managerBulkScript(mgr string, pkgs []string) (script string, complete bool, ok bool) {
 	m := managers[mgr]
-	var quoted []string
-	for _, p := range pkgs {
-		quoted = append(quoted, transport.Quote(p))
+	if m.bulkScript == nil {
+		return "", false, false
 	}
-	qList := strings.Join(quoted, " ")
+	quoted := make([]string, len(pkgs))
+	for i, p := range pkgs {
+		quoted[i] = transport.Quote(p)
+	}
+	return m.bulkScript(m.tool, strings.Join(quoted, " ")), m.bulkComplete, true
+}
 
-	var script string
-	complete := true
-	switch mgr {
-	case "vite":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-out=$(vp list -g 2>&1) || { echo "the query of %s failed with exit code $?" >&2; exit 5; }
-printf '%%s\n' "$out"`, m.tool, m.tool)
-	case "apt":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-out=$(dpkg-query -W -f='${Package}\t${Status}\n' %s 2>/dev/null); rc=$?
-[ $rc -le 1 ] || { echo "the query of %s failed with exit code $rc" >&2; exit 5; }
-printf '%%s\n' "$out"`, m.tool, qList, m.tool)
-	case "dnf":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-for p in %s; do rpm -q "$p" >/dev/null 2>&1 && printf '%%s\n' "$p"; done
-exit 0`, m.tool, qList)
-	case "pacman", "yay":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-for p in %s; do pacman -Q "$p" >/dev/null 2>&1 && printf '%%s\n' "$p"; done
-exit 0`, m.tool, qList)
-	case "apk":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-for p in %s; do apk info -e "$p" >/dev/null 2>&1 && printf '%%s\n' "$p"; done
-exit 0`, m.tool, qList)
-	case "uv":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-out=$(uv tool list 2>&1) || { echo "the query of %s failed with exit code $?" >&2; exit 5; }
-printf '%%s\n' "$out"`, m.tool, m.tool)
-	case "bun":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-out=$(bun pm ls -g 2>&1) || { case "$out" in *"No package.json"*) exit 0 ;; *) echo "the query of %s failed with exit code $?" >&2; exit 5 ;; esac; }
-printf '%%s\n' "$out"`, m.tool, m.tool)
-	case "cargo":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-[ -e "$HOME/.local/.crates.toml" ] || exit 0
-cat "$HOME/.local/.crates.toml" || exit 5`, m.tool)
-	case "go":
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-for b in "$HOME/.local/bin/"*; do
-  [ -f "$b" ] || continue
-  TEST_TELEMETRY_DIR=/dev/null go version -m "$b" 2>/dev/null || true
-done`, m.tool)
-	case "brew":
-		complete = false
-		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
-brew list --formula -1 2>/dev/null || true
-brew list --cask -1 2>/dev/null || true`, m.tool)
-	default:
+func queryManagerBulk(ctx context.Context, env *Env, mgr string, pkgs []string, sudo bool) (map[string]bool, bool, error) {
+	script, complete, ok := managerBulkScript(mgr, pkgs)
+	if !ok {
 		return nil, false, nil
 	}
-
 	r, err := env.UserScript(ctx, script, sudo, fmt.Sprintf("ask %s for %d packages", mgr, len(pkgs)), 2*time.Minute)
 	if err != nil {
 		return nil, false, err
@@ -165,69 +119,5 @@ brew list --cask -1 2>/dev/null || true`, m.tool)
 	if r.Code != 0 {
 		return nil, false, sudoHint(&ExitError{Label: "ask " + mgr, Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, sudo, "package")
 	}
-
-	out := map[string]bool{}
-	lines := strings.Split(string(r.Stdout), "\n")
-	switch mgr {
-	case "vite":
-		for i, line := range lines {
-			if i < 2 {
-				continue
-			}
-			f := strings.Fields(line)
-			if len(f) == 0 {
-				continue
-			}
-			n := f[0]
-			if at := strings.LastIndexByte(n, '@'); at > 0 {
-				n = n[:at]
-			}
-			if n != "" {
-				out[n] = true
-			}
-		}
-	case "apt":
-		for _, line := range lines {
-			pkg, status, ok := strings.Cut(line, "\t")
-			if ok && strings.Contains(status, "install ok installed") {
-				out[strings.TrimSpace(pkg)] = true
-			}
-		}
-	case "dnf", "pacman", "yay", "apk", "brew":
-		for _, line := range lines {
-			if n := strings.TrimSpace(line); n != "" {
-				out[n] = true
-			}
-		}
-	case "uv":
-		for _, line := range lines {
-			if f := strings.Fields(line); len(f) > 0 {
-				out[f[0]] = true
-			}
-		}
-	case "bun":
-		for _, line := range lines {
-			for _, tok := range strings.Fields(line) {
-				if at := strings.LastIndexByte(tok, '@'); at > 0 {
-					out[tok[:at]] = true
-				}
-			}
-		}
-	case "cargo":
-		for _, line := range lines {
-			parts := strings.Split(line, "\"")
-			if len(parts) >= 2 {
-				if name, _, ok := strings.Cut(parts[1], " "); ok && name != "" {
-					out[name] = true
-				}
-			}
-		}
-	case "go":
-		for _, line := range lines {
-			if f := strings.Fields(line); len(f) >= 2 && f[0] == "path" {
-				out[f[1]] = true
-			}
-		}
-	}
-	return out, complete, nil
+	return managers[mgr].bulkParse(strings.Split(string(r.Stdout), "\n")), complete, nil
 }

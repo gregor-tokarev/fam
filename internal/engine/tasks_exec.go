@@ -33,6 +33,13 @@ func (t *ScriptTask) Name() string { return t.Title }
 // Restarts implements Restarter.
 func (t *ScriptTask) Restarts() []Unit { return t.units }
 
+func (t *ScriptTask) specReqs(env *Env) []transport.SpecReq {
+	if t.CheckSh == "" {
+		return []transport.SpecReq{specStat(t.sudo, env.Path(t.Creates))}
+	}
+	return []transport.SpecReq{specExec(t.sudo, env.userScriptFull(t.CheckSh), scriptTimeout)}
+}
+
 // Check implements Task. Exit code 0 is satisfied, 100 is a change, any other code is an error.
 func (t *ScriptTask) Check(ctx context.Context, env *Env) (Check, error) {
 	script := t.CheckSh
@@ -107,6 +114,9 @@ type PackageTask struct {
 	PackageName string
 	// ApplySudo runs install, update, and uninstall with sudo (OS package managers).
 	ApplySudo bool
+	// CustomInstall / CustomUpdate are true when the bundle provided explicit install/update scripts.
+	CustomInstall bool
+	CustomUpdate  bool
 	// SkipUpdate turns the update off for this run, with this detail. FAM sets it before the
 	// apply loop when the verify scripts of the bundle pass.
 	SkipUpdate string
@@ -143,6 +153,18 @@ func (t *PackageTask) bin(env *Env) string {
 	return t.Binary
 }
 
+func (t *PackageTask) binCheckScript(env *Env) string {
+	return "if command -v " + transport.Quote(t.bin(env)) + " >/dev/null 2>&1; then exit 0; else exit 3; fi"
+}
+
+func (t *PackageTask) specReqs(env *Env) []transport.SpecReq {
+	script := t.binCheckScript(env)
+	if t.Manager != "" {
+		script = managerCheck(t.Manager, t.PackageName)
+	}
+	return []transport.SpecReq{specExec(t.sudo, env.userScriptFull(script), 2*time.Minute)}
+}
+
 // installed exits 0 when the program is found, 3 when it is not. Any other code is an error
 // (for example sudo without a password).
 func (t *PackageTask) installed(ctx context.Context, env *Env) (bool, error) {
@@ -151,7 +173,7 @@ func (t *PackageTask) installed(ctx context.Context, env *Env) (bool, error) {
 			return ok, err
 		}
 	}
-	script := "if command -v " + transport.Quote(t.bin(env)) + " >/dev/null 2>&1; then exit 0; else exit 3; fi"
+	script := t.binCheckScript(env)
 	label := "find " + t.Binary
 	if t.Manager != "" {
 		script, label = managerCheck(t.Manager, t.PackageName), "ask "+t.Manager+" for "+t.PackageName
@@ -259,12 +281,20 @@ func (t *PackageTask) Apply(ctx context.Context, env *Env) (string, error) {
 			return "", fmt.Errorf("FAM cannot install %s: %s is not on the machine. Install it first, for example with an earlier bundle", t.PackageName, managers[t.Manager].tool)
 		}
 	}
+	if t.Manager == "apt" && !t.CustomInstall && !t.Absent && env.aptUpdated {
+		if tpl := managers[t.Manager].installNoUpdate; tpl != "" {
+			script = fmt.Sprintf(tpl, transport.Quote(t.PackageName))
+		}
+	}
 	r, err := env.UserScript(ctx, script, t.applySudo(), verb+" "+t.Name(), scriptTimeout)
 	if err != nil {
 		return "", err
 	}
 	if r.Code != 0 {
 		return "", sudoHint(&ExitError{Label: strings.TrimSuffix(verb, "ed"), Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, t.applySudo(), "package")
+	}
+	if t.Manager == "apt" && !t.CustomInstall && !t.Absent {
+		env.aptUpdated = true
 	}
 	if v := t.version(ctx, env); v != "" && !t.Absent {
 		return verb + " " + v, nil
@@ -288,7 +318,13 @@ func (t *PackageTask) Update(ctx context.Context, env *Env, before string) (Upda
 	if !t.Updates() {
 		return Update{Detail: t.SkipUpdate}, nil
 	}
-	r, err := env.UserScript(ctx, t.UpdateSh, t.applySudo(), "update "+t.Name(), scriptTimeout)
+	updScript := t.UpdateSh
+	if t.Manager == "apt" && !t.CustomUpdate && env.aptUpdated {
+		if tpl := managers[t.Manager].updateNoUpdate; tpl != "" {
+			updScript = fmt.Sprintf(tpl, transport.Quote(t.PackageName))
+		}
+	}
+	r, err := env.UserScript(ctx, updScript, t.applySudo(), "update "+t.Name(), scriptTimeout)
 	if err != nil {
 		return Update{Ran: true}, err
 	}
@@ -312,8 +348,11 @@ func (t *PackageTask) Update(ctx context.Context, env *Env, before string) (Upda
 	if r.Code != 0 {
 		return Update{Ran: true}, sudoHint(&ExitError{Label: "update", Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, t.applySudo(), "package")
 	}
+	if t.Manager == "apt" && !t.CustomUpdate {
+		env.aptUpdated = true
+	}
 	if sr, ok := env.T.(transport.SessionRefresher); ok {
-		if rerr := sr.RefreshSession(ctx); rerr != nil {
+		if rerr := sr.RefreshSessionIfNeeded(ctx); rerr != nil {
 			return Update{Ran: true}, rerr
 		}
 	}

@@ -3,6 +3,7 @@ package engine
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
 	"context"
@@ -20,6 +21,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
@@ -39,6 +41,178 @@ type GitHubReleaseTask struct {
 	VersionCommand *string
 	Absent         bool
 	units          []Unit
+
+	prefOnce sync.Once
+	prefDone chan struct{}
+	prefMu   sync.Mutex
+	prefTag  string
+	prefPath string
+	prefErr  error
+}
+
+func (t *GitHubReleaseTask) takePrefPath() string {
+	t.prefMu.Lock()
+	p := t.prefPath
+	t.prefPath = ""
+	t.prefMu.Unlock()
+	return p
+}
+
+// prefetchReleases downloads, verifies, and extracts binaries for unsatisfied GitHubReleaseTasks
+// concurrently to temporary files on disk while earlier tasks apply on the machine. The returned
+// cleanup function cancels any in-flight downloads, waits for them to exit, and removes any
+// unconsumed temporary files so prefetched binaries never accumulate in memory or on disk.
+func prefetchReleases(ctx context.Context, env *Env, ts []Task, pre map[Task]checked) func() {
+	var todo []*GitHubReleaseTask
+	for _, t := range ts {
+		gr, ok := t.(*GitHubReleaseTask)
+		if !ok || gr.Absent {
+			continue
+		}
+		if res, has := pre[t]; has && res.err == nil && res.c.Status == Satisfied {
+			continue
+		}
+		todo = append(todo, gr)
+	}
+	if len(todo) == 0 {
+		return func() {}
+	}
+	prefCtx, prefCancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 4)
+	for _, gr := range todo {
+		gr := gr
+		gr.prefOnce.Do(func() {
+			gr.prefDone = make(chan struct{})
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer close(gr.prefDone)
+				select {
+				case sem <- struct{}{}:
+					defer func() { <-sem }()
+				case <-prefCtx.Done():
+					gr.prefErr = prefCtx.Err()
+					return
+				}
+				tag, binPath, err := gr.prepareBinaryFile(prefCtx, env)
+				gr.prefMu.Lock()
+				gr.prefTag = tag
+				gr.prefPath = binPath
+				gr.prefErr = err
+				gr.prefMu.Unlock()
+			}()
+		})
+	}
+	return func() {
+		prefCancel()
+		wg.Wait()
+		for _, gr := range todo {
+			if p := gr.takePrefPath(); p != "" {
+				_ = os.Remove(p)
+			}
+		}
+	}
+}
+
+func (t *GitHubReleaseTask) prepareBinary(ctx context.Context, env *Env) (string, []byte, error) {
+	var buf bytes.Buffer
+	tag, err := t.prepareBinaryToWriter(ctx, env, &buf)
+	if err != nil {
+		return "", nil, err
+	}
+	return tag, buf.Bytes(), nil
+}
+
+type prefStageError struct{ err error }
+
+func (e *prefStageError) Error() string { return e.err.Error() }
+func (e *prefStageError) Unwrap() error { return e.err }
+
+func (t *GitHubReleaseTask) prepareBinaryFile(ctx context.Context, env *Env) (string, string, error) {
+	f, err := os.CreateTemp("", "fam-release-bin-*")
+	if err != nil {
+		return "", "", &prefStageError{err: err}
+	}
+	binPath := f.Name()
+	_ = os.Chmod(binPath, 0o600)
+	dst := &stageWriter{w: f}
+	tag, err := t.prepareBinaryToWriter(ctx, env, dst)
+	cerr := f.Close()
+	if err != nil {
+		_ = os.Remove(binPath)
+		if dst.err != nil {
+			return "", "", &prefStageError{err: dst.err}
+		}
+		return "", "", err
+	}
+	if cerr != nil {
+		_ = os.Remove(binPath)
+		return "", "", &prefStageError{err: cerr}
+	}
+	return tag, binPath, nil
+}
+
+type stageWriter struct {
+	w   io.Writer
+	err error
+}
+
+func (s *stageWriter) Write(p []byte) (int, error) {
+	n, err := s.w.Write(p)
+	if err != nil && s.err == nil {
+		s.err = err
+	}
+	return n, err
+}
+
+func (t *GitHubReleaseTask) prepareBinaryToWriter(ctx context.Context, env *Env, dst io.Writer) (string, error) {
+	tag, a, name, err := t.target(ctx, env)
+	if err != nil {
+		return "", err
+	}
+	assets, err := releaseAssets(ctx, t.Repo, tag)
+	if err != nil {
+		return "", err
+	}
+	if !assets[name] {
+		return "", fmt.Errorf("release %s@%s has no asset %s", t.Repo, tag, name)
+	}
+	data, err := releaseDownload(ctx, t.Repo, tag, name, maxReleaseAsset)
+	if err != nil {
+		return "", err
+	}
+	defer removeReleaseDownload(data)
+	checksum := ""
+	if a.Checksum != nil {
+		checksum = expandReleaseName(*a.Checksum, tag)
+		if !assets[checksum] {
+			return "", fmt.Errorf("release %s@%s has no checksum asset %s", t.Repo, tag, checksum)
+		}
+	} else {
+		checksum = findChecksum(assets, name)
+	}
+	if checksum != "" {
+		checksFile, err := releaseDownload(ctx, t.Repo, tag, checksum, maxSkillFile)
+		if err != nil {
+			return "", err
+		}
+		defer removeReleaseDownload(checksFile)
+		checks, err := io.ReadAll(checksFile)
+		if err != nil {
+			return "", err
+		}
+		if err := checkReleaseDigest(data, checks, name, strings.HasPrefix(checksum, name+".")); err != nil {
+			return "", err
+		}
+	}
+	if _, err := data.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	if err := releaseBinaryToWriter(data, a, dst); err != nil {
+		return "", fmt.Errorf("release asset %s: %w", name, err)
+	}
+	return tag, nil
 }
 
 func (t *GitHubReleaseTask) Kind() string           { return "github-release" }
@@ -130,6 +304,13 @@ func (t *GitHubReleaseTask) ownership(ctx context.Context, env *Env) (transport.
 
 var releaseDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
+func (t *GitHubReleaseTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{
+		specStat(false, t.binary(env)),
+		specStat(false, t.recordPath(env)),
+	}
+}
+
 func (t *GitHubReleaseTask) Check(ctx context.Context, env *Env) (Check, error) {
 	fi, record, err := t.ownership(ctx, env)
 	if err != nil {
@@ -187,52 +368,36 @@ func (t *GitHubReleaseTask) Apply(ctx context.Context, env *Env) (string, error)
 		_, err := env.ShOK(ctx, "rm -f -- "+transport.Quote(t.binary(env))+" "+transport.Quote(t.recordPath(env)), false, "remove "+t.Binary)
 		return "removed", err
 	}
-	tag, a, name, err := t.target(ctx, env)
-	if err != nil {
-		return "", err
-	}
-	// Asset links come from GitHub's release fragment. This avoids API rate limits.
-	assets, err := releaseAssets(ctx, t.Repo, tag)
-	if err != nil {
-		return "", err
-	}
-	if !assets[name] {
-		return "", fmt.Errorf("release %s@%s has no asset %s", t.Repo, tag, name)
-	}
-	data, err := releaseDownload(ctx, t.Repo, tag, name, maxReleaseAsset)
-	if err != nil {
-		return "", err
-	}
-	defer removeReleaseDownload(data)
-	checksum := ""
-	if a.Checksum != nil {
-		checksum = expandReleaseName(*a.Checksum, tag)
-		if !assets[checksum] {
-			return "", fmt.Errorf("release %s@%s has no checksum asset %s", t.Repo, tag, checksum)
+	var tag string
+	var binary []byte
+	if t.prefDone != nil {
+		select {
+		case <-t.prefDone:
+			t.prefMu.Lock()
+			tag, err = t.prefTag, t.prefErr
+			t.prefMu.Unlock()
+			binPath := t.takePrefPath()
+			var stageErr *prefStageError
+			if binPath != "" {
+				defer os.Remove(binPath)
+				if err == nil {
+					if b, rerr := os.ReadFile(binPath); rerr == nil {
+						binary = b
+					} else {
+						tag, binary, err = t.prepareBinary(ctx, env)
+					}
+				}
+			} else if err == nil || errors.As(err, &stageErr) {
+				tag, binary, err = t.prepareBinary(ctx, env)
+			}
+		case <-ctx.Done():
+			return "", ctx.Err()
 		}
 	} else {
-		checksum = findChecksum(assets, name)
+		tag, binary, err = t.prepareBinary(ctx, env)
 	}
-	if checksum != "" {
-		checksFile, err := releaseDownload(ctx, t.Repo, tag, checksum, maxSkillFile)
-		if err != nil {
-			return "", err
-		}
-		defer removeReleaseDownload(checksFile)
-		checks, err := io.ReadAll(checksFile)
-		if err != nil {
-			return "", err
-		}
-		if err := checkReleaseDigest(data, checks, name, strings.HasPrefix(checksum, name+".")); err != nil {
-			return "", err
-		}
-	}
-	if _, err := data.Seek(0, io.SeekStart); err != nil {
-		return "", err
-	}
-	binary, err := releaseBinary(data, a)
 	if err != nil {
-		return "", fmt.Errorf("release asset %s: %w", name, err)
+		return "", err
 	}
 	// Recheck ownership after the download, before replacing any file.
 	fi, _, err := t.ownership(ctx, env)
@@ -393,34 +558,33 @@ func checkReleaseDigest(data io.Reader, checks []byte, name string, single bool)
 	return fmt.Errorf("the checksum file has no SHA-256 for release asset %s", name)
 }
 
-func releaseBinary(data *os.File, a tasks.ReleaseAsset) ([]byte, error) {
-	read := func(r io.Reader, size int64, name string) ([]byte, error) {
+func releaseBinaryToWriter(data *os.File, a tasks.ReleaseAsset, dst io.Writer) error {
+	copyExact := func(r io.Reader, size int64, name string) error {
 		if size <= 0 || size > maxReleaseBinary {
-			return nil, fmt.Errorf("binary %s has %d bytes; size must be between 1 and %d bytes", name, size, maxReleaseBinary)
+			return fmt.Errorf("binary %s has %d bytes; size must be between 1 and %d bytes", name, size, maxReleaseBinary)
 		}
-		b := make([]byte, int(size))
-		if _, err := io.ReadFull(r, b); err != nil {
-			return nil, err
+		if _, err := io.CopyN(dst, r, size); err != nil {
+			return err
 		}
 		// Read through EOF to check the checksum of a zip member.
 		var probe [1]byte
 		if n, err := r.Read(probe[:]); n != 0 || err != io.EOF {
 			if err != nil && err != io.EOF {
-				return nil, err
+				return err
 			}
-			return nil, fmt.Errorf("binary %s does not match its declared size of %d bytes", name, size)
+			return fmt.Errorf("binary %s does not match its declared size of %d bytes", name, size)
 		}
-		return b, nil
+		return nil
 	}
 	if a.Format == "binary" {
 		st, err := data.Stat()
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return read(data, st.Size(), a.Name)
+		return copyExact(data, st.Size(), a.Name)
 	}
 	if a.File == nil {
-		return nil, fmt.Errorf("an archive needs file")
+		return fmt.Errorf("an archive needs file")
 	}
 	wanted := path.Clean(*a.File)
 	switch a.Format {
@@ -430,7 +594,7 @@ func releaseBinary(data *os.File, a tasks.ReleaseAsset) ([]byte, error) {
 		case "tar.gz":
 			gz, err := gzip.NewReader(data)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			defer gz.Close()
 			decoded = gz
@@ -439,14 +603,14 @@ func releaseBinary(data *os.File, a tasks.ReleaseAsset) ([]byte, error) {
 		case "tar.xz":
 			xr, err := xz.NewReader(data)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			decoded = xr
 		}
 		capped := &capReader{r: decoded, left: maxReleaseAsset,
 			limitError: fmt.Errorf("uncompressed archive is larger than the limit of %d bytes", maxReleaseAsset)}
 		tr := tar.NewReader(capped)
-		var binary []byte
+		found := false
 		entries := 0
 		for {
 			h, err := tr.Next()
@@ -454,68 +618,69 @@ func releaseBinary(data *os.File, a tasks.ReleaseAsset) ([]byte, error) {
 				break
 			}
 			if err != nil {
-				return nil, err
+				return err
 			}
 			entries++
 			if entries > maxSkillFiles {
-				return nil, fmt.Errorf("archive has more than %d entries", maxSkillFiles)
+				return fmt.Errorf("archive has more than %d entries", maxSkillFiles)
 			}
 			if path.Clean(h.Name) != wanted {
 				continue
 			}
-			if h.Typeflag != tar.TypeReg || binary != nil {
-				return nil, fmt.Errorf("%s must be one regular file", wanted)
+			if h.Typeflag != tar.TypeReg || found {
+				return fmt.Errorf("%s must be one regular file", wanted)
 			}
-			binary, err = read(tr, h.Size, wanted)
-			if err != nil {
-				return nil, err
+			if err := copyExact(tr, h.Size, wanted); err != nil {
+				return err
 			}
+			found = true
 		}
 		if _, err := io.Copy(io.Discard, capped); err != nil {
-			return nil, err
+			return err
 		}
-		if binary != nil {
-			return binary, nil
+		if found {
+			return nil
 		}
 	case "zip":
 		st, err := data.Stat()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		zr, err := zip.NewReader(data, st.Size())
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if len(zr.File) > maxSkillFiles {
-			return nil, fmt.Errorf("archive has more than %d entries", maxSkillFiles)
+			return fmt.Errorf("archive has more than %d entries", maxSkillFiles)
 		}
-		var binary []byte
+		found := false
 		for _, f := range zr.File {
 			if path.Clean(f.Name) != wanted {
 				continue
 			}
-			if !f.Mode().IsRegular() || binary != nil {
-				return nil, fmt.Errorf("%s must be one regular file", wanted)
+			if !f.Mode().IsRegular() || found {
+				return fmt.Errorf("%s must be one regular file", wanted)
 			}
 			r, err := f.Open()
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if f.UncompressedSize64 == 0 || f.UncompressedSize64 > maxReleaseBinary {
 				r.Close()
-				return nil, fmt.Errorf("binary %s has %d bytes; size must be between 1 and %d bytes", wanted, f.UncompressedSize64, maxReleaseBinary)
+				return fmt.Errorf("binary %s has %d bytes; size must be between 1 and %d bytes", wanted, f.UncompressedSize64, maxReleaseBinary)
 			}
-			binary, err = read(r, int64(f.UncompressedSize64), wanted)
+			err = copyExact(r, int64(f.UncompressedSize64), wanted)
 			r.Close()
 			if err != nil {
-				return nil, err
+				return err
 			}
+			found = true
 		}
-		if binary != nil {
-			return binary, nil
+		if found {
+			return nil
 		}
 	default:
-		return nil, fmt.Errorf("unknown archive format %q", a.Format)
+		return fmt.Errorf("unknown archive format %q", a.Format)
 	}
-	return nil, fmt.Errorf("archive has no binary %s", wanted)
+	return fmt.Errorf("archive has no binary %s", wanted)
 }

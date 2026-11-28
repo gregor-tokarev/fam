@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
+	"github.com/gregor-tokarev/fam/internal/daemon"
 	"github.com/gregor-tokarev/fam/internal/facts"
 	"github.com/gregor-tokarev/fam/internal/output"
-	pklconfig "github.com/gregor-tokarev/fam/internal/pklgen/config"
 	"github.com/gregor-tokarev/fam/internal/progress"
 	"github.com/gregor-tokarev/fam/internal/schema"
 	"github.com/gregor-tokarev/fam/internal/secrets"
@@ -107,15 +107,12 @@ func Run(ctx context.Context, opts Options) *output.Run {
 		return fail(fmt.Errorf("no config entrypoint: %w", err))
 	}
 	opts.Reporter.Step("evaluating the config")
-	ev, err := config.NewEvaluator(ctx, opts.Project.Base, opts.Project.ConfigPath, opts.Progress)
-	if err != nil {
-		return fail(err)
-	}
+	ev := config.NewLazyEvaluator(opts.Project.Base, opts.Project.ConfigPath, pkg.Checksum, opts.Progress)
 	defer ev.Close()
 	local := facts.Facts{}
 	{
 		lt := transport.NewLocal("cockpit", nil, nil)
-		if f, err := facts.Collect(ctx, lt, "", true, nil); err == nil {
+		if f, err := facts.CollectLocalCached(ctx, lt, "", true, nil); err == nil {
 			local = f
 		}
 	}
@@ -206,8 +203,8 @@ func Run(ctx context.Context, opts Options) *output.Run {
 		runs[i] = mr
 		// pkl-go sends the requests of all evaluators over one channel, so machines can evaluate
 		// at the same time.
-		runMachine(ctx, opts, mr, secretList, addSecrets, func(props map[string]string) (*pklconfig.Config, error) {
-			return ev.Eval(ctx, props)
+		runMachine(ctx, opts, mr, local, secretList, addSecrets, func(props map[string]string) (*config.Spec, error) {
+			return ev.EvalSpec(ctx, m.Name, props)
 		})
 		mr.p.Done(mr.res.Status)
 	}
@@ -241,7 +238,7 @@ func checkProject(p *Project) error {
 	return nil
 }
 
-type evalFunc func(props map[string]string) (*pklconfig.Config, error)
+type evalSpecFunc func(props map[string]string) (*config.Spec, error)
 
 func setError(r *output.MachineResult, err error) {
 	r.Status = "error"
@@ -253,7 +250,8 @@ func setError(r *output.MachineResult, err error) {
 		r.ErrorKind = "unsupported"
 	default:
 		var ee *config.EvalError
-		if errors.As(err, &ee) {
+		var ce *config.ConfigError
+		if errors.As(err, &ee) || errors.As(err, &ce) {
 			r.ErrorKind = "config"
 		} else if r.ErrorKind == "" {
 			r.ErrorKind = "task"
@@ -261,7 +259,7 @@ func setError(r *output.MachineResult, err error) {
 	}
 }
 
-func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []secrets.Secret, addSecrets func([]string), eval evalFunc) {
+func runMachine(ctx context.Context, opts Options, mr *machineRun, cockpitFacts facts.Facts, secretList []secrets.Secret, addSecrets func([]string), evalSpec evalSpecFunc) {
 	m := mr.m
 	var t transport.Transport
 	if m.IsCockpit() {
@@ -273,27 +271,67 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 			setError(mr.res, fmt.Errorf("machine %s has no address", m.Name))
 			return
 		}
-		t = transport.NewSSH(m.Name, m.Target(), opts.SSHConfig, opts.Observer)
+		sshT := transport.NewSSH(m.Name, m.Target(), opts.SSHConfig, opts.Observer)
+		sshT.Pool = daemon.NewPool()
+		t = sshT
 		mr.res.Transport = "ssh"
 		mr.res.Target = m.Target()
 	}
 	defer t.Close()
 
-	// 2. Collect facts (and read existing secrets file in the same initial connection when supported).
+	// 2. Collect facts (and read existing secrets file + run speculative checks in the same
+	// initial SSH connection when cached facts are available).
 	mr.p.Stage("collecting facts")
 	var f facts.Facts
 	var err error
 	var oldSecrets []byte
 	var oldSecretsKnown bool
-	if bs, ok := t.(transport.Bootstrapper); ok {
-		var factsRes transport.Result
-		var hasSecrets bool
-		factsRes, oldSecrets, hasSecrets, err = bs.Bootstrap(ctx, facts.Script(), secretsFile)
+
+	var specSpec *config.Spec
+	var specEnv *Env
+	var specSects []Section
+	var specVerify []VerifySpec
+	var specHit bool
+
+	if m.IsCockpit() && cockpitFacts.OS != "" {
+		f = cockpitFacts
+		f.Machine = m.Name
+		f.Cockpit = m.Cockpit
+		f.Tags = append([]string{}, m.Tags...)
+	} else if sbs, ok := t.(transport.SpecBootstrapper); ok {
+		var expectedSHA string
+		var specReqs []transport.SpecReq
+		cf, hasCF := facts.LoadCache(m.Target(), opts.SSHConfig, m.Name, m.Cockpit, m.Tags)
+		if hasCF && (opts.Mode == ModePlan || opts.Mode == ModeApply) {
+			if sp, serr := evalSpec(cf.Facts.Properties()); serr == nil {
+				se := &Env{T: t, Facts: cf.Facts, Machine: m, Project: opts.Project, Secrets: secretList}
+				if ss, sv, berr := buildSections(ctx, se, sp, false); berr == nil {
+					specSpec, specEnv, specSects, specVerify = sp, se, ss, sv
+					expectedSHA = cf.RawSHA256
+					specReqs = buildSpecChecks(se, ss)
+				}
+			}
+		}
+		boot, berr := sbs.BootstrapSpec(ctx, facts.Script(), secretsFile, expectedSHA, specReqs)
+		err = berr
 		if err == nil {
+			factsRes := boot.FactsRes
+			oldSecrets = boot.SecretsData
+			specHit = boot.SpecHit
 			f, err = facts.Parse(ctx, t, factsRes, m.Name, m.Cockpit, m.Tags)
 			oldSecretsKnown = true
-			if !hasSecrets {
+			if !boot.SecretsExists {
 				oldSecrets = nil
+			}
+			if err == nil {
+				liveSHA := facts.RawHash(factsRes.Stdout)
+				if !hasCF || liveSHA != cf.RawSHA256 {
+					facts.SaveCache(m.Target(), opts.SSHConfig, factsRes.Stdout, liveSHA)
+				}
+				if liveSHA != expectedSHA {
+					specHit = false
+					sbs.ClearSpecCache()
+				}
 			}
 		}
 	} else {
@@ -325,31 +363,40 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 		}
 	}
 
-	// 3. Evaluate Pkl for this machine.
-	mr.p.Stage("evaluating the config")
-	cfg, err := eval(f.Properties())
-	if err != nil {
-		setError(mr.res, err)
-		return
+	// 3. Evaluate Pkl for this machine (or reuse the verified speculative evaluation).
+	var spec *config.Spec
+	var sects []Section
+	var verify []VerifySpec
+	if specHit && specSpec != nil && specSects != nil {
+		spec = specSpec
+		specEnv.Facts = f
+		mr.env = specEnv
+		sects, verify = specSects, specVerify
+		if opts.Mode == ModePlan || opts.Mode == ModeApply {
+			mr.res.Warnings = append(mr.res.Warnings, missingSecrets(spec, secretList)...)
+		}
+		mr.spec = spec
+		mr.sects, mr.verify = sects, verify
+	} else {
+		mr.p.Stage("evaluating the config")
+		spec, err = evalSpec(f.Properties())
+		if err != nil {
+			setError(mr.res, err)
+			return
+		}
+		if opts.Mode == ModePlan || opts.Mode == ModeApply {
+			mr.res.Warnings = append(mr.res.Warnings, missingSecrets(spec, secretList)...)
+		}
+		mr.spec = spec
+		mr.p.Stage("preparing the tasks")
+		sects, verify, err = buildSections(ctx, mr.env, spec, false)
+		if err != nil {
+			mr.res.ErrorKind = "config"
+			setError(mr.res, err)
+			return
+		}
+		mr.sects, mr.verify = sects, verify
 	}
-	spec, err := config.Resolve(cfg, m.Name)
-	if err != nil {
-		mr.res.ErrorKind = "config"
-		setError(mr.res, err)
-		return
-	}
-	if opts.Mode == ModePlan || opts.Mode == ModeApply {
-		mr.res.Warnings = append(mr.res.Warnings, missingSecrets(spec, secretList)...)
-	}
-	mr.spec = spec
-	mr.p.Stage("preparing the tasks")
-	sects, verify, err := buildSections(ctx, mr.env, spec, false)
-	if err != nil {
-		mr.res.ErrorKind = "config"
-		setError(mr.res, err)
-		return
-	}
-	mr.sects, mr.verify = sects, verify
 
 	switch opts.Mode {
 	case ModePlan:
@@ -426,6 +473,9 @@ func maxCheckConcurrency(t transport.Transport) int {
 }
 
 func checkAll(ctx context.Context, env *Env, ts []Task, rp *running, before bool) (out []checked, connErr error) {
+	if sbs, ok := env.T.(transport.SpecBootstrapper); ok {
+		defer sbs.ClearSpecCache()
+	}
 	out = make([]checked, len(ts))
 	prevCache := env.mgrCache
 	env.mgrCache = newManagerCache(ts)
@@ -640,19 +690,14 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			r.Counts.Add(string(Conflict))
 		}
 	}
-	// satisfied holds the tasks that the first check pass found satisfied. A refresh checks only
-	// these: a task that was not satisfied probably changes the machine, and then the results of
-	// the tasks after it are old.
-	satisfied := make(map[Task]bool, len(all))
-	for t, res := range pre {
-		satisfied[t] = res.err == nil && res.c.Status == Satisfied
-	}
 	if r.Counts.Conflict > 0 {
 		r.Status = "conflict"
 		r.Error = "the plan has conflicts. FAM changed nothing on this machine"
 		r.ErrorKind = "task"
 		return
 	}
+	// Start downloading any unsatisfied GitHubRelease assets in parallel with update gates and earlier apply tasks.
+	defer prefetchReleases(ctx, env, all, pre)()
 	var preVerify map[int][2]shellRun
 	if !mr.update {
 		var err error
@@ -662,310 +707,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			return
 		}
 	}
-	r.Status = "ok"
-	stopped := false
-	mr.p.Count("applying", countTasks(mr.sects, true))
-	n := 0
-	// order is the run order of the tasks of the apply loop. pos is the position of each task.
-	var order []Task
-	pos := map[Task]int{}
-	// secEnd is the position after the last task of the section of each task.
-	secEnd := map[Task]int{}
-	for _, s := range mr.sects {
-		if s.SkipReason == "" {
-			for _, t := range s.Tasks {
-				pos[t] = len(order)
-				order = append(order, t)
-			}
-			for _, t := range s.Tasks {
-				secEnd[t] = len(order)
-			}
-		}
-	}
-	// pre holds check results that are still current. A task with a satisfied result in pre
-	// needs no new check, also a package that then runs its update. A task with a result that is
-	// not satisfied checks again right before its apply. After a task changes the machine, FAM
-	// clears pre:
-	//   - after an apply or a restart, each next task checks again before it runs, as before.
-	//   - after an update, FAM checks the next tasks again at the same time, up to and including
-	//     the next task with an update, and reads its version before the update. An update can
-	//     change files of other tasks, so the results of before the update are not current.
-	updates := func(t Task) bool { u, ok := t.(Updater); return ok && u.Updates() }
-	refresh := false
-	// fresh is true while pre holds results of a refresh: each result there is the check of its
-	// task, as if the task checked itself at its turn, because no task changed the machine
-	// after the refresh. FAM uses it also when it is an error. A result of the first check pass
-	// is used only when it is satisfied: there, as before, an error makes the task check again.
-	fresh := false
-	// inSection limits the refresh to the section of t: a restart at the end of the section
-	// changes the machine, so results after it would be old.
-	refreshFrom := func(t Task, n int, inSection bool) {
-		refresh = false
-		end := len(order)
-		if inSection {
-			end = secEnd[t]
-		}
-		var seg []Task
-		for _, x := range order[pos[t]:end] {
-			if !satisfied[x] {
-				break
-			}
-			seg = append(seg, x)
-			// The update of x can change the machine, so the results after it would be old.
-			if updates(x) {
-				break
-			}
-		}
-		// The progress keeps the number of the apply step and names the slowest check.
-		rp := newRunning(mr.p)
-		rp.index = n
-		results, _ := checkAll(ctx, env, seg, rp, true)
-		pre = make(map[Task]checked, len(seg))
-		for i, x := range seg {
-			if results[i].ran {
-				pre[x] = results[i]
-			}
-		}
-		fresh = true
-	}
-	// The position of each task in r.Tasks.
-	index := map[Task]int{}
-	// A change of the sshd configuration applies only to new connections.
-	reconnect := false
-	// mutated tracks whether any task applied, updated, or restarted a unit on this machine.
-	mutated := false
-	// envDirty tracks whether a prior task may have changed shell startup files, env.sh, or
-	// secrets.env, requiring a fresh persistent remote session before later commands run.
-	envDirty := false
-	sa, canSeq := env.T.(transport.SeqApplier)
-	if canSeq && !sa.SupportsApplySeq() {
-		canSeq = false
-	}
-	flushEnv := func() bool {
-		if !envDirty {
-			return true
-		}
-		envDirty = false
-		if reconnect {
-			mr.p.Stage("reconnecting")
-			if err := env.T.Reconnect(ctx); err != nil {
-				setError(r, err)
-				stopped = true
-				return false
-			}
-			reconnect = false
-		}
-		if sr, ok := env.T.(transport.SessionRefresher); ok {
-			if err := sr.RefreshSession(ctx); err != nil {
-				setError(r, err)
-				stopped = true
-				return false
-			}
-		}
-		if sa != nil {
-			canSeq = sa.SupportsApplySeq()
-		}
-		return true
-	}
-	for _, s := range mr.sects {
-		if recordSkippedSection(r, s) {
-			continue
-		}
-		var units []Unit
-		failedInSection := false
-		env.restarted = nil
-		recordOutcome := func(t Task, st Status, detail string, err error, tc touch, fromSeq bool) {
-			switch tc {
-			case touchApply:
-				mutated = true
-				pre, refresh, fresh = nil, true, false
-			case touchUpdate:
-				mutated = true
-				pre, refresh, fresh = nil, true, false
-			}
-			index[t] = len(r.Tasks)
-			r.Tasks = append(r.Tasks, taskResult(t, st, detail, err))
-			r.Counts.Add(string(st))
-			if transport.IsConnError(err) {
-				setError(r, err)
-				stopped = true
-				failedInSection = true
-				return
-			}
-			if st == Failed || st == Conflict {
-				stopped = true
-				failedInSection = true
-				return
-			}
-			if st == Changed {
-				if s.Name == "environment" || (fromSeq && mayChangeShellEnv(t)) {
-					envDirty = true
-				}
-				if _, ok := t.(*SshdEnvTask); ok {
-					reconnect = true
-				}
-				// A Service task that restarted its unit satisfies the restart requests before it.
-				// Requests after it still restart the unit at the end of the bundle.
-				if len(env.restarted) > 0 {
-					kept := units[:0]
-					for _, u := range units {
-						if !env.restarted[u] {
-							kept = append(kept, u)
-						}
-					}
-					units = kept
-					env.restarted = nil
-				}
-				if rs, ok := t.(Restarter); ok {
-					units = append(units, rs.Restarts()...)
-				}
-			}
-		}
-		for ti := 0; ti < len(s.Tasks); ti++ {
-			t := s.Tasks[ti]
-			if stopped {
-				r.Tasks = append(r.Tasks, taskResult(t, Skipped, "an earlier task failed", nil))
-				r.Counts.Add(string(Skipped))
-				continue
-			}
-			if envDirty && s.Name != "environment" {
-				if !flushEnv() {
-					failedInSection = true
-					r.Tasks = append(r.Tasks, taskResult(t, Skipped, "an earlier task failed", nil))
-					r.Counts.Add(string(Skipped))
-					continue
-				}
-			}
-			// After an apply, update, or restart, a task that the first pass found satisfied
-			// starts a parallel/batched refresh up to the next non-satisfied task or updater.
-			if _, ok := pre[t]; !ok && refresh && satisfied[t] {
-				refreshFrom(t, n+1, s.RestartUnits && len(units) > 0)
-			}
-			// A satisfied result skips the check. A task that applies a change always checks right
-			// before, for example a removal that checks the owner.
-			var p *checked
-			if res, ok := pre[t]; ok {
-				switch {
-				case res.err == nil && res.c.Status == Satisfied:
-					p = &res
-				case res.err != nil && fresh:
-					p = &res
-				}
-			}
-			// When a task must check/apply and the transport supports sequential remote execution,
-			// execute the contiguous run of encodable tasks in this section in one round trip.
-			if p == nil && canSeq {
-				var ops []transport.ApplyOp
-				for j := ti; j < len(s.Tasks); j++ {
-					op, ok := encodeApplyOp(ctx, env, j, s.Tasks[j])
-					if !ok {
-						break
-					}
-					ops = append(ops, op)
-				}
-				if len(ops) > 0 {
-					mr.p.Task(n+1, taskLabel(s.Tasks[ti]))
-					doneOps := make(map[int]transport.ApplyOpResult, len(ops))
-					seqErr := sa.ApplySeq(ctx, ops, func(res transport.ApplyOpResult) {
-						doneOps[res.Index] = res
-						nextPos := res.Index + 1
-						if nextPos < ti+len(ops) {
-							mr.p.Task(n+(nextPos-ti)+1, taskLabel(s.Tasks[nextPos]))
-						}
-					})
-					consumed := 0
-					for j := ti; j < ti+len(ops); j++ {
-						if res, ok := doneOps[j]; ok {
-							n++
-							consumed++
-							st, detail, err, tc := decodeApplyOpResult(res)
-							recordOutcome(s.Tasks[j], st, detail, err, tc, true)
-							if stopped {
-								break
-							}
-							continue
-						}
-						if seqErr != nil {
-							n++
-							consumed++
-							recordOutcome(s.Tasks[j], Failed, "check failed", seqErr, touchApply, true)
-							break
-						}
-					}
-					if consumed > 0 {
-						ti += consumed - 1
-						continue
-					}
-				}
-			}
-			n++
-			mr.p.Task(n, taskLabel(t))
-			st, detail, err, tc := applyTask(ctx, env, t, p)
-			recordOutcome(t, st, detail, err, tc, false)
-			if sa != nil {
-				canSeq = sa.SupportsApplySeq()
-			}
-		}
-		// Restart each changed unit once, at the end of the bundle. No restart after a failure.
-		if s.RestartUnits && !failedInSection && !stopped {
-			seen := map[Unit]bool{}
-			for _, u := range units {
-				if stopped {
-					break
-				}
-				if seen[u] {
-					continue
-				}
-				seen[u] = true
-				mr.p.Stage("restarting " + u.Name)
-				mutated = true
-				pre, refresh, fresh = nil, true, false
-				rr := output.RestartResult{Unit: u.Name, Scope: u.Scope, Status: "restarted"}
-				if err := restartUnit(ctx, env, u); err != nil {
-					rr.Status = "failed"
-					rr.Error = err.Error()
-					stopped = true
-					if transport.IsConnError(err) {
-						setError(r, err)
-					}
-				}
-				r.Restarts = append(r.Restarts, rr)
-			}
-		}
-	}
-	if r.Status == "error" {
-		return
-	}
-	if !stopped && mutated {
-		mr.p.Stage("checking the shell blocks")
-		stopped = restoreBlocks(ctx, env, mr, index)
-		if r.Status == "error" {
-			return
-		}
-	}
-	if r.Counts.Failed > 0 || stopped {
-		r.Status = "failed"
-		r.ErrorKind = "task"
-		if r.Error == "" {
-			r.Error = "a task failed. FAM stopped the tasks after it"
-		}
-		return
-	}
-	if r.Counts.Changed > 0 {
-		r.Status = "changed"
-	}
-	// 7. Verify.
-	if reconnect {
-		mr.p.Stage("reconnecting")
-		if err := env.T.Reconnect(ctx); err != nil {
-			setError(r, err)
-			return
-		}
-	}
-	if mutated || reconnect {
-		preVerify = nil
-	}
-	verifyMachineWithCache(ctx, mr, preVerify)
+	newApplyLoop(mr, pre).run(ctx, preVerify)
 }
 
 // mayChangeShellEnv reports whether mutating t could alter shell startup files or environment
@@ -1074,13 +816,6 @@ const (
 // applyTask runs check, apply, and check again. pre is a current, satisfied check result of
 // this task; FAM uses it instead of a new check when it is not nil.
 func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, detail string, err error, tc touch) {
-	if pre == nil && !mayChangeShellEnv(t) {
-		if fa, ok := t.(FastApplier); ok {
-			if handled, fst, fdetail, ferr, ftc := fa.ApplyChecked(ctx, env); handled {
-				return fst, fdetail, ferr, ftc
-			}
-		}
-	}
 	var c Check
 	if pre != nil {
 		c, err = pre.c, pre.err
@@ -1134,9 +869,12 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 	if err != nil {
 		return Failed, c.Detail, err, touchApply
 	}
-	if mayChangeShellEnv(t) && t.Group() != "environment" {
+	// Refresh the persistent worker before post-apply Check only for ScriptTask/PackageTask,
+	// whose Apply may have updated shell startup files that their post-apply check relies on.
+	switch t.(type) {
+	case *ScriptTask, *PackageTask:
 		if sr, ok := env.T.(transport.SessionRefresher); ok {
-			if rerr := sr.RefreshSession(ctx); rerr != nil {
+			if rerr := sr.RefreshSessionIfNeeded(ctx); rerr != nil {
 				return Failed, "check after apply failed", rerr, touchApply
 			}
 		}

@@ -56,6 +56,10 @@ func (t *FileTask) Name() string {
 // Restarts implements Restarter.
 func (t *FileTask) Restarts() []Unit { return t.units }
 
+func (t *FileTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specStat(t.sudo, env.Path(t.Path))}
+}
+
 // Check implements Task.
 func (t *FileTask) Check(ctx context.Context, env *Env) (Check, error) {
 	p := env.Path(t.Path)
@@ -75,7 +79,11 @@ func (t *FileTask) Check(ctx context.Context, env *Env) (Check, error) {
 	}
 	switch {
 	case !fi.Exists:
-		return Check{Status: Change, Detail: "create"}, nil
+		return Check{
+			Status: Change,
+			Detail: "create",
+			Plan:   writePrimPlan(p, t.Content, t.Mode, t.sudo, t.Secret, true, "", "file"),
+		}, nil
 	case fi.Type != "file":
 		return Check{}, fmt.Errorf("%s is a %s, not a regular file", p, fi.Type)
 	}
@@ -89,7 +97,11 @@ func (t *FileTask) Check(ctx context.Context, env *Env) (Check, error) {
 	if len(diffs) == 0 {
 		return Check{Status: Satisfied}, nil
 	}
-	return Check{Status: Change, Detail: strings.Join(diffs, ", ")}, nil
+	return Check{
+		Status: Change,
+		Detail: strings.Join(diffs, ", "),
+		Plan:   writePrimPlan(p, t.Content, t.Mode, t.sudo, t.Secret, false, fi.SHA256, "file"),
+	}, nil
 }
 
 // Apply implements Task.
@@ -125,6 +137,10 @@ func (t *SymlinkTask) Name() string { return t.Path + " -> " + t.Target }
 // Restarts implements Restarter.
 func (t *SymlinkTask) Restarts() []Unit { return t.units }
 
+func (t *SymlinkTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specStat(t.sudo, env.Path(t.Path))}
+}
+
 // Check implements Task.
 func (t *SymlinkTask) Check(ctx context.Context, env *Env) (Check, error) {
 	p, target := env.Path(t.Path), env.Path(t.Target)
@@ -144,11 +160,30 @@ func (t *SymlinkTask) Check(ctx context.Context, env *Env) (Check, error) {
 	}
 	switch {
 	case !fi.Exists:
-		return Check{Status: Change, Detail: "create link"}, nil
+		return Check{
+			Status: Change,
+			Detail: "create link",
+			Plan: &PrimPlan{
+				Op:         transport.PrimOp{Op: "symlink", Label: "link " + p, Path: p, Target: target, Sudo: t.sudo, IfMissing: true},
+				TargetPath: p,
+				WantTarget: target,
+				SudoKind:   "symlink",
+			},
+		}, nil
 	case fi.Type == "link" && fi.Target == target:
 		return Check{Status: Satisfied}, nil
 	case fi.Type == "link":
-		return Check{Status: Change, Detail: "link points to " + fi.Target}, nil
+		oldTarget := fi.Target
+		return Check{
+			Status: Change,
+			Detail: "link points to " + fi.Target,
+			Plan: &PrimPlan{
+				Op:         transport.PrimOp{Op: "symlink", Label: "link " + p, Path: p, Target: target, Sudo: t.sudo, IfLinkTarget: &oldTarget},
+				TargetPath: p,
+				WantTarget: target,
+				SudoKind:   "symlink",
+			},
+		}, nil
 	case fi.Type == "file" && t.Backup:
 		return Check{Status: Change, Detail: "replace the file with a link (FAM saves a copy)"}, nil
 	default:

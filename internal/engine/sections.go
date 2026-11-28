@@ -3,10 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
@@ -194,58 +191,25 @@ func gateUpdates(ctx context.Context, mr *machineRun) (map[int][2]shellRun, erro
 	cached := map[int][2]shellRun{}
 	if len(items) > 0 {
 		mr.p.Count("verifying before updates", len(items))
-		var mu sync.Mutex
-		var connErr error
-		var wg sync.WaitGroup
-		// Keep SSH direct verify sessions below sshd MaxSessions (10).
-		limit := parallelCommands
-		if mr.env.T.Kind() != "ssh" {
-			limit = maxCheckConcurrency(mr.env.T)
-		}
-		sem := make(chan struct{}, limit)
-		rp := newRunning(mr.p)
+		specs := make([]VerifySpec, len(items))
 		for j, it := range items {
-			sem <- struct{}{}
-			mu.Lock()
-			stop := connErr != nil
-			mu.Unlock()
-			if stop {
-				<-sem
-				break
-			}
-			wg.Add(1)
-			rp.begin(j, "verify "+it.v.Name)
-			go func(j int, it item) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				defer rp.end(j)
-				for k, interactive := range []bool{false, true} {
-					res, err := runVerify(ctx, mr.env, it.v, interactive)
-					conn := transport.IsConnError(err)
-					mu.Lock()
-					if conn && connErr == nil {
-						connErr = err
-					}
-					pair := cached[it.idx]
-					if conn {
-						pair[k] = shellRun{err: err, ran: true}
-					} else {
-						pair[k] = shellRun{row: verifyRow(it.v, verifyShells[k], res, err), ran: true}
-					}
-					cached[it.idx] = pair
-					if err != nil || res.Code != 0 {
-						failed[it.v.Group] = true
-					}
-					mu.Unlock()
-					if conn || err != nil || res.Code != 0 {
-						return
-					}
-				}
-			}(j, it)
+			specs[j] = it.v
 		}
-		wg.Wait()
-		if connErr != nil {
-			return nil, connErr
+		pairs := runVerifyPairs(ctx, mr.env, mr.p, specs, func(sr shellRun) bool {
+			return sr.row.Status == "passed"
+		})
+		for j, pair := range pairs {
+			it := items[j]
+			if transport.IsConnError(pair[0].err) {
+				return nil, pair[0].err
+			}
+			if transport.IsConnError(pair[1].err) {
+				return nil, pair[1].err
+			}
+			cached[it.idx] = pair
+			if !pair[0].ran || pair[0].row.Status != "passed" || !pair[1].ran || pair[1].row.Status != "passed" {
+				failed[it.v.Group] = true
+			}
 		}
 	}
 	for g, list := range pkgs {
@@ -320,52 +284,14 @@ func verifyMachineWithCache(ctx context.Context, mr *machineRun, cached map[int]
 	}
 
 	if len(toRun) > 0 {
-		var mu sync.Mutex
-		var stopAt atomic.Int64
-		stopAt.Store(math.MaxInt64)
-		var wg sync.WaitGroup
-		limit := parallelCommands
-		if env.T.Kind() != "ssh" {
-			limit = maxCheckConcurrency(env.T)
+		specs := make([]VerifySpec, len(toRun))
+		for j, idx := range toRun {
+			specs[j] = mr.verify[idx]
 		}
-		sem := make(chan struct{}, limit)
-		rp := newRunning(mr.p)
-		for _, i := range toRun {
-			v := mr.verify[i]
-			sem <- struct{}{}
-			if int64(i) > stopAt.Load() {
-				<-sem
-				break
-			}
-			wg.Add(1)
-			rp.begin(i, "verify "+v.Name)
-			go func(i int, v VerifySpec) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				defer rp.end(i)
-				for k, interactive := range []bool{false, true} {
-					if k > 0 && int64(i) > stopAt.Load() {
-						return
-					}
-					res, err := run(ctx, v, interactive)
-					mu.Lock()
-					conn := transport.IsConnError(err)
-					if conn {
-						runs[i][k] = shellRun{err: err, ran: true}
-					} else {
-						runs[i][k] = shellRun{row: verifyRow(v, verifyShells[k], res, err), ran: true}
-					}
-					if conn && int64(i) < stopAt.Load() {
-						stopAt.Store(int64(i))
-					}
-					mu.Unlock()
-					if conn {
-						return
-					}
-				}
-			}(i, v)
+		pairs := runVerifyPairs(ctx, env, mr.p, specs, func(shellRun) bool { return true })
+		for j, pair := range pairs {
+			runs[toRun[j]] = pair
 		}
-		wg.Wait()
 	}
 
 	// Report the shells in config order, as if they ran one after the other: up to and

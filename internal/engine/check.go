@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gregor-tokarev/fam/internal/config"
 	"github.com/gregor-tokarev/fam/internal/facts"
@@ -103,14 +104,19 @@ func CheckProject(ctx context.Context, project *Project) (result CheckResult) {
 	}
 	defer ev.Close()
 	f := facts.Reference()
-	machines, err := ev.MachineList(ctx, f.Properties())
+	machines, sec, err := ev.Init(ctx, f.Properties())
 	if err != nil {
-		add("error", project.ConfigPath, err)
-		return
+		// Fall back to separate reads so a broken secrets block still reports machines.
+		var merr error
+		machines, merr = ev.MachineList(ctx, f.Properties())
+		if merr != nil {
+			add("error", project.ConfigPath, merr)
+			return
+		}
+		sec, err = ev.Secrets(ctx, f.Properties())
 	}
 	result.Machines = machines
 	add("error", "", checkProject(project))
-	sec, err := ev.Secrets(ctx, f.Properties())
 	var list []secrets.Secret
 	secretsOK := err == nil
 	if err != nil {
@@ -132,45 +138,70 @@ func CheckProject(ctx context.Context, project *Project) (result CheckResult) {
 		add("error", project.ConfigPath, fmt.Errorf("the config has no machines"))
 		machines = []config.Machine{{Name: "check", Cockpit: true}}
 	}
+	type evalJob struct {
+		m      config.Machine
+		osName string
+	}
+	var jobs []evalJob
 	for _, m := range machines {
 		for _, osName := range []string{"linux", "darwin"} {
-			f := facts.Reference()
-			f.Machine = m.Name
-			f.Cockpit = m.Cockpit
-			f.Tags = m.Tags
-			if osName == "darwin" {
-				f.OS = "darwin"
-				f.Distro = "macos"
-				f.DistroVersion = "15"
-				f.Arch = "arm64"
-				f.Libc = ""
-				f.Init = "launchd"
-				f.Home = "/Users/fam"
-				f.Shell = "/bin/zsh"
+			jobs = append(jobs, evalJob{m: m, osName: osName})
+		}
+	}
+	type evalOut struct {
+		errs []error
+	}
+	outs := make([]evalOut, len(jobs))
+	var wg sync.WaitGroup
+	for idx, job := range jobs {
+		idx, job := idx, job
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var errs []error
+			jf := facts.Reference()
+			jf.Machine = job.m.Name
+			jf.Cockpit = job.m.Cockpit
+			jf.Tags = job.m.Tags
+			if job.osName == "darwin" {
+				jf.OS = "darwin"
+				jf.Distro = "macos"
+				jf.DistroVersion = "15"
+				jf.Arch = "arm64"
+				jf.Libc = ""
+				jf.Init = "launchd"
+				jf.Home = "/Users/fam"
+				jf.Shell = "/bin/zsh"
 			}
-			cfg, err := ev.Eval(ctx, f.Properties())
+			cfg, err := ev.Eval(ctx, jf.Properties())
 			if err != nil {
-				add("error", project.ConfigPath, err)
-				continue
+				outs[idx].errs = []error{err}
+				return
 			}
 			if problems := config.ValidationErrors(cfg); len(problems) > 0 {
-				for _, err := range problems {
-					add("error", project.ConfigPath, err)
-				}
-				continue
+				outs[idx].errs = problems
+				return
 			}
-			spec, err := config.Resolve(cfg, m.Name)
+			spec, err := config.Resolve(cfg, job.m.Name)
 			if err != nil {
-				add("error", project.ConfigPath, err)
-				continue
+				outs[idx].errs = []error{err}
+				return
 			}
 			if secretsOK {
 				for _, message := range missingSecrets(spec, list) {
-					add("error", project.ConfigPath, errors.New(message))
+					errs = append(errs, errors.New(message))
 				}
 			}
-			env := &Env{Facts: f, Machine: m, Project: project, Secrets: list}
-			_, _, err = buildSections(ctx, env, spec, true)
+			env := &Env{Facts: jf, Machine: job.m, Project: project, Secrets: list}
+			if _, _, err := buildSections(ctx, env, spec, true); err != nil {
+				errs = append(errs, err)
+			}
+			outs[idx].errs = errs
+		}()
+	}
+	wg.Wait()
+	for _, o := range outs {
+		for _, err := range o.errs {
 			add("error", project.ConfigPath, err)
 		}
 	}
