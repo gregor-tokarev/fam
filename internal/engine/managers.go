@@ -66,9 +66,12 @@ exit 5`,
 	"bun": {tool: "bun", installed: `out=$(bun pm ls -g 2>&1) || { case "$out" in *"No package.json"*) exit 1 ;; *) exit 5 ;; esac; }
 printf '%%s\n' "$out" | awk -v p=%[1]s '{for (i = 1; i <= NF; i++) { n = $i; sub(/@[^@]*$/, "", n); if (n != $i && n == p) f = 1 }} END { exit !f }'`,
 		install: "bun add -g %s", update: "bun add -g %s@latest", uninstall: "bun remove -g %s"},
+	// Vite+ refuses to install when another global package already owns the same executable
+	// unless --force is passed. --force auto-replaces conflicting Vite+ packages and still
+	// rejects binaries that Vite+ does not manage.
 	"vite": {tool: "vp", installed: `out=$(vp list -g 2>&1) || exit 5
 printf '%%s\n' "$out" | awk -v p=%[1]s 'NR > 2 { n = $1; sub(/@[^@]*$/, "", n); if (n == p) f = 1 } END { exit !f }'`,
-		install: "vp install -g %s", update: "vp update -g %s", uninstall: "vp uninstall -g %s"},
+		install: "vp install -g --force %s", update: "vp update -g %s", uninstall: "vp uninstall -g %s"},
 	"brew": {tool: "brew", installed: "brew list %[1]s >/dev/null 2>&1",
 		install: "brew install %s", update: "brew upgrade %s", uninstall: "brew uninstall %s"},
 	"apt": {tool: "apt-get", installed: `st=$(dpkg-query -W -f='${Status}' %[1]s 2>/dev/null); rc=$?
