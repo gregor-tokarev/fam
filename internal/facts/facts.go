@@ -102,6 +102,17 @@ func Collect(ctx context.Context, t transport.Transport, machine string, cockpit
 	if err != nil {
 		return Facts{}, err
 	}
+	return Parse(ctx, t, r, machine, cockpit, tags)
+}
+
+// Script returns the POSIX fact-collection script used by remote transports.
+func Script() string { return script }
+
+// Marker is the header line emitted by Script.
+const Marker = marker
+
+// Parse parses the output of Script into Facts, running Windows detection if needed.
+func Parse(ctx context.Context, t transport.Transport, r transport.Result, machine string, cockpit bool, tags []string) (Facts, error) {
 	out := string(r.Stdout)
 	if r.Code != 0 || !strings.Contains(out, marker) {
 		if isWindows(ctx, t, out+"\n"+string(r.Stderr)) {

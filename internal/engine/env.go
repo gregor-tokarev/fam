@@ -25,6 +25,8 @@ type Env struct {
 	// restarted holds the units that the last Service task restarted. The apply loop removes
 	// them from the restart requests made before that task.
 	restarted map[Unit]bool
+	// mgrCache deduplicates read-only package manager queries across a single checkAll pass.
+	mgrCache *managerCache
 }
 
 func (e *Env) markRestarted(u Unit) {
@@ -82,8 +84,8 @@ unset HOME_FAM
 
 // UserScript runs a user script (Bash when the machine has it, else sh) with the FAM environment.
 func (e *Env) UserScript(ctx context.Context, script string, sudo bool, label string, timeout time.Duration) (transport.Result, error) {
-	s := e.prelude() + `if command -v bash >/dev/null 2>&1; then exec bash -c "$0"; else exec sh -c "$0"; fi`
-	full := "sh -c " + transport.Quote(s) + " " + transport.Quote(script)
+	q := transport.Quote(script)
+	full := e.prelude() + "if command -v bash >/dev/null 2>&1; then exec bash -c " + q + "; else exec sh -c " + q + "; fi"
 	return e.T.Run(ctx, transport.Cmd{Script: full, Sudo: sudo, Label: label, Timeout: timeout})
 }
 

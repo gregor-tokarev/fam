@@ -146,6 +146,11 @@ func (t *PackageTask) bin(env *Env) string {
 // installed exits 0 when the program is found, 3 when it is not. Any other code is an error
 // (for example sudo without a password).
 func (t *PackageTask) installed(ctx context.Context, env *Env) (bool, error) {
+	if t.Manager != "" && env.mgrCache != nil {
+		if ok, handled, err := env.mgrCache.lookup(ctx, env, t.Manager, t.PackageName, t.sudo); handled {
+			return ok, err
+		}
+	}
 	script := "if command -v " + transport.Quote(t.bin(env)) + " >/dev/null 2>&1; then exit 0; else exit 3; fi"
 	label := "find " + t.Binary
 	if t.Manager != "" {
@@ -306,6 +311,11 @@ func (t *PackageTask) Update(ctx context.Context, env *Env, before string) (Upda
 	}
 	if r.Code != 0 {
 		return Update{Ran: true}, sudoHint(&ExitError{Label: "update", Code: r.Code, Stderr: r.Err(), Stdout: r.Out()}, t.applySudo(), "package")
+	}
+	if sr, ok := env.T.(transport.SessionRefresher); ok {
+		if rerr := sr.RefreshSession(ctx); rerr != nil {
+			return Update{Ran: true}, rerr
+		}
 	}
 	// Check again: an update must leave the program installed. The search and the version are
 	// two separate commands, as before, but they run at the same time: both only read.

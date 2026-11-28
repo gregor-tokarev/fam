@@ -176,7 +176,7 @@ func (s skillSpec) load(ctx context.Context, name, origin string) (*SkillSource,
 	key := s.kind + "\x00" + s.url + "\x00" + s.folder
 	_, files, err := remoteSkillOnce(ctx, key, func() (string, []skillFile, error) {
 		if s.kind == skillMDFile {
-			files, err := downloadCached(ctx, "url:"+s.url, "", s.url, maxSkillFile, func(r io.Reader, _ *io.SectionReader) ([]skillFile, error) {
+			files, err := downloadCached(ctx, "url:"+s.url, "", s.url, maxSkillFile, "md", func(r io.Reader, _ *io.SectionReader) ([]skillFile, error) {
 				tooLarge := fmt.Errorf("%s has more than %d bytes", s.url, maxSkillFile)
 				data, err := io.ReadAll(&capReader{r: r, left: maxSkillFile, limitError: tooLarge})
 				if err != nil {
@@ -186,7 +186,8 @@ func (s skillSpec) load(ctx context.Context, name, origin string) (*SkillSource,
 			})
 			return s.url, files, err
 		}
-		files, err := downloadCached(ctx, "url:"+s.url, "", s.url, maxArchive, func(r io.Reader, sec *io.SectionReader) ([]skillFile, error) {
+		hint := fmt.Sprintf("arc\x00%v\x00%s", s.zip, s.folder)
+		files, err := downloadCached(ctx, "url:"+s.url, "", s.url, maxArchive, hint, func(r io.Reader, sec *io.SectionReader) ([]skillFile, error) {
 			if !s.zip {
 				return readSkill(tarEntries(r, s.url), s.folder, s.url, false)
 			}

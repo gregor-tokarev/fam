@@ -57,6 +57,8 @@ type Transport interface {
 	Run(ctx context.Context, c Cmd) (Result, error)
 	// ReadFile reads a regular file. exists is false when the path does not exist.
 	ReadFile(ctx context.Context, path string, sudo bool) (data []byte, exists bool, err error)
+	// ReadFileInfo reads a regular file and returns its FileInfo (including Mode) in one step.
+	ReadFileInfo(ctx context.Context, path string, sudo bool) (data []byte, info FileInfo, err error)
 	// WriteFile writes a file atomically: a temporary file, then a rename.
 	WriteFile(ctx context.Context, path string, data []byte, mode os.FileMode, sudo bool) error
 	// Stat returns information about a path. It does not follow a symbolic link.
@@ -69,6 +71,85 @@ type Transport interface {
 	Reconnect(ctx context.Context) error
 	// Close closes the shared connection.
 	Close() error
+}
+
+// SkillState describes a skill directory on a machine.
+type SkillState struct {
+	Exists  bool
+	IsDir   bool
+	Managed bool
+	Digest  string
+}
+
+// SkillOps is implemented by transports that check and install skill folders natively.
+type SkillOps interface {
+	SkillCheck(ctx context.Context, dir, marker string) (SkillState, error)
+	SkillWrite(ctx context.Context, dir, marker string, tarball []byte) error
+}
+
+// ConcurrencyProvider reports how many read-only operations a transport can run concurrently.
+type ConcurrencyProvider interface {
+	MaxConcurrency() int
+}
+
+// VerifiedWriter writes a file atomically and returns its post-write FileInfo (mode + SHA-256)
+// in the same round trip so the caller can verify the write without a second Stat RPC.
+type VerifiedWriter interface {
+	WriteFileVerify(ctx context.Context, path string, data []byte, mode os.FileMode, sudo bool) (FileInfo, error)
+}
+
+// ApplyOp describes one check-apply-recheck operation in a sequential remote apply pipeline.
+type ApplyOp struct {
+	Index           int     `json:"index"`
+	Kind            string  `json:"kind"` // file, symlink, block, skill, managed_file, script
+	Label           string  `json:"label,omitempty"`
+	Secret          bool    `json:"-"`
+	Path            string  `json:"path,omitempty"`
+	Target          string  `json:"target,omitempty"`
+	Dir             string  `json:"dir,omitempty"`
+	Marker          string  `json:"marker,omitempty"`
+	DataB64         string  `json:"data_b64,omitempty"`
+	TarB64          string  `json:"tar_b64,omitempty"`
+	SHA256          string  `json:"sha256,omitempty"`
+	ExpectedDigest  string  `json:"expected_digest,omitempty"`
+	Mode            *uint32 `json:"mode,omitempty"`
+	Sudo            bool    `json:"sudo,omitempty"`
+	Backup          bool    `json:"backup,omitempty"`
+	StrictConflict  bool    `json:"strict_conflict,omitempty"`
+	Block           string  `json:"block,omitempty"`
+	BlockBegin      string  `json:"block_begin,omitempty"`
+	BlockEnd        string  `json:"block_end,omitempty"`
+	Top             bool    `json:"top,omitempty"`
+	OnlyIfExists    bool    `json:"only_if_exists,omitempty"`
+	ManagedPrefix   string  `json:"managed_prefix,omitempty"`
+	Creates         string  `json:"creates,omitempty"`
+	CreatesDisplay  string  `json:"creates_display,omitempty"`
+	ApplyScript     string  `json:"apply_script,omitempty"`
+	Prelude         string  `json:"prelude,omitempty"`
+	StopAfterChange bool    `json:"stop_after_change,omitempty"`
+	TimeoutMS       int64   `json:"timeout_ms,omitempty"`
+}
+
+// ApplyOpResult is the outcome of one ApplyOp executed sequentially on the remote worker.
+type ApplyOpResult struct {
+	Index      int    `json:"index"`
+	Status     string `json:"status"` // unchanged, changed, failed, conflict
+	Detail     string `json:"detail,omitempty"`
+	Err        string `json:"err,omitempty"`
+	DurationMS int64  `json:"duration_ms,omitempty"`
+}
+
+// SeqApplier executes an ordered slice of ApplyOps sequentially on the remote host in one round
+// trip, stopping immediately at the first failure, conflict, or shell-environment mutation.
+type SeqApplier interface {
+	SupportsApplySeq() bool
+	ApplySeq(ctx context.Context, ops []ApplyOp, onResult func(ApplyOpResult)) error
+}
+
+// SessionRefresher restarts a persistent remote session so later commands inherit updated
+// login environment files (such as ~/.config/fam/env.sh, secrets.env, or ~/.bashrc).
+type SessionRefresher interface {
+	RefreshSession(ctx context.Context) error
 }
 
 // ConnError is a connection error: `ssh` exited with code 255.

@@ -167,11 +167,18 @@ func skillTasks(ctx context.Context, t tasks.Task, u config.BundleUse, group str
 	if absent {
 		return []Task{&SkillRemoveTask{base: g, Name_: name, units: units}}, true, nil
 	}
-	var src *SkillSource
 	if staticOnly && spec.kind != skillLocal {
-		// fam check does not download skills.
-		src = &SkillSource{Name: name, Dir: spec.String(), Origin: origin}
-	} else if src, err = spec.load(ctx, name, origin); err != nil {
+		// fam check does not download remote skills.
+		src := &SkillSource{Name: name, Dir: spec.String(), Origin: origin}
+		return []Task{&SkillTask{base: g, Skill: src, units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
+	}
+	if spec.kind != skillLocal {
+		// Start remote skill download concurrently so multiple skills and remote checks overlap.
+		loader := startAsyncSkill(ctx, spec, name, origin)
+		return []Task{&SkillTask{base: g, loader: loader, units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
+	}
+	src, err := spec.load(ctx, name, origin)
+	if err != nil {
 		return nil, true, err
 	}
 	return []Task{&SkillTask{base: g, Skill: src, units: units}, &SkillLinkTask{base: g, Name_: name}}, true, nil
