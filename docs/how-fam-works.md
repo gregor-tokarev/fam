@@ -276,7 +276,7 @@ To use another package manager for a bundle that you cannot change, for example 
 |---|---|---|---|---|---|
 | `npm` | `npm ls -g` (no global folder yet: not installed) | `npm install -g` | `npm install -g <p>@latest` | `npm uninstall -g` | user |
 | `bun` | `bun pm ls -g` | `bun add -g` | `bun add -g <p>@latest` | `bun remove -g` | user |
-| `vite` | `vp list -g` | `vp install -g` | `vp update -g` | `vp uninstall -g` | user |
+| `vite` | `vp list -g` | `vp install -g --force` | `vp update -g` | `vp uninstall -g` | user |
 | `uv` | `uv tool list` | `uv tool install` | `uv tool upgrade` | `uv tool uninstall` | user |
 | `cargo` | Cargo install records | `cargo install --locked` | `cargo install --locked` | `cargo uninstall` | user |
 | `go` | `go version -m` | `go install <module>@latest` | the install command | remove the matching binary | user |
@@ -290,7 +290,7 @@ To use another package manager for a bundle that you cannot change, for example 
 
 FAM asks the package manager, not `PATH`, whether the package is installed. When the manager itself is missing, the plan shows a change (an earlier bundle can install it), and apply stops with a clear error if it is still missing. `binary` defaults to the package name without its npm scope. Own `install`, `update`, and `uninstall` commands win over the commands of the manager.
 
-Cargo uses `--root ~/.local`. Go uses `GOBIN=~/.local/bin`. A `PackageRef` can give `names` for each manager, for example `names { ["apt"] = "fd-find" }`. FAM uses the generic `package` name when no name matches the selected manager.
+Cargo uses `--root ~/.local`. Go uses `GOBIN=~/.local/bin`. Vite+ uses `--force` on install to replace another Vite+-managed global package that provides the same executable. A `PackageRef` can give `names` for each manager, for example `names { ["apt"] = "fd-find" }`. FAM uses the generic `package` name when no name matches the selected manager.
 
 ### Updates
 
