@@ -79,9 +79,11 @@ func convert(t tasks.Task, group string, absent bool, bundleManager string, f fa
 		// Own commands win over the commands of the package manager.
 		if v := x.GetInstall(); v != nil {
 			pt.Install = *v
+			pt.CustomInstall = true
 		}
 		if v := x.GetUpdate(); v != nil {
 			pt.UpdateSh = *v
+			pt.CustomUpdate = true
 		}
 		if v := x.GetUninstall(); v != nil {
 			pt.Uninstall = *v

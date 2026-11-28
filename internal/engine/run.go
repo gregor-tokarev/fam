@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
+	"github.com/gregor-tokarev/fam/internal/daemon"
 	"github.com/gregor-tokarev/fam/internal/facts"
 	"github.com/gregor-tokarev/fam/internal/output"
-	pklconfig "github.com/gregor-tokarev/fam/internal/pklgen/config"
 	"github.com/gregor-tokarev/fam/internal/progress"
 	"github.com/gregor-tokarev/fam/internal/schema"
 	"github.com/gregor-tokarev/fam/internal/secrets"
@@ -107,15 +107,12 @@ func Run(ctx context.Context, opts Options) *output.Run {
 		return fail(fmt.Errorf("no config entrypoint: %w", err))
 	}
 	opts.Reporter.Step("evaluating the config")
-	ev, err := config.NewEvaluator(ctx, opts.Project.Base, opts.Project.ConfigPath, opts.Progress)
-	if err != nil {
-		return fail(err)
-	}
+	ev := config.NewLazyEvaluator(opts.Project.Base, opts.Project.ConfigPath, pkg.Checksum, opts.Progress)
 	defer ev.Close()
 	local := facts.Facts{}
 	{
 		lt := transport.NewLocal("cockpit", nil, nil)
-		if f, err := facts.Collect(ctx, lt, "", true, nil); err == nil {
+		if f, err := facts.CollectLocalCached(ctx, lt, "", true, nil); err == nil {
 			local = f
 		}
 	}
@@ -206,8 +203,8 @@ func Run(ctx context.Context, opts Options) *output.Run {
 		runs[i] = mr
 		// pkl-go sends the requests of all evaluators over one channel, so machines can evaluate
 		// at the same time.
-		runMachine(ctx, opts, mr, secretList, addSecrets, func(props map[string]string) (*pklconfig.Config, error) {
-			return ev.Eval(ctx, props)
+		runMachine(ctx, opts, mr, local, secretList, addSecrets, func(props map[string]string) (*config.Spec, error) {
+			return ev.EvalSpec(ctx, m.Name, props)
 		})
 		mr.p.Done(mr.res.Status)
 	}
@@ -241,7 +238,7 @@ func checkProject(p *Project) error {
 	return nil
 }
 
-type evalFunc func(props map[string]string) (*pklconfig.Config, error)
+type evalSpecFunc func(props map[string]string) (*config.Spec, error)
 
 func setError(r *output.MachineResult, err error) {
 	r.Status = "error"
@@ -253,7 +250,8 @@ func setError(r *output.MachineResult, err error) {
 		r.ErrorKind = "unsupported"
 	default:
 		var ee *config.EvalError
-		if errors.As(err, &ee) {
+		var ce *config.ConfigError
+		if errors.As(err, &ee) || errors.As(err, &ce) {
 			r.ErrorKind = "config"
 		} else if r.ErrorKind == "" {
 			r.ErrorKind = "task"
@@ -261,7 +259,7 @@ func setError(r *output.MachineResult, err error) {
 	}
 }
 
-func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []secrets.Secret, addSecrets func([]string), eval evalFunc) {
+func runMachine(ctx context.Context, opts Options, mr *machineRun, cockpitFacts facts.Facts, secretList []secrets.Secret, addSecrets func([]string), evalSpec evalSpecFunc) {
 	m := mr.m
 	var t transport.Transport
 	if m.IsCockpit() {
@@ -273,19 +271,73 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 			setError(mr.res, fmt.Errorf("machine %s has no address", m.Name))
 			return
 		}
-		t = transport.NewSSH(m.Name, m.Target(), opts.SSHConfig, opts.Observer)
+		if dt := daemon.NewTransport(ctx, m.Name, m.Target(), opts.SSHConfig, opts.Observer); dt != nil {
+			t = dt
+		} else {
+			t = transport.NewSSH(m.Name, m.Target(), opts.SSHConfig, opts.Observer)
+		}
 		mr.res.Transport = "ssh"
 		mr.res.Target = m.Target()
 	}
 	defer t.Close()
 
-	// 2. Collect facts (and read existing secrets file in the same initial connection when supported).
+	// 2. Collect facts (and read existing secrets file + run speculative checks in the same
+	// initial SSH connection when cached facts are available).
 	mr.p.Stage("collecting facts")
 	var f facts.Facts
 	var err error
 	var oldSecrets []byte
 	var oldSecretsKnown bool
-	if bs, ok := t.(transport.Bootstrapper); ok {
+
+	var specSpec *config.Spec
+	var specEnv *Env
+	var specSects []Section
+	var specVerify []VerifySpec
+	var specHit bool
+
+	if m.IsCockpit() && cockpitFacts.OS != "" {
+		f = cockpitFacts
+		f.Machine = m.Name
+		f.Cockpit = m.Cockpit
+		f.Tags = append([]string{}, m.Tags...)
+	} else if sbs, ok := t.(transport.SpecBootstrapper); ok {
+		var expectedSHA string
+		var specReqs []transport.SpecReq
+		cf, hasCF := facts.LoadCache(m.Target(), opts.SSHConfig)
+		if hasCF && (opts.Mode == ModePlan || opts.Mode == ModeApply) {
+			cf.Facts.Machine = m.Name
+			cf.Facts.Cockpit = m.Cockpit
+			cf.Facts.Tags = append([]string{}, m.Tags...)
+			if sp, serr := evalSpec(cf.Facts.Properties()); serr == nil {
+				se := &Env{T: t, Facts: cf.Facts, Machine: m, Project: opts.Project, Secrets: secretList}
+				if ss, sv, berr := buildSections(ctx, se, sp, false); berr == nil {
+					specSpec, specEnv, specSects, specVerify = sp, se, ss, sv
+					expectedSHA = cf.RawSHA256
+					specReqs = buildSpecChecks(se, ss)
+				}
+			}
+		}
+		var factsRes transport.Result
+		var hasSecrets bool
+		factsRes, oldSecrets, hasSecrets, specHit, err = sbs.BootstrapSpec(ctx, facts.Script(), secretsFile, expectedSHA, specReqs)
+		if err == nil {
+			f, err = facts.Parse(ctx, t, factsRes, m.Name, m.Cockpit, m.Tags)
+			oldSecretsKnown = true
+			if !hasSecrets {
+				oldSecrets = nil
+			}
+			if err == nil {
+				liveSHA := facts.RawHash(factsRes.Stdout)
+				if !hasCF || liveSHA != cf.RawSHA256 {
+					facts.SaveCache(m.Target(), opts.SSHConfig, facts.CachedFacts{Facts: f, RawSHA256: liveSHA})
+				}
+				if liveSHA != expectedSHA {
+					specHit = false
+					sbs.ClearSpecCache()
+				}
+			}
+		}
+	} else if bs, ok := t.(transport.Bootstrapper); ok {
 		var factsRes transport.Result
 		var hasSecrets bool
 		factsRes, oldSecrets, hasSecrets, err = bs.Bootstrap(ctx, facts.Script(), secretsFile)
@@ -325,31 +377,40 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, secretList []
 		}
 	}
 
-	// 3. Evaluate Pkl for this machine.
-	mr.p.Stage("evaluating the config")
-	cfg, err := eval(f.Properties())
-	if err != nil {
-		setError(mr.res, err)
-		return
+	// 3. Evaluate Pkl for this machine (or reuse the verified speculative evaluation).
+	var spec *config.Spec
+	var sects []Section
+	var verify []VerifySpec
+	if specHit && specSpec != nil && specSects != nil {
+		spec = specSpec
+		specEnv.Facts = f
+		mr.env = specEnv
+		sects, verify = specSects, specVerify
+		if opts.Mode == ModePlan || opts.Mode == ModeApply {
+			mr.res.Warnings = append(mr.res.Warnings, missingSecrets(spec, secretList)...)
+		}
+		mr.spec = spec
+		mr.sects, mr.verify = sects, verify
+	} else {
+		mr.p.Stage("evaluating the config")
+		spec, err = evalSpec(f.Properties())
+		if err != nil {
+			setError(mr.res, err)
+			return
+		}
+		if opts.Mode == ModePlan || opts.Mode == ModeApply {
+			mr.res.Warnings = append(mr.res.Warnings, missingSecrets(spec, secretList)...)
+		}
+		mr.spec = spec
+		mr.p.Stage("preparing the tasks")
+		sects, verify, err = buildSections(ctx, mr.env, spec, false)
+		if err != nil {
+			mr.res.ErrorKind = "config"
+			setError(mr.res, err)
+			return
+		}
+		mr.sects, mr.verify = sects, verify
 	}
-	spec, err := config.Resolve(cfg, m.Name)
-	if err != nil {
-		mr.res.ErrorKind = "config"
-		setError(mr.res, err)
-		return
-	}
-	if opts.Mode == ModePlan || opts.Mode == ModeApply {
-		mr.res.Warnings = append(mr.res.Warnings, missingSecrets(spec, secretList)...)
-	}
-	mr.spec = spec
-	mr.p.Stage("preparing the tasks")
-	sects, verify, err := buildSections(ctx, mr.env, spec, false)
-	if err != nil {
-		mr.res.ErrorKind = "config"
-		setError(mr.res, err)
-		return
-	}
-	mr.sects, mr.verify = sects, verify
 
 	switch opts.Mode {
 	case ModePlan:
@@ -426,6 +487,9 @@ func maxCheckConcurrency(t transport.Transport) int {
 }
 
 func checkAll(ctx context.Context, env *Env, ts []Task, rp *running, before bool) (out []checked, connErr error) {
+	if sbs, ok := env.T.(transport.SpecBootstrapper); ok {
+		defer sbs.ClearSpecCache()
+	}
 	out = make([]checked, len(ts))
 	prevCache := env.mgrCache
 	env.mgrCache = newManagerCache(ts)
@@ -653,6 +717,8 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		r.ErrorKind = "task"
 		return
 	}
+	// Start downloading any unsatisfied GitHubRelease assets in parallel with update gates and earlier apply tasks.
+	prefetchReleases(ctx, env, all, pre)
 	var preVerify map[int][2]shellRun
 	if !mr.update {
 		var err error
@@ -671,17 +737,24 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 	pos := map[Task]int{}
 	// secEnd is the position after the last task of the section of each task.
 	secEnd := map[Task]int{}
+	sectionHasRestarts := map[Task]bool{}
 	for _, s := range mr.sects {
 		if s.SkipReason == "" {
+			hasR := false
 			for _, t := range s.Tasks {
 				pos[t] = len(order)
 				order = append(order, t)
+				if rs, ok := t.(Restarter); ok && len(rs.Restarts()) > 0 {
+					hasR = true
+				}
 			}
 			for _, t := range s.Tasks {
 				secEnd[t] = len(order)
+				sectionHasRestarts[t] = s.RestartUnits && hasR
 			}
 		}
 	}
+	batchedDone := map[*PackageTask]batchPkgResult{}
 	// pre holds check results that are still current. A task with a satisfied result in pre
 	// needs no new check, also a package that then runs its update. A task with a result that is
 	// not satisfied checks again right before its apply. After a task changes the machine, FAM
@@ -779,6 +852,9 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			case touchApply:
 				mutated = true
 				pre, refresh, fresh = nil, true, false
+				if _, isPkg := t.(*PackageTask); !isPkg {
+					env.aptUpdated = false
+				}
 			case touchUpdate:
 				mutated = true
 				pre, refresh, fresh = nil, true, false
@@ -852,6 +928,40 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 					p = &res
 				}
 			}
+			if pt, ok := t.(*PackageTask); ok {
+				if br, done := batchedDone[pt]; done {
+					delete(batchedDone, pt)
+					n++
+					mr.p.Task(n, taskLabel(t))
+					recordOutcome(t, Changed, br.detail, nil, touchApply, false)
+					continue
+				}
+			}
+			// When a task must check/apply and is the start of a batchable same-manager package run,
+			// install all compatible packages in a single manager invocation.
+			if p == nil {
+				if batch := collectPackageBatch(order, pos[t], pre, satisfied, secEnd, sectionHasRestarts); len(batch) >= 2 {
+					mr.p.Task(n+1, fmt.Sprintf("install %d %s packages", len(batch), batch[0].Manager))
+					resMap, berr := runPackageBatch(ctx, env, batch)
+					if berr != nil {
+						n++
+						recordOutcome(t, Failed, "install", berr, touchApply, false)
+						continue
+					}
+					if len(resMap) == len(batch) {
+						pt := batch[0]
+						for _, bpt := range batch[1:] {
+							batchedDone[bpt] = resMap[bpt]
+						}
+						n++
+						recordOutcome(t, Changed, resMap[pt].detail, nil, touchApply, false)
+						if sa != nil {
+							canSeq = sa.SupportsApplySeq()
+						}
+						continue
+					}
+				}
+			}
 			// When a task must check/apply and the transport supports sequential remote execution,
 			// execute the contiguous run of encodable tasks in this section in one round trip.
 			if p == nil && canSeq {
@@ -869,13 +979,16 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 					seqErr := sa.ApplySeq(ctx, ops, func(res transport.ApplyOpResult) {
 						doneOps[res.Index] = res
 						nextPos := res.Index + 1
-						if nextPos < ti+len(ops) {
+						if res.Status != "fallback" && nextPos < ti+len(ops) {
 							mr.p.Task(n+(nextPos-ti)+1, taskLabel(s.Tasks[nextPos]))
 						}
 					})
 					consumed := 0
 					for j := ti; j < ti+len(ops); j++ {
 						if res, ok := doneOps[j]; ok {
+							if res.Status == "fallback" {
+								break
+							}
 							n++
 							consumed++
 							st, detail, err, tc := decodeApplyOpResult(res)
@@ -1136,7 +1249,14 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 	}
 	if mayChangeShellEnv(t) && t.Group() != "environment" {
 		if sr, ok := env.T.(transport.SessionRefresher); ok {
-			if rerr := sr.RefreshSession(ctx); rerr != nil {
+			var rerr error
+			switch t.(type) {
+			case *ScriptTask, *PackageTask:
+				rerr = sr.RefreshSessionIfNeeded(ctx)
+			default:
+				rerr = sr.RefreshSession(ctx)
+			}
+			if rerr != nil {
 				return Failed, "check after apply failed", rerr, touchApply
 			}
 		}

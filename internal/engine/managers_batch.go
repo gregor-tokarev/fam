@@ -96,7 +96,7 @@ func (c *managerCache) lookup(ctx context.Context, env *Env, mgr, pkg string, su
 	return false, true, nil
 }
 
-func queryManagerBulk(ctx context.Context, env *Env, mgr string, pkgs []string, sudo bool) (map[string]bool, bool, error) {
+func managerBulkScript(mgr string, pkgs []string) (script string, complete bool, ok bool) {
 	m := managers[mgr]
 	var quoted []string
 	for _, p := range pkgs {
@@ -104,8 +104,7 @@ func queryManagerBulk(ctx context.Context, env *Env, mgr string, pkgs []string, 
 	}
 	qList := strings.Join(quoted, " ")
 
-	var script string
-	complete := true
+	complete = true
 	switch mgr {
 	case "vite":
 		script = fmt.Sprintf(`command -v %s >/dev/null 2>&1 || exit 4
@@ -152,6 +151,14 @@ done`, m.tool)
 brew list --formula -1 2>/dev/null || true
 brew list --cask -1 2>/dev/null || true`, m.tool)
 	default:
+		return "", false, false
+	}
+	return script, complete, true
+}
+
+func queryManagerBulk(ctx context.Context, env *Env, mgr string, pkgs []string, sudo bool) (map[string]bool, bool, error) {
+	script, complete, ok := managerBulkScript(mgr, pkgs)
+	if !ok {
 		return nil, false, nil
 	}
 

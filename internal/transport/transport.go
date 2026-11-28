@@ -101,8 +101,9 @@ type VerifiedWriter interface {
 // ApplyOp describes one check-apply-recheck operation in a sequential remote apply pipeline.
 type ApplyOp struct {
 	Index           int     `json:"index"`
-	Kind            string  `json:"kind"` // file, symlink, block, skill, managed_file, script
+	Kind            string  `json:"kind"` // file, symlink, block, skill, managed_file, script, merge_fresh
 	Label           string  `json:"label,omitempty"`
+	Detail          string  `json:"detail,omitempty"`
 	Secret          bool    `json:"-"`
 	Path            string  `json:"path,omitempty"`
 	Target          string  `json:"target,omitempty"`
@@ -150,6 +151,27 @@ type SeqApplier interface {
 // login environment files (such as ~/.config/fam/env.sh, secrets.env, or ~/.bashrc).
 type SessionRefresher interface {
 	RefreshSession(ctx context.Context) error
+	// RefreshSessionIfNeeded restarts the session only if watched shell startup files changed.
+	RefreshSessionIfNeeded(ctx context.Context) error
+}
+
+// SpecReq describes one speculative read-only remote check pipelined into Bootstrap stdin.
+type SpecReq struct {
+	Key       string `json:"key"`
+	Op        string `json:"op"` // stat, read, skill_check, exec
+	Path      string `json:"path,omitempty"`
+	Dir       string `json:"dir,omitempty"`
+	Marker    string `json:"marker,omitempty"`
+	Script    string `json:"script,omitempty"`
+	Sudo      bool   `json:"sudo,omitempty"`
+	TimeoutMS int64  `json:"timeout_ms,omitempty"`
+}
+
+// SpecBootstrapper establishes the persistent session, returns facts + secrets, and optionally
+// pipelines a speculative read-only check batch gated on the SHA-256 of the live facts output.
+type SpecBootstrapper interface {
+	BootstrapSpec(ctx context.Context, factsScript, secretsRelPath, expectedFactsSHA string, reqs []SpecReq) (factsRes Result, secretsData []byte, secretsExists bool, specHit bool, err error)
+	ClearSpecCache()
 }
 
 // ConnError is a connection error: `ssh` exited with code 255.

@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
@@ -39,6 +40,99 @@ type GitHubReleaseTask struct {
 	VersionCommand *string
 	Absent         bool
 	units          []Unit
+
+	prefOnce sync.Once
+	prefDone chan struct{}
+	prefTag  string
+	prefBin  []byte
+	prefErr  error
+}
+
+// prefetchReleases downloads, verifies, and extracts binaries for unsatisfied GitHubReleaseTasks
+// concurrently in the background while earlier tasks apply on the machine.
+func prefetchReleases(ctx context.Context, env *Env, ts []Task, pre map[Task]checked) {
+	var todo []*GitHubReleaseTask
+	for _, t := range ts {
+		gr, ok := t.(*GitHubReleaseTask)
+		if !ok || gr.Absent {
+			continue
+		}
+		if res, has := pre[t]; has && res.err == nil && res.c.Status == Satisfied {
+			continue
+		}
+		todo = append(todo, gr)
+	}
+	if len(todo) == 0 {
+		return
+	}
+	sem := make(chan struct{}, 4)
+	for _, gr := range todo {
+		gr := gr
+		gr.prefOnce.Do(func() {
+			gr.prefDone = make(chan struct{})
+			go func() {
+				defer close(gr.prefDone)
+				select {
+				case sem <- struct{}{}:
+					defer func() { <-sem }()
+				case <-ctx.Done():
+					gr.prefErr = ctx.Err()
+					return
+				}
+				gr.prefTag, gr.prefBin, gr.prefErr = gr.prepareBinary(ctx, env)
+			}()
+		})
+	}
+}
+
+func (t *GitHubReleaseTask) prepareBinary(ctx context.Context, env *Env) (string, []byte, error) {
+	tag, a, name, err := t.target(ctx, env)
+	if err != nil {
+		return "", nil, err
+	}
+	assets, err := releaseAssets(ctx, t.Repo, tag)
+	if err != nil {
+		return "", nil, err
+	}
+	if !assets[name] {
+		return "", nil, fmt.Errorf("release %s@%s has no asset %s", t.Repo, tag, name)
+	}
+	data, err := releaseDownload(ctx, t.Repo, tag, name, maxReleaseAsset)
+	if err != nil {
+		return "", nil, err
+	}
+	defer removeReleaseDownload(data)
+	checksum := ""
+	if a.Checksum != nil {
+		checksum = expandReleaseName(*a.Checksum, tag)
+		if !assets[checksum] {
+			return "", nil, fmt.Errorf("release %s@%s has no checksum asset %s", t.Repo, tag, checksum)
+		}
+	} else {
+		checksum = findChecksum(assets, name)
+	}
+	if checksum != "" {
+		checksFile, err := releaseDownload(ctx, t.Repo, tag, checksum, maxSkillFile)
+		if err != nil {
+			return "", nil, err
+		}
+		defer removeReleaseDownload(checksFile)
+		checks, err := io.ReadAll(checksFile)
+		if err != nil {
+			return "", nil, err
+		}
+		if err := checkReleaseDigest(data, checks, name, strings.HasPrefix(checksum, name+".")); err != nil {
+			return "", nil, err
+		}
+	}
+	if _, err := data.Seek(0, io.SeekStart); err != nil {
+		return "", nil, err
+	}
+	binary, err := releaseBinary(data, a)
+	if err != nil {
+		return "", nil, fmt.Errorf("release asset %s: %w", name, err)
+	}
+	return tag, binary, nil
 }
 
 func (t *GitHubReleaseTask) Kind() string           { return "github-release" }
@@ -187,52 +281,20 @@ func (t *GitHubReleaseTask) Apply(ctx context.Context, env *Env) (string, error)
 		_, err := env.ShOK(ctx, "rm -f -- "+transport.Quote(t.binary(env))+" "+transport.Quote(t.recordPath(env)), false, "remove "+t.Binary)
 		return "removed", err
 	}
-	tag, a, name, err := t.target(ctx, env)
-	if err != nil {
-		return "", err
-	}
-	// Asset links come from GitHub's release fragment. This avoids API rate limits.
-	assets, err := releaseAssets(ctx, t.Repo, tag)
-	if err != nil {
-		return "", err
-	}
-	if !assets[name] {
-		return "", fmt.Errorf("release %s@%s has no asset %s", t.Repo, tag, name)
-	}
-	data, err := releaseDownload(ctx, t.Repo, tag, name, maxReleaseAsset)
-	if err != nil {
-		return "", err
-	}
-	defer removeReleaseDownload(data)
-	checksum := ""
-	if a.Checksum != nil {
-		checksum = expandReleaseName(*a.Checksum, tag)
-		if !assets[checksum] {
-			return "", fmt.Errorf("release %s@%s has no checksum asset %s", t.Repo, tag, checksum)
+	var tag string
+	var binary []byte
+	if t.prefDone != nil {
+		select {
+		case <-t.prefDone:
+			tag, binary, err = t.prefTag, t.prefBin, t.prefErr
+		case <-ctx.Done():
+			return "", ctx.Err()
 		}
 	} else {
-		checksum = findChecksum(assets, name)
+		tag, binary, err = t.prepareBinary(ctx, env)
 	}
-	if checksum != "" {
-		checksFile, err := releaseDownload(ctx, t.Repo, tag, checksum, maxSkillFile)
-		if err != nil {
-			return "", err
-		}
-		defer removeReleaseDownload(checksFile)
-		checks, err := io.ReadAll(checksFile)
-		if err != nil {
-			return "", err
-		}
-		if err := checkReleaseDigest(data, checks, name, strings.HasPrefix(checksum, name+".")); err != nil {
-			return "", err
-		}
-	}
-	if _, err := data.Seek(0, io.SeekStart); err != nil {
-		return "", err
-	}
-	binary, err := releaseBinary(data, a)
 	if err != nil {
-		return "", fmt.Errorf("release asset %s: %w", name, err)
+		return "", err
 	}
 	// Recheck ownership after the download, before replacing any file.
 	fi, _, err := t.ownership(ctx, env)

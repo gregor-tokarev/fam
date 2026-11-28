@@ -480,6 +480,42 @@ func (t *MergeTask) compute(ctx context.Context, env *Env) (out []byte, keys []s
 	return out, keys, exists, mode, nil
 }
 
+// renderFresh renders the exact bytes and change detail for a MergeTask when the target file does
+// not exist yet. Returns ok=false for absent merges or if rendering fails.
+func (t *MergeTask) renderFresh() (out []byte, detail string, ok bool) {
+	if t.Absent {
+		return nil, "", false
+	}
+	doc := newOmap()
+	var keys []string
+	mergeInto(doc, t.Values, "", &keys)
+	if len(keys) == 0 {
+		return nil, "", false
+	}
+	switch t.Format {
+	case "json":
+		var buf bytes.Buffer
+		if err := writeJSON(&buf, doc, ""); err != nil {
+			return nil, "", false
+		}
+		buf.WriteString("\n")
+		out = buf.Bytes()
+	case "toml":
+		var err error
+		out, err = toml.Marshal(toPlain(doc))
+		if err != nil {
+			return nil, "", false
+		}
+	default:
+		return nil, "", false
+	}
+	// Verify the rendered bytes satisfy checkBytes (catches e.g. TOML null drops).
+	if rem, err := t.checkBytes(t.Path, out); err != nil || len(rem) > 0 {
+		return nil, "", false
+	}
+	return out, "create with " + strings.Join(keys, ", "), true
+}
+
 // Check implements Task.
 func (t *MergeTask) Check(ctx context.Context, env *Env) (Check, error) {
 	_, keys, exists, _, err := t.compute(ctx, env)

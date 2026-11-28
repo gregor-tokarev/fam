@@ -27,9 +27,11 @@ type SSH struct {
 	Observer       Observer
 	files
 
-	wireMu sync.Mutex
-	wire   *sshWire
-	hasPy3 bool
+	wireMu     sync.Mutex
+	wire       *sshWire
+	hasPy3     bool
+	specCache  *specResultCache
+	envChanged bool
 }
 
 // NewSSH returns an SSH transport for one worker.
@@ -104,17 +106,25 @@ func (s *SSH) Run(ctx context.Context, c Cmd) (Result, error) {
 }
 
 func (s *SSH) runWire(ctx context.Context, w *sshWire, c Cmd) (Result, error) {
-	req := wireReq{
-		Op:        "exec",
-		Script:    c.Script,
-		Sudo:      c.Sudo,
-		TimeoutMS: c.Timeout.Milliseconds(),
-	}
-	if len(c.Stdin) > 0 {
-		req.StdinB64 = base64.StdEncoding.EncodeToString(c.Stdin)
-	}
 	start := time.Now()
-	resp, err := w.call(ctx, req)
+	var resp wireResp
+	var err error
+	var hit bool
+	if len(c.Stdin) == 0 && !c.LoginShell && !c.Interactive {
+		resp, hit, err = s.lookupSpec(ctx, fmt.Sprintf("exec:%t:%s", c.Sudo, c.Script))
+	}
+	if !hit {
+		req := wireReq{
+			Op:        "exec",
+			Script:    c.Script,
+			Sudo:      c.Sudo,
+			TimeoutMS: c.Timeout.Milliseconds(),
+		}
+		if len(c.Stdin) > 0 {
+			req.StdinB64 = base64.StdEncoding.EncodeToString(c.Stdin)
+		}
+		resp, err = w.call(ctx, req)
+	}
 	if err != nil {
 		if c.Sudo && ctx.Err() != nil {
 			s.closeWire()
@@ -133,6 +143,11 @@ func (s *SSH) runWire(ctx context.Context, w *sshWire, c Cmd) (Result, error) {
 		Stderr:   errB,
 		Code:     resp.Code,
 		Duration: time.Duration(resp.DurationMS) * time.Millisecond,
+	}
+	if resp.EnvChanged {
+		s.wireMu.Lock()
+		s.envChanged = true
+		s.wireMu.Unlock()
 	}
 	if resp.TimedOut {
 		err = fmt.Errorf("command on %s stopped after the timeout: %w", s.Machine, context.DeadlineExceeded)
@@ -160,7 +175,10 @@ func (s *SSH) Stat(ctx context.Context, path string, sudo bool) (FileInfo, error
 		return s.files.Stat(ctx, path, sudo)
 	}
 	start := time.Now()
-	resp, err := w.call(ctx, wireReq{Op: "stat", Path: path, Sudo: sudo})
+	resp, hit, err := s.lookupSpec(ctx, fmt.Sprintf("stat:%t:%s", sudo, path))
+	if !hit {
+		resp, err = w.call(ctx, wireReq{Op: "stat", Path: path, Sudo: sudo})
+	}
 	if err != nil {
 		s.observe(Cmd{Label: "stat " + path, Sudo: sudo}, Result{Duration: time.Since(start)}, err)
 		return FileInfo{}, err
@@ -200,7 +218,10 @@ func (s *SSH) ReadFileInfo(ctx context.Context, path string, sudo bool) ([]byte,
 		return s.files.ReadFileInfo(ctx, path, sudo)
 	}
 	start := time.Now()
-	resp, err := w.call(ctx, wireReq{Op: "read", Path: path, Sudo: sudo})
+	resp, hit, err := s.lookupSpec(ctx, fmt.Sprintf("read:%t:%s", sudo, path))
+	if !hit {
+		resp, err = w.call(ctx, wireReq{Op: "read", Path: path, Sudo: sudo})
+	}
 	if err != nil {
 		s.observe(Cmd{Label: "read " + path, Sudo: sudo, Secret: true}, Result{Duration: time.Since(start)}, err)
 		return nil, FileInfo{}, err
@@ -308,7 +329,10 @@ func (s *SSH) SkillCheck(ctx context.Context, dir, marker string) (SkillState, e
 		return s.skillCheckFallback(ctx, dir, marker)
 	}
 	start := time.Now()
-	resp, err := w.call(ctx, wireReq{Op: "skill_check", Dir: dir, Marker: marker})
+	resp, hit, err := s.lookupSpec(ctx, "skill:"+dir+"\x00"+marker)
+	if !hit {
+		resp, err = w.call(ctx, wireReq{Op: "skill_check", Dir: dir, Marker: marker})
+	}
 	if err != nil {
 		s.observe(Cmd{Label: "digest of " + dir}, Result{Duration: time.Since(start)}, err)
 		return SkillState{}, err
@@ -379,6 +403,9 @@ func (s *SSH) SkillWrite(ctx context.Context, dir, marker string, tarball []byte
 
 // ErrSkillFallback signals SkillTask to fall back to shell execution when wire is unavailable.
 var errUseFallbackSkillWrite = errors.New("use shell skill write")
+
+// ErrUseFallbackSkillWrite returns the sentinel error telling SkillTask to use shell skill write.
+func ErrUseFallbackSkillWrite() error { return errUseFallbackSkillWrite }
 
 // IsSkillFallback reports whether err asks the caller to use shell skill operations.
 func IsSkillFallback(err error) bool { return errors.Is(err, errUseFallbackSkillWrite) }

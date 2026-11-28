@@ -27,6 +27,9 @@ type Env struct {
 	restarted map[Unit]bool
 	// mgrCache deduplicates read-only package manager queries across a single checkAll pass.
 	mgrCache *managerCache
+	// aptUpdated records whether `apt-get update` already succeeded in the current apply run
+	// without an intervening non-package mutation.
+	aptUpdated bool
 }
 
 func (e *Env) markRestarted(u Unit) {
@@ -82,11 +85,14 @@ unset HOME_FAM
 `, home, envFile)
 }
 
+func (e *Env) userScriptFull(script string) string {
+	q := transport.Quote(script)
+	return e.prelude() + "if command -v bash >/dev/null 2>&1; then exec bash -c " + q + "; else exec sh -c " + q + "; fi"
+}
+
 // UserScript runs a user script (Bash when the machine has it, else sh) with the FAM environment.
 func (e *Env) UserScript(ctx context.Context, script string, sudo bool, label string, timeout time.Duration) (transport.Result, error) {
-	q := transport.Quote(script)
-	full := e.prelude() + "if command -v bash >/dev/null 2>&1; then exec bash -c " + q + "; else exec sh -c " + q + "; fi"
-	return e.T.Run(ctx, transport.Cmd{Script: full, Sudo: sudo, Label: label, Timeout: timeout})
+	return e.T.Run(ctx, transport.Cmd{Script: e.userScriptFull(script), Sudo: sudo, Label: label, Timeout: timeout})
 }
 
 // Sh runs a FAM-internal POSIX script.

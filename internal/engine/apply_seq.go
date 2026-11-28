@@ -119,6 +119,27 @@ func encodeApplyOp(ctx context.Context, env *Env, idx int, t Task) (transport.Ap
 			StopAfterChange: stopAfter,
 			TimeoutMS:       scriptTimeout.Milliseconds(),
 		}, true
+	case *MergeTask:
+		if x.Absent || stopAfter {
+			return transport.ApplyOp{}, false
+		}
+		out, detail, ok := x.renderFresh()
+		if !ok {
+			return transport.ApplyOp{}, false
+		}
+		p := env.Path(x.Path)
+		m := uint32(x.Mode.Perm())
+		return transport.ApplyOp{
+			Index:   idx,
+			Kind:    "merge_fresh",
+			Label:   "write " + p,
+			Detail:  detail,
+			Path:    p,
+			DataB64: base64.StdEncoding.EncodeToString(out),
+			SHA256:  sha(out),
+			Mode:    &m,
+			Sudo:    x.sudo,
+		}, true
 	}
 	return transport.ApplyOp{}, false
 }
