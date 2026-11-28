@@ -1,29 +1,34 @@
 package facts
 
 import (
-	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/gregor-tokarev/fam/internal/transport"
 )
 
-const factsCacheDirName = "facts-cache-v1"
+const factsCacheDirName = "facts-cache-v2"
 
-// CachedFacts stores the last observed facts of a remote SSH target alongside the SHA-256 of the
-// trimmed raw facts script output so speculative evaluation can verify exact parity on connect.
+// CachedFacts holds the parsed facts alongside the SHA-256 of the trimmed raw facts script output
+// so speculative evaluation can verify exact parity on connect.
 type CachedFacts struct {
-	Facts     Facts  `json:"facts"`
+	Facts     Facts
+	RawSHA256 string
+}
+
+type cachedFactsDisk struct {
+	RawStdout []byte `json:"rawStdout"`
 	RawSHA256 string `json:"rawSha256"`
 }
 
-// RawHash returns the SHA-256 hex digest of the facts script output with trailing CR/LF trimmed.
-// Both Go and the remote ssh_wire worker compute this exact digest.
+// RawHash returns the SHA-256 hex digest of the facts script output with trailing CR/LF trimmed,
+// delegating to transport.RawFactsSHA so Go and wire_worker.py share one canonical digest.
 func RawHash(stdout []byte) string {
-	trimmed := bytes.TrimRight(stdout, "\r\n")
-	sum := sha256.Sum256(trimmed)
-	return hex.EncodeToString(sum[:])
+	return transport.RawFactsSHA(stdout)
 }
 
 func factsCacheDir() string {
@@ -48,8 +53,9 @@ func factsCachePath(target, sshConfig string) string {
 	return filepath.Join(dir, hex.EncodeToString(h[:])+".json")
 }
 
-// LoadCache returns the cached facts for an SSH target, if available.
-func LoadCache(target, sshConfig string) (CachedFacts, bool) {
+// LoadCache loads the last raw facts output for an SSH target and re-parses it with the current
+// Parse logic so parser changes never serve stale derived properties.
+func LoadCache(target, sshConfig, machine string, cockpit bool, tags []string) (CachedFacts, bool) {
 	p := factsCachePath(target, sshConfig)
 	if p == "" {
 		return CachedFacts{}, false
@@ -58,20 +64,27 @@ func LoadCache(target, sshConfig string) (CachedFacts, bool) {
 	if err != nil {
 		return CachedFacts{}, false
 	}
-	var cf CachedFacts
-	if err := json.Unmarshal(b, &cf); err != nil || cf.RawSHA256 == "" || cf.Facts.OS == "" {
+	var disk cachedFactsDisk
+	if err := json.Unmarshal(b, &disk); err != nil || disk.RawSHA256 == "" || len(disk.RawStdout) == 0 {
 		return CachedFacts{}, false
 	}
-	return cf, true
+	if RawHash(disk.RawStdout) != disk.RawSHA256 {
+		return CachedFacts{}, false
+	}
+	f, err := Parse(context.Background(), nil, transport.Result{Stdout: disk.RawStdout, Code: 0}, machine, cockpit, tags)
+	if err != nil {
+		return CachedFacts{}, false
+	}
+	return CachedFacts{Facts: f, RawSHA256: disk.RawSHA256}, true
 }
 
-// SaveCache atomically persists the observed facts and raw digest for an SSH target.
-func SaveCache(target, sshConfig string, cf CachedFacts) {
+// SaveCache atomically persists the raw facts stdout and digest for an SSH target.
+func SaveCache(target, sshConfig string, rawStdout []byte, rawSHA string) {
 	p := factsCachePath(target, sshConfig)
-	if p == "" || cf.RawSHA256 == "" || cf.Facts.OS == "" {
+	if p == "" || rawSHA == "" || len(rawStdout) == 0 {
 		return
 	}
-	b, err := json.Marshal(cf)
+	b, err := json.Marshal(cachedFactsDisk{RawStdout: rawStdout, RawSHA256: rawSHA})
 	if err != nil {
 		return
 	}

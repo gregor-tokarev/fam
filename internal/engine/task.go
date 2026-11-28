@@ -2,6 +2,10 @@ package engine
 
 import (
 	"context"
+	"encoding/base64"
+	"os"
+
+	"github.com/gregor-tokarev/fam/internal/transport"
 )
 
 // Status is the result of a check.
@@ -23,10 +27,68 @@ const (
 	Failed    Status = "failed"
 )
 
+// PrimPlan is an optional Go-computed dumb primitive produced directly by Task.Check so the
+// apply loop can pipeline independent file/symlink/skill mutations in one remote round trip
+// (guarded by CAS preconditions) while keeping 100% of task logic and error rules in Go.
+type PrimPlan struct {
+	Op         transport.PrimOp
+	TargetPath string
+	Data       []byte // raw bytes for write
+	WantSHA256 string
+	WantMode   os.FileMode
+	WantTarget string
+	WantDigest string
+	SudoKind   string
+	// Tarball builds the skill tarball lazily only during apply (never during plan).
+	Tarball func() ([]byte, error)
+}
+
+func writePrimPlan(p string, data []byte, mode os.FileMode, sudo, secret bool, ifMissing bool, ifSHA256, sudoKind string) *PrimPlan {
+	m := uint32(mode.Perm())
+	return &PrimPlan{
+		Op: transport.PrimOp{
+			Op:        "write",
+			Label:     "write " + p,
+			Secret:    secret,
+			Path:      p,
+			Mode:      &m,
+			Sudo:      sudo,
+			Verify:    true,
+			IfMissing: ifMissing,
+			IfSHA256:  ifSHA256,
+		},
+		TargetPath: p,
+		Data:       data,
+		WantSHA256: sha(data),
+		WantMode:   mode.Perm(),
+		SudoKind:   sudoKind,
+	}
+}
+
+func (p *PrimPlan) finalizeOp(index int, stopAfter bool) (transport.PrimOp, error) {
+	op := p.Op
+	op.Index = index
+	op.StopAfter = stopAfter
+	if op.Op == "write" && op.DataB64 == "" && len(p.Data) > 0 {
+		op.DataB64 = base64.StdEncoding.EncodeToString(p.Data)
+	}
+	if op.Op == "skill_write" && op.TarB64 == "" && p.Tarball != nil {
+		tb, err := p.Tarball()
+		if err != nil {
+			return transport.PrimOp{}, err
+		}
+		op.TarB64 = base64.StdEncoding.EncodeToString(tb)
+	}
+	return op, nil
+}
+
 // Check is the result of a check.
 type Check struct {
 	Status Status
 	Detail string
+	// Plan is optionally populated by Task.Check when Status == Change and the apply can run
+	// as a CAS-guarded primitive write/symlink/skill_write without re-reading state.
+	Plan *PrimPlan
 }
 
 // Task is one unit of work on a machine.
@@ -67,12 +129,6 @@ type Update struct {
 	Checked bool
 	Diff    string
 	Detail  string
-}
-
-// FastApplier is an optional interface for tasks that can execute check -> apply -> post-check
-// in fewer round trips while preserving the exact semantics of applyTask.
-type FastApplier interface {
-	ApplyChecked(ctx context.Context, env *Env) (handled bool, st Status, detail string, err error, tc touch)
 }
 
 // Restarter is a task that restarts units at the end of its bundle when it changed.

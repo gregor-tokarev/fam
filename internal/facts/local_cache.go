@@ -30,9 +30,20 @@ func localEnvFingerprint() (string, bool) {
 		return "", false
 	}
 	h := sha256.New()
+	scriptSum := sha256.Sum256([]byte(script))
+	h.Write([]byte("v2\x00" + runtime.GOOS + "\x00" + runtime.GOARCH + "\x00"))
+	h.Write(scriptSum[:])
+	h.Write([]byte{0})
+	if exe, err := os.Executable(); err == nil {
+		h.Write([]byte(exe))
+		h.Write([]byte{0})
+		if ei, err := os.Stat(exe); err == nil {
+			h.Write([]byte(ei.ModTime().UTC().String()))
+			h.Write([]byte{0})
+		}
+	}
 	host, _ := os.Hostname()
 	home, _ := os.UserHomeDir()
-	h.Write([]byte("v1\x00" + runtime.GOOS + "\x00" + runtime.GOARCH + "\x00"))
 	h.Write([]byte(host + "\x00" + home + "\x00" + os.Getenv("USER") + "\x00" + os.Getenv("SHELL") + "\x00" + os.Getenv("PATH") + "\x00"))
 
 	statFile := func(p string) {

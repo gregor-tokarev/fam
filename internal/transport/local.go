@@ -178,13 +178,8 @@ func (l *Local) WriteFile(ctx context.Context, path string, data []byte, mode os
 	return err
 }
 
-// WriteFileVerify implements VerifiedWriter natively on the local filesystem.
-func (l *Local) WriteFileVerify(ctx context.Context, path string, data []byte, mode os.FileMode, sudo bool) (FileInfo, error) {
-	if err := l.WriteFile(ctx, path, data, mode, sudo); err != nil {
-		return FileInfo{}, err
-	}
-	return l.Stat(ctx, path, sudo)
-}
+// HasNativeSkillOps implements SkillOps.
+func (l *Local) HasNativeSkillOps() bool { return true }
 
 // SkillCheck implements SkillOps natively on the local filesystem.
 func (l *Local) SkillCheck(ctx context.Context, dir, marker string) (SkillState, error) {

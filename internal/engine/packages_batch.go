@@ -14,43 +14,20 @@ type batchPkgResult struct {
 	detail string
 }
 
-func supportsBatchInstall(mgr string) bool {
-	switch mgr {
-	case "apt", "dnf", "pacman", "yay", "apk", "brew", "bun", "npm":
-		return true
+func batchInstallScript(mgr string, pkgs []string, skipUpdate bool) (string, bool) {
+	m, ok := managers[mgr]
+	if !ok || !m.batchInstall {
+		return "", false
 	}
-	return false
-}
-
-func batchInstallScript(mgr string, pkgs []string, skipAptUpdate bool) (string, bool) {
 	quoted := make([]string, len(pkgs))
 	for i, p := range pkgs {
 		quoted[i] = transport.Quote(p)
 	}
-	qList := strings.Join(quoted, " ")
-	switch mgr {
-	case "apt":
-		if skipAptUpdate {
-			return "DEBIAN_FRONTEND=noninteractive apt-get install -y " + qList, true
-		}
-		return "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y " + qList, true
-	case "dnf":
-		return "dnf install -y " + qList, true
-	case "pacman":
-		return "pacman -S --needed --noconfirm " + qList, true
-	case "yay":
-		return "yay -S --needed --noconfirm " + qList, true
-	case "apk":
-		return "apk add --no-cache " + qList, true
-	case "brew":
-		return "brew install " + qList, true
-	case "bun":
-		return "bun add -g " + qList, true
-	case "npm":
-		return "npm install -g " + qList, true
-	default:
-		return "", false
+	tpl := m.install
+	if skipUpdate && m.installNoUpdate != "" {
+		tpl = m.installNoUpdate
 	}
+	return fmt.Sprintf(tpl, strings.Join(quoted, " ")), true
 }
 
 func isBatchablePackage(t Task) (*PackageTask, bool) {
@@ -58,22 +35,23 @@ func isBatchablePackage(t Task) (*PackageTask, bool) {
 	if !ok {
 		return nil, false
 	}
-	if pt.Absent || pt.CustomInstall || pt.Pin != "" || pt.Manager == "" || !supportsBatchInstall(pt.Manager) {
+	if pt.Absent || pt.CustomInstall || pt.Pin != "" || pt.Manager == "" || !managers[pt.Manager].batchInstall {
 		return nil, false
 	}
 	return pt, true
 }
 
-// collectPackageBatch looks ahead from order[startIdx] to gather unsatisfied PackageTasks sharing
-// the same package manager and sudo mode that are separated only by already-satisfied tasks (and no
-// pending unit restart boundaries). This preserves exact stop-on-first-failure semantics because no
-// intervening unsatisfied task is ever skipped over.
-func collectPackageBatch(order []Task, startIdx int, pre map[Task]checked, satisfied map[Task]bool, secEnd map[Task]int, restartUnits map[Task]bool) []*PackageTask {
+func hasPendingUpdate(t Task) bool {
+	u, ok := t.(Updater)
+	return ok && u.Updates()
+}
+
+// collectPackageBatch gathers strictly contiguous unsatisfied PackageTasks starting at
+// order[startIdx] that share the same package manager and sudo mode, without crossing any
+// intervening task, pending update boundary, or pending unit restart boundary.
+func collectPackageBatch(order []Task, startIdx int, pre map[Task]checked, secEnd map[Task]int, restartUnits map[Task]bool) []*PackageTask {
 	first, ok := isBatchablePackage(order[startIdx])
 	if !ok {
-		return nil
-	}
-	if satisfied[first] {
 		return nil
 	}
 	if res, has := pre[first]; has && (res.err != nil || res.c.Status != Change) {
@@ -93,8 +71,9 @@ func collectPackageBatch(order []Task, startIdx int, pre map[Task]checked, satis
 			curEnd = secEnd[order[i]]
 		}
 		x := order[i]
-		if satisfied[x] {
-			continue
+		// Any later task with a pending update is a hard boundary (whether satisfied or missing).
+		if hasPendingUpdate(x) {
+			break
 		}
 		pt, ok := isBatchablePackage(x)
 		if !ok {
@@ -106,10 +85,11 @@ func collectPackageBatch(order []Task, startIdx int, pre map[Task]checked, satis
 		if res, has := pre[pt]; has && (res.err != nil || res.c.Status != Change) {
 			break
 		}
-		if !seenPkg[pt.PackageName] {
-			seenPkg[pt.PackageName] = true
-			batch = append(batch, pt)
+		if seenPkg[pt.PackageName] {
+			break
 		}
+		seenPkg[pt.PackageName] = true
+		batch = append(batch, pt)
 		if len(pt.Restarts()) > 0 {
 			// Stop after a task that triggers a unit restart so the restart runs on time.
 			break
@@ -121,13 +101,97 @@ func collectPackageBatch(order []Task, startIdx int, pre map[Task]checked, satis
 	return batch
 }
 
+// confirmStillMissing filters batch to packages that still need installation when pre does not
+// have fresh Check results for every candidate (for example, after an earlier mutation cleared pre).
+func confirmStillMissing(ctx context.Context, env *Env, batch []*PackageTask, pre map[Task]checked) ([]*PackageTask, error) {
+	allPreConfirmed := true
+	for _, pt := range batch {
+		res, has := pre[pt]
+		if !has || res.err != nil || res.c.Status != Change {
+			allPreConfirmed = false
+			break
+		}
+	}
+	if allPreConfirmed {
+		return batch, nil
+	}
+
+	mgr := batch[0].Manager
+	checkedInst := map[string]bool{}
+	checkedOK := map[string]bool{}
+	if supportsBulkManager(mgr) {
+		var bulkPkgs []string
+		for _, pt := range batch {
+			if mgr == "apt" && strings.Contains(pt.PackageName, ":") {
+				continue
+			}
+			bulkPkgs = append(bulkPkgs, pt.PackageName)
+		}
+		if len(bulkPkgs) > 0 {
+			inst, ok, berr := queryManagerBulk(ctx, env, mgr, bulkPkgs, batch[0].sudo)
+			if berr != nil {
+				if transport.IsConnError(berr) {
+					return nil, berr
+				}
+				return nil, nil
+			}
+			if ok {
+				for _, p := range bulkPkgs {
+					checkedInst[p] = inst[p]
+					checkedOK[p] = true
+				}
+			}
+		}
+	}
+
+	var toInstall []*PackageTask
+	for i, pt := range batch {
+		inst := false
+		if checkedOK[pt.PackageName] {
+			inst = checkedInst[pt.PackageName]
+		} else {
+			var err error
+			inst, err = pt.installed(ctx, env)
+			if err != nil {
+				if transport.IsConnError(err) {
+					return nil, err
+				}
+				if i == 0 {
+					return nil, nil
+				}
+				break
+			}
+		}
+		if inst {
+			if i == 0 {
+				return nil, nil
+			}
+			// Stop at the first already-installed package so the batch stays a strictly contiguous
+			// missing prefix and never jumps over an intervening package task.
+			break
+		}
+		toInstall = append(toInstall, pt)
+	}
+	if len(toInstall) < 2 {
+		return nil, nil
+	}
+	return toInstall, nil
+}
+
 // runPackageBatch installs batch in a single package-manager invocation and verifies all packages.
 // On non-connection failure it returns (nil, nil) so the caller falls back cleanly to single-package
-// apply with exact per-task error attribution.
-func runPackageBatch(ctx context.Context, env *Env, batch []*PackageTask) (map[*PackageTask]batchPkgResult, error) {
+// apply with exact per-task error attribution; the underlying failed command is already recorded
+// in the run log via env.UserScript.
+func runPackageBatch(ctx context.Context, env *Env, batch []*PackageTask, pre map[Task]checked) (map[*PackageTask]batchPkgResult, error) {
 	if len(batch) < 2 {
 		return nil, nil
 	}
+	var err error
+	batch, err = confirmStillMissing(ctx, env, batch, pre)
+	if err != nil || len(batch) < 2 {
+		return nil, err
+	}
+
 	mgr := batch[0].Manager
 	sudo := batch[0].applySudo()
 	pkgs := make([]string, len(batch))
@@ -151,7 +215,7 @@ func runPackageBatch(ctx context.Context, env *Env, batch []*PackageTask) (map[*
 	if !ok {
 		return nil, nil
 	}
-	label := fmt.Sprintf("install %d %s packages", len(pkgs), mgr)
+	label := fmt.Sprintf("install %d %s packages (batch)", len(pkgs), mgr)
 	r, err := env.UserScript(ctx, script, sudo, label, scriptTimeout)
 	if err != nil {
 		if transport.IsConnError(err) {
@@ -164,14 +228,6 @@ func runPackageBatch(ctx context.Context, env *Env, batch []*PackageTask) (map[*
 	}
 	if mgr == "apt" {
 		env.aptUpdated = true
-	}
-	if sr, ok := env.T.(transport.SessionRefresher); ok {
-		if rerr := sr.RefreshSessionIfNeeded(ctx); rerr != nil {
-			if transport.IsConnError(rerr) {
-				return nil, rerr
-			}
-			return nil, nil
-		}
 	}
 
 	// Verify all batched packages are installed in bulk (plus parallel version lookups).

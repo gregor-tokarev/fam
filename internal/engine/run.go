@@ -271,11 +271,9 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, cockpitFacts 
 			setError(mr.res, fmt.Errorf("machine %s has no address", m.Name))
 			return
 		}
-		if dt := daemon.NewTransport(ctx, m.Name, m.Target(), opts.SSHConfig, opts.Observer); dt != nil {
-			t = dt
-		} else {
-			t = transport.NewSSH(m.Name, m.Target(), opts.SSHConfig, opts.Observer)
-		}
+		sshT := transport.NewSSH(m.Name, m.Target(), opts.SSHConfig, opts.Observer)
+		sshT.Pool = daemon.NewPool()
+		t = sshT
 		mr.res.Transport = "ssh"
 		mr.res.Target = m.Target()
 	}
@@ -303,11 +301,8 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, cockpitFacts 
 	} else if sbs, ok := t.(transport.SpecBootstrapper); ok {
 		var expectedSHA string
 		var specReqs []transport.SpecReq
-		cf, hasCF := facts.LoadCache(m.Target(), opts.SSHConfig)
+		cf, hasCF := facts.LoadCache(m.Target(), opts.SSHConfig, m.Name, m.Cockpit, m.Tags)
 		if hasCF && (opts.Mode == ModePlan || opts.Mode == ModeApply) {
-			cf.Facts.Machine = m.Name
-			cf.Facts.Cockpit = m.Cockpit
-			cf.Facts.Tags = append([]string{}, m.Tags...)
 			if sp, serr := evalSpec(cf.Facts.Properties()); serr == nil {
 				se := &Env{T: t, Facts: cf.Facts, Machine: m, Project: opts.Project, Secrets: secretList}
 				if ss, sv, berr := buildSections(ctx, se, sp, false); berr == nil {
@@ -317,35 +312,26 @@ func runMachine(ctx context.Context, opts Options, mr *machineRun, cockpitFacts 
 				}
 			}
 		}
-		var factsRes transport.Result
-		var hasSecrets bool
-		factsRes, oldSecrets, hasSecrets, specHit, err = sbs.BootstrapSpec(ctx, facts.Script(), secretsFile, expectedSHA, specReqs)
+		boot, berr := sbs.BootstrapSpec(ctx, facts.Script(), secretsFile, expectedSHA, specReqs)
+		err = berr
 		if err == nil {
+			factsRes := boot.FactsRes
+			oldSecrets = boot.SecretsData
+			specHit = boot.SpecHit
 			f, err = facts.Parse(ctx, t, factsRes, m.Name, m.Cockpit, m.Tags)
 			oldSecretsKnown = true
-			if !hasSecrets {
+			if !boot.SecretsExists {
 				oldSecrets = nil
 			}
 			if err == nil {
 				liveSHA := facts.RawHash(factsRes.Stdout)
 				if !hasCF || liveSHA != cf.RawSHA256 {
-					facts.SaveCache(m.Target(), opts.SSHConfig, facts.CachedFacts{Facts: f, RawSHA256: liveSHA})
+					facts.SaveCache(m.Target(), opts.SSHConfig, factsRes.Stdout, liveSHA)
 				}
 				if liveSHA != expectedSHA {
 					specHit = false
 					sbs.ClearSpecCache()
 				}
-			}
-		}
-	} else if bs, ok := t.(transport.Bootstrapper); ok {
-		var factsRes transport.Result
-		var hasSecrets bool
-		factsRes, oldSecrets, hasSecrets, err = bs.Bootstrap(ctx, facts.Script(), secretsFile)
-		if err == nil {
-			f, err = facts.Parse(ctx, t, factsRes, m.Name, m.Cockpit, m.Tags)
-			oldSecretsKnown = true
-			if !hasSecrets {
-				oldSecrets = nil
 			}
 		}
 	} else {
@@ -704,13 +690,6 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			r.Counts.Add(string(Conflict))
 		}
 	}
-	// satisfied holds the tasks that the first check pass found satisfied. A refresh checks only
-	// these: a task that was not satisfied probably changes the machine, and then the results of
-	// the tasks after it are old.
-	satisfied := make(map[Task]bool, len(all))
-	for t, res := range pre {
-		satisfied[t] = res.err == nil && res.c.Status == Satisfied
-	}
 	if r.Counts.Conflict > 0 {
 		r.Status = "conflict"
 		r.Error = "the plan has conflicts. FAM changed nothing on this machine"
@@ -718,7 +697,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 		return
 	}
 	// Start downloading any unsatisfied GitHubRelease assets in parallel with update gates and earlier apply tasks.
-	prefetchReleases(ctx, env, all, pre)
+	defer prefetchReleases(ctx, env, all, pre)()
 	var preVerify map[int][2]shellRun
 	if !mr.update {
 		var err error
@@ -728,357 +707,7 @@ func applyMachine(ctx context.Context, mr *machineRun) {
 			return
 		}
 	}
-	r.Status = "ok"
-	stopped := false
-	mr.p.Count("applying", countTasks(mr.sects, true))
-	n := 0
-	// order is the run order of the tasks of the apply loop. pos is the position of each task.
-	var order []Task
-	pos := map[Task]int{}
-	// secEnd is the position after the last task of the section of each task.
-	secEnd := map[Task]int{}
-	sectionHasRestarts := map[Task]bool{}
-	for _, s := range mr.sects {
-		if s.SkipReason == "" {
-			hasR := false
-			for _, t := range s.Tasks {
-				pos[t] = len(order)
-				order = append(order, t)
-				if rs, ok := t.(Restarter); ok && len(rs.Restarts()) > 0 {
-					hasR = true
-				}
-			}
-			for _, t := range s.Tasks {
-				secEnd[t] = len(order)
-				sectionHasRestarts[t] = s.RestartUnits && hasR
-			}
-		}
-	}
-	batchedDone := map[*PackageTask]batchPkgResult{}
-	// pre holds check results that are still current. A task with a satisfied result in pre
-	// needs no new check, also a package that then runs its update. A task with a result that is
-	// not satisfied checks again right before its apply. After a task changes the machine, FAM
-	// clears pre:
-	//   - after an apply or a restart, each next task checks again before it runs, as before.
-	//   - after an update, FAM checks the next tasks again at the same time, up to and including
-	//     the next task with an update, and reads its version before the update. An update can
-	//     change files of other tasks, so the results of before the update are not current.
-	updates := func(t Task) bool { u, ok := t.(Updater); return ok && u.Updates() }
-	refresh := false
-	// fresh is true while pre holds results of a refresh: each result there is the check of its
-	// task, as if the task checked itself at its turn, because no task changed the machine
-	// after the refresh. FAM uses it also when it is an error. A result of the first check pass
-	// is used only when it is satisfied: there, as before, an error makes the task check again.
-	fresh := false
-	// inSection limits the refresh to the section of t: a restart at the end of the section
-	// changes the machine, so results after it would be old.
-	refreshFrom := func(t Task, n int, inSection bool) {
-		refresh = false
-		end := len(order)
-		if inSection {
-			end = secEnd[t]
-		}
-		var seg []Task
-		for _, x := range order[pos[t]:end] {
-			if !satisfied[x] {
-				break
-			}
-			seg = append(seg, x)
-			// The update of x can change the machine, so the results after it would be old.
-			if updates(x) {
-				break
-			}
-		}
-		// The progress keeps the number of the apply step and names the slowest check.
-		rp := newRunning(mr.p)
-		rp.index = n
-		results, _ := checkAll(ctx, env, seg, rp, true)
-		pre = make(map[Task]checked, len(seg))
-		for i, x := range seg {
-			if results[i].ran {
-				pre[x] = results[i]
-			}
-		}
-		fresh = true
-	}
-	// The position of each task in r.Tasks.
-	index := map[Task]int{}
-	// A change of the sshd configuration applies only to new connections.
-	reconnect := false
-	// mutated tracks whether any task applied, updated, or restarted a unit on this machine.
-	mutated := false
-	// envDirty tracks whether a prior task may have changed shell startup files, env.sh, or
-	// secrets.env, requiring a fresh persistent remote session before later commands run.
-	envDirty := false
-	sa, canSeq := env.T.(transport.SeqApplier)
-	if canSeq && !sa.SupportsApplySeq() {
-		canSeq = false
-	}
-	flushEnv := func() bool {
-		if !envDirty {
-			return true
-		}
-		envDirty = false
-		if reconnect {
-			mr.p.Stage("reconnecting")
-			if err := env.T.Reconnect(ctx); err != nil {
-				setError(r, err)
-				stopped = true
-				return false
-			}
-			reconnect = false
-		}
-		if sr, ok := env.T.(transport.SessionRefresher); ok {
-			if err := sr.RefreshSession(ctx); err != nil {
-				setError(r, err)
-				stopped = true
-				return false
-			}
-		}
-		if sa != nil {
-			canSeq = sa.SupportsApplySeq()
-		}
-		return true
-	}
-	for _, s := range mr.sects {
-		if recordSkippedSection(r, s) {
-			continue
-		}
-		var units []Unit
-		failedInSection := false
-		env.restarted = nil
-		recordOutcome := func(t Task, st Status, detail string, err error, tc touch, fromSeq bool) {
-			switch tc {
-			case touchApply:
-				mutated = true
-				pre, refresh, fresh = nil, true, false
-				if _, isPkg := t.(*PackageTask); !isPkg {
-					env.aptUpdated = false
-				}
-			case touchUpdate:
-				mutated = true
-				pre, refresh, fresh = nil, true, false
-			}
-			index[t] = len(r.Tasks)
-			r.Tasks = append(r.Tasks, taskResult(t, st, detail, err))
-			r.Counts.Add(string(st))
-			if transport.IsConnError(err) {
-				setError(r, err)
-				stopped = true
-				failedInSection = true
-				return
-			}
-			if st == Failed || st == Conflict {
-				stopped = true
-				failedInSection = true
-				return
-			}
-			if st == Changed {
-				if s.Name == "environment" || (fromSeq && mayChangeShellEnv(t)) {
-					envDirty = true
-				}
-				if _, ok := t.(*SshdEnvTask); ok {
-					reconnect = true
-				}
-				// A Service task that restarted its unit satisfies the restart requests before it.
-				// Requests after it still restart the unit at the end of the bundle.
-				if len(env.restarted) > 0 {
-					kept := units[:0]
-					for _, u := range units {
-						if !env.restarted[u] {
-							kept = append(kept, u)
-						}
-					}
-					units = kept
-					env.restarted = nil
-				}
-				if rs, ok := t.(Restarter); ok {
-					units = append(units, rs.Restarts()...)
-				}
-			}
-		}
-		for ti := 0; ti < len(s.Tasks); ti++ {
-			t := s.Tasks[ti]
-			if stopped {
-				r.Tasks = append(r.Tasks, taskResult(t, Skipped, "an earlier task failed", nil))
-				r.Counts.Add(string(Skipped))
-				continue
-			}
-			if envDirty && s.Name != "environment" {
-				if !flushEnv() {
-					failedInSection = true
-					r.Tasks = append(r.Tasks, taskResult(t, Skipped, "an earlier task failed", nil))
-					r.Counts.Add(string(Skipped))
-					continue
-				}
-			}
-			// After an apply, update, or restart, a task that the first pass found satisfied
-			// starts a parallel/batched refresh up to the next non-satisfied task or updater.
-			if _, ok := pre[t]; !ok && refresh && satisfied[t] {
-				refreshFrom(t, n+1, s.RestartUnits && len(units) > 0)
-			}
-			// A satisfied result skips the check. A task that applies a change always checks right
-			// before, for example a removal that checks the owner.
-			var p *checked
-			if res, ok := pre[t]; ok {
-				switch {
-				case res.err == nil && res.c.Status == Satisfied:
-					p = &res
-				case res.err != nil && fresh:
-					p = &res
-				}
-			}
-			if pt, ok := t.(*PackageTask); ok {
-				if br, done := batchedDone[pt]; done {
-					delete(batchedDone, pt)
-					n++
-					mr.p.Task(n, taskLabel(t))
-					recordOutcome(t, Changed, br.detail, nil, touchApply, false)
-					continue
-				}
-			}
-			// When a task must check/apply and is the start of a batchable same-manager package run,
-			// install all compatible packages in a single manager invocation.
-			if p == nil {
-				if batch := collectPackageBatch(order, pos[t], pre, satisfied, secEnd, sectionHasRestarts); len(batch) >= 2 {
-					mr.p.Task(n+1, fmt.Sprintf("install %d %s packages", len(batch), batch[0].Manager))
-					resMap, berr := runPackageBatch(ctx, env, batch)
-					if berr != nil {
-						n++
-						recordOutcome(t, Failed, "install", berr, touchApply, false)
-						continue
-					}
-					if len(resMap) == len(batch) {
-						pt := batch[0]
-						for _, bpt := range batch[1:] {
-							batchedDone[bpt] = resMap[bpt]
-						}
-						n++
-						recordOutcome(t, Changed, resMap[pt].detail, nil, touchApply, false)
-						if sa != nil {
-							canSeq = sa.SupportsApplySeq()
-						}
-						continue
-					}
-				}
-			}
-			// When a task must check/apply and the transport supports sequential remote execution,
-			// execute the contiguous run of encodable tasks in this section in one round trip.
-			if p == nil && canSeq {
-				var ops []transport.ApplyOp
-				for j := ti; j < len(s.Tasks); j++ {
-					op, ok := encodeApplyOp(ctx, env, j, s.Tasks[j])
-					if !ok {
-						break
-					}
-					ops = append(ops, op)
-				}
-				if len(ops) > 0 {
-					mr.p.Task(n+1, taskLabel(s.Tasks[ti]))
-					doneOps := make(map[int]transport.ApplyOpResult, len(ops))
-					seqErr := sa.ApplySeq(ctx, ops, func(res transport.ApplyOpResult) {
-						doneOps[res.Index] = res
-						nextPos := res.Index + 1
-						if res.Status != "fallback" && nextPos < ti+len(ops) {
-							mr.p.Task(n+(nextPos-ti)+1, taskLabel(s.Tasks[nextPos]))
-						}
-					})
-					consumed := 0
-					for j := ti; j < ti+len(ops); j++ {
-						if res, ok := doneOps[j]; ok {
-							if res.Status == "fallback" {
-								break
-							}
-							n++
-							consumed++
-							st, detail, err, tc := decodeApplyOpResult(res)
-							recordOutcome(s.Tasks[j], st, detail, err, tc, true)
-							if stopped {
-								break
-							}
-							continue
-						}
-						if seqErr != nil {
-							n++
-							consumed++
-							recordOutcome(s.Tasks[j], Failed, "check failed", seqErr, touchApply, true)
-							break
-						}
-					}
-					if consumed > 0 {
-						ti += consumed - 1
-						continue
-					}
-				}
-			}
-			n++
-			mr.p.Task(n, taskLabel(t))
-			st, detail, err, tc := applyTask(ctx, env, t, p)
-			recordOutcome(t, st, detail, err, tc, false)
-			if sa != nil {
-				canSeq = sa.SupportsApplySeq()
-			}
-		}
-		// Restart each changed unit once, at the end of the bundle. No restart after a failure.
-		if s.RestartUnits && !failedInSection && !stopped {
-			seen := map[Unit]bool{}
-			for _, u := range units {
-				if stopped {
-					break
-				}
-				if seen[u] {
-					continue
-				}
-				seen[u] = true
-				mr.p.Stage("restarting " + u.Name)
-				mutated = true
-				pre, refresh, fresh = nil, true, false
-				rr := output.RestartResult{Unit: u.Name, Scope: u.Scope, Status: "restarted"}
-				if err := restartUnit(ctx, env, u); err != nil {
-					rr.Status = "failed"
-					rr.Error = err.Error()
-					stopped = true
-					if transport.IsConnError(err) {
-						setError(r, err)
-					}
-				}
-				r.Restarts = append(r.Restarts, rr)
-			}
-		}
-	}
-	if r.Status == "error" {
-		return
-	}
-	if !stopped && mutated {
-		mr.p.Stage("checking the shell blocks")
-		stopped = restoreBlocks(ctx, env, mr, index)
-		if r.Status == "error" {
-			return
-		}
-	}
-	if r.Counts.Failed > 0 || stopped {
-		r.Status = "failed"
-		r.ErrorKind = "task"
-		if r.Error == "" {
-			r.Error = "a task failed. FAM stopped the tasks after it"
-		}
-		return
-	}
-	if r.Counts.Changed > 0 {
-		r.Status = "changed"
-	}
-	// 7. Verify.
-	if reconnect {
-		mr.p.Stage("reconnecting")
-		if err := env.T.Reconnect(ctx); err != nil {
-			setError(r, err)
-			return
-		}
-	}
-	if mutated || reconnect {
-		preVerify = nil
-	}
-	verifyMachineWithCache(ctx, mr, preVerify)
+	newApplyLoop(mr, pre).run(ctx, preVerify)
 }
 
 // mayChangeShellEnv reports whether mutating t could alter shell startup files or environment
@@ -1187,13 +816,6 @@ const (
 // applyTask runs check, apply, and check again. pre is a current, satisfied check result of
 // this task; FAM uses it instead of a new check when it is not nil.
 func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, detail string, err error, tc touch) {
-	if pre == nil && !mayChangeShellEnv(t) {
-		if fa, ok := t.(FastApplier); ok {
-			if handled, fst, fdetail, ferr, ftc := fa.ApplyChecked(ctx, env); handled {
-				return fst, fdetail, ferr, ftc
-			}
-		}
-	}
 	var c Check
 	if pre != nil {
 		c, err = pre.c, pre.err
@@ -1247,16 +869,12 @@ func applyTask(ctx context.Context, env *Env, t Task, pre *checked) (st Status, 
 	if err != nil {
 		return Failed, c.Detail, err, touchApply
 	}
-	if mayChangeShellEnv(t) && t.Group() != "environment" {
+	// Refresh the persistent worker before post-apply Check only for ScriptTask/PackageTask,
+	// whose Apply may have updated shell startup files that their post-apply check relies on.
+	switch t.(type) {
+	case *ScriptTask, *PackageTask:
 		if sr, ok := env.T.(transport.SessionRefresher); ok {
-			var rerr error
-			switch t.(type) {
-			case *ScriptTask, *PackageTask:
-				rerr = sr.RefreshSessionIfNeeded(ctx)
-			default:
-				rerr = sr.RefreshSession(ctx)
-			}
-			if rerr != nil {
+			if rerr := sr.RefreshSessionIfNeeded(ctx); rerr != nil {
 				return Failed, "check after apply failed", rerr, touchApply
 			}
 		}

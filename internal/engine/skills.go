@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gregor-tokarev/fam/internal/transport"
 )
@@ -207,6 +208,12 @@ func startAsyncSkill(ctx context.Context, spec skillSpec, name, origin string) *
 	return a
 }
 
+func resolvedSkill(src *SkillSource) *asyncSkill {
+	ch := make(chan struct{})
+	close(ch)
+	return &asyncSkill{name: src.Name, dir: src.Dir, origin: src.Origin, done: ch, src: src}
+}
+
 func (a *asyncSkill) wait(ctx context.Context) (*SkillSource, error) {
 	select {
 	case <-a.done:
@@ -217,9 +224,9 @@ func (a *asyncSkill) wait(ctx context.Context) (*SkillSource, error) {
 }
 
 // SkillTask copies one skill to ~/.agents/skills/<name>.
+// Always uses loader (already completed for local/static skills) so there is only one code path.
 type SkillTask struct {
 	base
-	Skill  *SkillSource
 	loader *asyncSkill
 	units  []Unit
 }
@@ -230,31 +237,11 @@ func (t *SkillTask) Restarts() []Unit { return t.units }
 // Kind implements Task.
 func (t *SkillTask) Kind() string { return "skill" }
 
-func (t *SkillTask) skillName() string {
-	if t.Skill != nil {
-		return t.Skill.Name
-	}
-	return t.loader.name
-}
-
-func (t *SkillTask) skillDir() string {
-	if t.Skill != nil {
-		return t.Skill.Dir
-	}
-	return t.loader.dir
-}
-
-func (t *SkillTask) skillOrigin() string {
-	if t.Skill != nil {
-		return t.Skill.Origin
-	}
-	return t.loader.origin
-}
+func (t *SkillTask) skillName() string   { return t.loader.name }
+func (t *SkillTask) skillDir() string    { return t.loader.dir }
+func (t *SkillTask) skillOrigin() string { return t.loader.origin }
 
 func (t *SkillTask) resolve(ctx context.Context) (*SkillSource, error) {
-	if t.Skill != nil {
-		return t.Skill, nil
-	}
 	src, err := t.loader.wait(ctx)
 	if err != nil {
 		return nil, &skillLoadError{err: err}
@@ -292,23 +279,25 @@ func (t *SkillTask) Name() string { return t.skillName() + " (" + t.skillOrigin(
 
 func (t *SkillTask) dir(env *Env) string { return env.Home(agentsSkills + "/" + t.skillName()) }
 
+func (t *SkillTask) specReqs(env *Env) []transport.SpecReq {
+	dir := t.dir(env)
+	return []transport.SpecReq{{
+		Key:    transport.SpecKeySkill(dir, managedMarker),
+		Op:     "skill_check",
+		Dir:    dir,
+		Marker: managedMarker,
+	}}
+}
+
 // Check implements Task.
 func (t *SkillTask) Check(ctx context.Context, env *Env) (Check, error) {
 	d := t.dir(env)
 	var st transport.SkillState
-	if ops, ok := env.T.(transport.SkillOps); ok {
+	if ops, ok := env.T.(transport.SkillOps); ok && ops.HasNativeSkillOps() {
 		var err error
 		st, err = ops.SkillCheck(ctx, d, managedMarker)
 		if err != nil {
 			return Check{}, err
-		}
-		if st.Exists && st.IsDir && st.Managed && st.Digest == "" {
-			// Fallback transport without native digesting: compute digest over shell.
-			got, err := remoteDigest(ctx, env, d)
-			if err != nil {
-				return Check{}, err
-			}
-			st.Digest = got
 		}
 	} else {
 		fi, err := env.T.Stat(ctx, d, false)
@@ -339,7 +328,16 @@ func (t *SkillTask) Check(ctx context.Context, env *Env) (Check, error) {
 		return Check{}, err
 	}
 	if !st.Exists {
-		return Check{Status: Change, Detail: "copy"}, nil
+		return Check{
+			Status: Change,
+			Detail: "copy",
+			Plan: &PrimPlan{
+				Op:         transport.PrimOp{Op: "skill_write", Label: "copy skill " + src.Name, Dir: d, Marker: managedMarker, Verify: true, IfMissing: true},
+				TargetPath: d,
+				WantDigest: src.digest(),
+				Tarball:    src.tarball,
+			},
+		}, nil
 	}
 	if !st.IsDir {
 		return Check{}, conflict(fmt.Sprintf("%s exists and FAM did not make it. Remove or rename it, or rename the skill", d))
@@ -350,7 +348,16 @@ func (t *SkillTask) Check(ctx context.Context, env *Env) (Check, error) {
 	if st.Digest == src.digest() {
 		return Check{Status: Satisfied}, nil
 	}
-	return Check{Status: Change, Detail: "update"}, nil
+	return Check{
+		Status: Change,
+		Detail: "update",
+		Plan: &PrimPlan{
+			Op:         transport.PrimOp{Op: "skill_write", Label: "copy skill " + src.Name, Dir: d, Marker: managedMarker, Verify: true, IfDigest: st.Digest},
+			TargetPath: d,
+			WantDigest: src.digest(),
+			Tarball:    src.tarball,
+		},
+	}, nil
 }
 
 // Apply implements Task. FAM extracts the skill into a temporary folder, then swaps the folders.
@@ -364,14 +371,11 @@ func (t *SkillTask) Apply(ctx context.Context, env *Env) (string, error) {
 		return "", err
 	}
 	d := t.dir(env)
-	if ops, ok := env.T.(transport.SkillOps); ok {
-		err := ops.SkillWrite(ctx, d, managedMarker, tb)
-		if err == nil {
-			return "copied", nil
-		}
-		if !transport.IsSkillFallback(err) {
+	if ops, ok := env.T.(transport.SkillOps); ok && ops.HasNativeSkillOps() {
+		if err := ops.SkillWrite(ctx, d, managedMarker, tb); err != nil {
 			return "", err
 		}
+		return "copied", nil
 	}
 	script := fmt.Sprintf(`set -e
 d=%[1]s
@@ -408,6 +412,10 @@ func (t *SkillLinkTask) Kind() string { return "symlink" }
 // Name implements Task.
 func (t *SkillLinkTask) Name() string { return "~/.claude/skills/" + t.Name_ }
 
+func (t *SkillLinkTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specStat(false, env.Home(".claude/skills/"+t.Name_))}
+}
+
 // Check implements Task.
 func (t *SkillLinkTask) Check(ctx context.Context, env *Env) (Check, error) {
 	p := env.Home(".claude/skills/" + t.Name_)
@@ -418,7 +426,15 @@ func (t *SkillLinkTask) Check(ctx context.Context, env *Env) (Check, error) {
 	}
 	switch {
 	case !fi.Exists:
-		return Check{Status: Change, Detail: "link to " + want}, nil
+		return Check{
+			Status: Change,
+			Detail: "link to " + want,
+			Plan: &PrimPlan{
+				Op:         transport.PrimOp{Op: "symlink", Label: "link skill " + t.Name_, Path: p, Target: want, IfMissing: true},
+				TargetPath: p,
+				WantTarget: want,
+			},
+		}, nil
 	case fi.Type == "link" && fi.Target == want:
 		return Check{Status: Satisfied}, nil
 	default:
@@ -449,11 +465,18 @@ func (t *SkillPruneTask) Kind() string { return "skills" }
 // Name implements Task.
 func (t *SkillPruneTask) Name() string { return "remove old skills" }
 
-func (t *SkillPruneTask) stale(ctx context.Context, env *Env) ([]string, error) {
-	script := fmt.Sprintf(`d=%s
+func (t *SkillPruneTask) listScript(env *Env) string {
+	return fmt.Sprintf(`d=%s
 [ -d "$d" ] || exit 0
 for m in "$d"/*/%s; do [ -f "$m" ] && basename "$(dirname "$m")"; done; exit 0`, transport.Quote(env.Home(agentsSkills)), managedMarker)
-	r, err := env.ShOK(ctx, script, false, "list managed skills")
+}
+
+func (t *SkillPruneTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specExec(false, t.listScript(env), 10*time.Minute)}
+}
+
+func (t *SkillPruneTask) stale(ctx context.Context, env *Env) ([]string, error) {
+	r, err := env.ShOK(ctx, t.listScript(env), false, "list managed skills")
 	if err != nil {
 		return nil, err
 	}
@@ -547,9 +570,17 @@ mine=; [ -f "$d/%[3]s" ] && mine=1
 link=; [ -L "$l" ] && [ "$(readlink -- "$l")" = "$d" ] && link=1`, d, l, managedMarker)
 }
 
+func (t *SkillRemoveTask) checkScript(env *Env) string {
+	return t.script(env) + "\n" + `[ -n "$mine$link" ] && echo change; exit 0`
+}
+
+func (t *SkillRemoveTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specExec(false, t.checkScript(env), 10*time.Minute)}
+}
+
 // Check implements Task.
 func (t *SkillRemoveTask) Check(ctx context.Context, env *Env) (Check, error) {
-	r, err := env.ShOK(ctx, t.script(env)+"\n"+`[ -n "$mine$link" ] && echo change; exit 0`, false, "check skill "+t.Name_)
+	r, err := env.ShOK(ctx, t.checkScript(env), false, "check skill "+t.Name_)
 	if err != nil {
 		return Check{}, err
 	}

@@ -432,15 +432,14 @@ func (t *MergeTask) Name() string {
 // Restarts implements Restarter.
 func (t *MergeTask) Restarts() []Unit { return t.units }
 
-func (t *MergeTask) compute(ctx context.Context, env *Env) (out []byte, keys []string, exists bool, mode os.FileMode, err error) {
+func (t *MergeTask) compute(ctx context.Context, env *Env) (out []byte, keys []string, fi transport.FileInfo, mode os.FileMode, err error) {
 	p := env.Path(t.Path)
 	data, fi, err := env.T.ReadFileInfo(ctx, p, t.sudo)
 	if err != nil {
-		return nil, nil, false, 0, err
+		return nil, nil, transport.FileInfo{}, 0, err
 	}
-	exists = fi.Exists
 	mode = t.Mode
-	if exists && fi.Type == "file" {
+	if fi.Exists && fi.Type == "file" {
 		mode = fi.Mode.Perm()
 	}
 	var doc *omap
@@ -450,10 +449,10 @@ func (t *MergeTask) compute(ctx context.Context, env *Env) (out []byte, keys []s
 	case "toml":
 		doc, err = parseTOML(data)
 	default:
-		return nil, nil, false, 0, fmt.Errorf("unknown merge format %q", t.Format)
+		return nil, nil, transport.FileInfo{}, 0, fmt.Errorf("unknown merge format %q", t.Format)
 	}
 	if err != nil {
-		return nil, nil, false, 0, fmt.Errorf("%s is not valid %s: %v. FAM does not change it", p, strings.ToUpper(t.Format), err)
+		return nil, nil, transport.FileInfo{}, 0, fmt.Errorf("%s is not valid %s: %v. FAM does not change it", p, strings.ToUpper(t.Format), err)
 	}
 	if t.Absent {
 		removeFrom(doc, t.Values, "", &keys)
@@ -461,64 +460,32 @@ func (t *MergeTask) compute(ctx context.Context, env *Env) (out []byte, keys []s
 		mergeInto(doc, t.Values, "", &keys)
 	}
 	if len(keys) == 0 {
-		return nil, nil, exists, mode, nil
+		return nil, nil, fi, mode, nil
 	}
 	switch t.Format {
 	case "json":
 		var buf bytes.Buffer
 		if err := writeJSON(&buf, doc, ""); err != nil {
-			return nil, nil, false, 0, err
+			return nil, nil, transport.FileInfo{}, 0, err
 		}
 		buf.WriteString("\n")
 		out = buf.Bytes()
 	case "toml":
 		out, err = toml.Marshal(toPlain(doc))
 		if err != nil {
-			return nil, nil, false, 0, err
+			return nil, nil, transport.FileInfo{}, 0, err
 		}
 	}
-	return out, keys, exists, mode, nil
+	return out, keys, fi, mode, nil
 }
 
-// renderFresh renders the exact bytes and change detail for a MergeTask when the target file does
-// not exist yet. Returns ok=false for absent merges or if rendering fails.
-func (t *MergeTask) renderFresh() (out []byte, detail string, ok bool) {
-	if t.Absent {
-		return nil, "", false
-	}
-	doc := newOmap()
-	var keys []string
-	mergeInto(doc, t.Values, "", &keys)
-	if len(keys) == 0 {
-		return nil, "", false
-	}
-	switch t.Format {
-	case "json":
-		var buf bytes.Buffer
-		if err := writeJSON(&buf, doc, ""); err != nil {
-			return nil, "", false
-		}
-		buf.WriteString("\n")
-		out = buf.Bytes()
-	case "toml":
-		var err error
-		out, err = toml.Marshal(toPlain(doc))
-		if err != nil {
-			return nil, "", false
-		}
-	default:
-		return nil, "", false
-	}
-	// Verify the rendered bytes satisfy checkBytes (catches e.g. TOML null drops).
-	if rem, err := t.checkBytes(t.Path, out); err != nil || len(rem) > 0 {
-		return nil, "", false
-	}
-	return out, "create with " + strings.Join(keys, ", "), true
+func (t *MergeTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specRead(t.sudo, env.Path(t.Path))}
 }
 
 // Check implements Task.
 func (t *MergeTask) Check(ctx context.Context, env *Env) (Check, error) {
-	_, keys, exists, _, err := t.compute(ctx, env)
+	out, keys, fi, mode, err := t.compute(ctx, env)
 	if err != nil {
 		return Check{}, err
 	}
@@ -528,10 +495,19 @@ func (t *MergeTask) Check(ctx context.Context, env *Env) (Check, error) {
 	verb := "set "
 	if t.Absent {
 		verb = "remove "
-	} else if !exists {
+	} else if !fi.Exists {
 		verb = "create with "
 	}
-	return Check{Status: Change, Detail: verb + strings.Join(keys, ", ")}, nil
+	p := env.Path(t.Path)
+	var plan *PrimPlan
+	// Only attach a write primitive when the target is not a symlink and the rendered bytes
+	// satisfy checkBytes (catches format-specific omissions such as TOML null drops).
+	if !fi.Exists || fi.Type == "file" {
+		if rem, cerr := t.checkBytes(p, out); cerr == nil && len(rem) == 0 {
+			plan = writePrimPlan(p, out, mode, t.sudo, false, !fi.Exists, fi.SHA256, "merge")
+		}
+	}
+	return Check{Status: Change, Detail: verb + strings.Join(keys, ", "), Plan: plan}, nil
 }
 
 // Apply implements Task.
@@ -570,48 +546,4 @@ func (t *MergeTask) checkBytes(p string, data []byte) ([]string, error) {
 		mergeInto(doc, t.Values, "", &keys)
 	}
 	return keys, nil
-}
-
-// ApplyChecked implements FastApplier: reads and merges once, writes and verifies the digest on
-// disk in a single round trip (2 round trips total instead of 4), and re-runs the semantic merge
-// check on the written content so format-specific omissions (e.g. null in TOML) are still caught.
-func (t *MergeTask) ApplyChecked(ctx context.Context, env *Env) (bool, Status, string, error, touch) {
-	vw, ok := env.T.(transport.VerifiedWriter)
-	if !ok {
-		return false, "", "", nil, touchNone
-	}
-	out, keys, exists, mode, err := t.compute(ctx, env)
-	if err != nil {
-		return true, Failed, "check failed", err, touchNone
-	}
-	if len(keys) == 0 {
-		return true, Unchanged, "", nil, touchNone
-	}
-	verb := "set "
-	if t.Absent {
-		verb = "remove "
-	} else if !exists {
-		verb = "create with "
-	}
-	checkDetail := verb + strings.Join(keys, ", ")
-	p := env.Path(t.Path)
-	fi, err := vw.WriteFileVerify(ctx, p, out, mode, t.sudo)
-	if err != nil {
-		return true, Failed, checkDetail, sudoHint(err, t.sudo, "merge"), touchApply
-	}
-	if !fi.Exists || fi.Type != "file" || fi.SHA256 != sha(out) {
-		return true, Failed, checkDetail, fmt.Errorf("the check still finds a difference after apply"), touchApply
-	}
-	remKeys, err := t.checkBytes(p, out)
-	if err != nil {
-		return true, Failed, "check after apply failed", err, touchApply
-	}
-	if len(remKeys) > 0 {
-		remVerb := "set "
-		if t.Absent {
-			remVerb = "remove "
-		}
-		return true, Failed, checkDetail, fmt.Errorf("the check still finds a difference after apply: %s%s", remVerb, strings.Join(remKeys, ", ")), touchApply
-	}
-	return true, Changed, checkDetail, nil, touchApply
 }

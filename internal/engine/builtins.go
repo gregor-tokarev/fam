@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
 	"github.com/gregor-tokarev/fam/internal/secrets"
@@ -131,26 +132,48 @@ func (t *BlockTask) want(cur []byte) []byte {
 	return []byte(s + t.Block)
 }
 
+func (t *BlockTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specRead(false, env.Path(t.Path))}
+}
+
 // Check implements Task.
 func (t *BlockTask) Check(ctx context.Context, env *Env) (Check, error) {
 	p := env.Path(t.Path)
-	cur, exists, err := env.T.ReadFile(ctx, p, false)
+	cur, fi, err := env.T.ReadFileInfo(ctx, p, false)
 	if err != nil {
 		return Check{}, err
 	}
-	if !exists {
+	mode := os.FileMode(0o644)
+	if t.Mode != 0 {
+		mode = t.Mode
+	}
+	if fi.Exists && fi.Type == "file" {
+		mode = fi.Mode.Perm()
+	}
+	if !fi.Exists {
 		if t.OnlyIfExists {
 			return Check{Status: Satisfied, Detail: "no file"}, nil
 		}
-		return Check{Status: Change, Detail: "create with the FAM block"}, nil
+		want := t.want(nil)
+		return Check{
+			Status: Change,
+			Detail: "create with the FAM block",
+			Plan:   writePrimPlan(p, want, mode, false, false, true, "", ""),
+		}, nil
 	}
-	if bytes.Equal(cur, t.want(cur)) {
+	want := t.want(cur)
+	if bytes.Equal(cur, want) {
 		return Check{Status: Satisfied}, nil
 	}
+	detail := "add the FAM block"
 	if bytes.Contains(cur, []byte(blockBegin)) {
-		return Check{Status: Change, Detail: "update the FAM block"}, nil
+		detail = "update the FAM block"
 	}
-	return Check{Status: Change, Detail: "add the FAM block"}, nil
+	var plan *PrimPlan
+	if fi.Type == "file" {
+		plan = writePrimPlan(p, want, mode, false, false, false, fi.SHA256, "")
+	}
+	return Check{Status: Change, Detail: detail, Plan: plan}, nil
 }
 
 // Apply implements Task.
@@ -220,9 +243,15 @@ func (t *SshdEnvTask) Kind() string { return "sshd" }
 // Name implements Task.
 func (t *SshdEnvTask) Name() string { return sshdDropIn + " (PermitUserEnvironment BASH_ENV)" }
 
+const sshdCheckScript = `out=$(sshd -T) || exit 5; printf '%s\n' "$out" | grep -i '^permituserenvironment ' || true`
+
+func (t *SshdEnvTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specExec(true, sshdCheckScript, 10*time.Minute)}
+}
+
 // Check implements Task.
 func (t *SshdEnvTask) Check(ctx context.Context, env *Env) (Check, error) {
-	r, err := env.Sh(ctx, `out=$(sshd -T) || exit 5; printf '%s\n' "$out" | grep -i '^permituserenvironment ' || true`, true, "sshd -T")
+	r, err := env.Sh(ctx, sshdCheckScript, true, "sshd -T")
 	if err != nil {
 		return Check{}, err
 	}
@@ -307,6 +336,10 @@ func (t *OwnedRemoveTask) Kind() string { return "file" }
 // Name implements Task.
 func (t *OwnedRemoveTask) Name() string { return t.Label }
 
+func (t *OwnedRemoveTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specRead(false, env.Path(t.Path))}
+}
+
 // Check implements Task.
 func (t *OwnedRemoveTask) Check(ctx context.Context, env *Env) (Check, error) {
 	data, exists, err := env.T.ReadFile(ctx, env.Path(t.Path), false)
@@ -363,6 +396,10 @@ func (t *ManagedFileTask) Kind() string { return "file" }
 // Name implements Task.
 func (t *ManagedFileTask) Name() string { return t.Path }
 
+func (t *ManagedFileTask) specReqs(env *Env) []transport.SpecReq {
+	return []transport.SpecReq{specStat(false, env.Path(t.Path))}
+}
+
 // Check implements Task.
 func (t *ManagedFileTask) Check(ctx context.Context, env *Env) (Check, error) {
 	p := env.Path(t.Path)
@@ -371,7 +408,11 @@ func (t *ManagedFileTask) Check(ctx context.Context, env *Env) (Check, error) {
 		return Check{}, err
 	}
 	if !fi.Exists {
-		return Check{Status: Change, Detail: "create"}, nil
+		return Check{
+			Status: Change,
+			Detail: "create",
+			Plan:   writePrimPlan(p, t.Content, 0o644, false, false, true, "", ""),
+		}, nil
 	}
 	if fi.Type != "file" {
 		return Check{}, conflict(fmt.Sprintf("%s is a %s. FAM needs a regular file here", p, fi.Type))
@@ -384,7 +425,11 @@ func (t *ManagedFileTask) Check(ctx context.Context, env *Env) (Check, error) {
 		return Check{}, err
 	}
 	if writtenByFAM(cur) {
-		return Check{Status: Change, Detail: "update"}, nil
+		return Check{
+			Status: Change,
+			Detail: "update",
+			Plan:   writePrimPlan(p, t.Content, 0o644, false, false, false, fi.SHA256, ""),
+		}, nil
 	}
 	return Check{Status: Change, Detail: "replace a file that FAM did not write (FAM saves a copy)"}, nil
 }

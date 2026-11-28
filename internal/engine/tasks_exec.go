@@ -33,6 +33,13 @@ func (t *ScriptTask) Name() string { return t.Title }
 // Restarts implements Restarter.
 func (t *ScriptTask) Restarts() []Unit { return t.units }
 
+func (t *ScriptTask) specReqs(env *Env) []transport.SpecReq {
+	if t.CheckSh == "" {
+		return []transport.SpecReq{specStat(t.sudo, env.Path(t.Creates))}
+	}
+	return []transport.SpecReq{specExec(t.sudo, env.userScriptFull(t.CheckSh), scriptTimeout)}
+}
+
 // Check implements Task. Exit code 0 is satisfied, 100 is a change, any other code is an error.
 func (t *ScriptTask) Check(ctx context.Context, env *Env) (Check, error) {
 	script := t.CheckSh
@@ -146,6 +153,18 @@ func (t *PackageTask) bin(env *Env) string {
 	return t.Binary
 }
 
+func (t *PackageTask) binCheckScript(env *Env) string {
+	return "if command -v " + transport.Quote(t.bin(env)) + " >/dev/null 2>&1; then exit 0; else exit 3; fi"
+}
+
+func (t *PackageTask) specReqs(env *Env) []transport.SpecReq {
+	script := t.binCheckScript(env)
+	if t.Manager != "" {
+		script = managerCheck(t.Manager, t.PackageName)
+	}
+	return []transport.SpecReq{specExec(t.sudo, env.userScriptFull(script), 2*time.Minute)}
+}
+
 // installed exits 0 when the program is found, 3 when it is not. Any other code is an error
 // (for example sudo without a password).
 func (t *PackageTask) installed(ctx context.Context, env *Env) (bool, error) {
@@ -154,7 +173,7 @@ func (t *PackageTask) installed(ctx context.Context, env *Env) (bool, error) {
 			return ok, err
 		}
 	}
-	script := "if command -v " + transport.Quote(t.bin(env)) + " >/dev/null 2>&1; then exit 0; else exit 3; fi"
+	script := t.binCheckScript(env)
 	label := "find " + t.Binary
 	if t.Manager != "" {
 		script, label = managerCheck(t.Manager, t.PackageName), "ask "+t.Manager+" for "+t.PackageName
@@ -263,7 +282,9 @@ func (t *PackageTask) Apply(ctx context.Context, env *Env) (string, error) {
 		}
 	}
 	if t.Manager == "apt" && !t.CustomInstall && !t.Absent && env.aptUpdated {
-		script = strings.TrimPrefix(script, "apt-get update && ")
+		if tpl := managers[t.Manager].installNoUpdate; tpl != "" {
+			script = fmt.Sprintf(tpl, transport.Quote(t.PackageName))
+		}
 	}
 	r, err := env.UserScript(ctx, script, t.applySudo(), verb+" "+t.Name(), scriptTimeout)
 	if err != nil {
@@ -299,7 +320,9 @@ func (t *PackageTask) Update(ctx context.Context, env *Env, before string) (Upda
 	}
 	updScript := t.UpdateSh
 	if t.Manager == "apt" && !t.CustomUpdate && env.aptUpdated {
-		updScript = strings.TrimPrefix(updScript, "apt-get update && ")
+		if tpl := managers[t.Manager].updateNoUpdate; tpl != "" {
+			updScript = fmt.Sprintf(tpl, transport.Quote(t.PackageName))
+		}
 	}
 	r, err := env.UserScript(ctx, updScript, t.applySudo(), "update "+t.Name(), scriptTimeout)
 	if err != nil {

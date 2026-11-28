@@ -1,11 +1,10 @@
 package config
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/gob"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -18,592 +17,30 @@ import (
 	"github.com/apple/pkl-go/pkl"
 
 	"github.com/gregor-tokarev/fam/internal/pklgen/base"
-	"github.com/gregor-tokarev/fam/internal/pklgen/bundle"
-	"github.com/gregor-tokarev/fam/internal/pklgen/bundle/verifyevent"
 	pklconfig "github.com/gregor-tokarev/fam/internal/pklgen/config"
-	"github.com/gregor-tokarev/fam/internal/pklgen/tasks"
-	"github.com/gregor-tokarev/fam/internal/pklgen/tasks/manager"
-	"github.com/gregor-tokarev/fam/internal/pklgen/tasks/state"
 	"github.com/gregor-tokarev/fam/internal/version"
 )
 
 const (
-	planCacheDirName   = "plan-cache-v1"
-	planCacheMaxFiles  = 128
-	planCacheMaxFileSz = 2 << 20
+	planCacheDirName         = "plan-cache-v3"
+	planCacheMaxFiles        = 128
+	planCacheMaxFileSz       = 8 << 20
+	planCacheMaxProjectFiles = 2000
 )
 
-// gobNil represents a nil value inside map/slice fields of pkl.Object, since encoding/gob cannot
-// encode bare nil interface elements directly.
-type gobNil struct{}
-
-type pklObjectDTO struct {
-	ModuleUri  string
-	Name       string
-	Properties map[string]any
-	Entries    []pklEntryDTO
-	Elements   []any
+type cachedInitDisk struct {
+	Machines   []Machine `json:"machines"`
+	SecretsRaw []byte    `json:"secretsRaw"`
 }
 
-type pklEntryDTO struct {
-	Key   any
-	Value any
-}
-
-type packageRefDTO struct {
-	Package string
-	Manager string
-	Names   map[string]string
-}
-
-type taskDTO struct {
-	Kind string // file, symlink, merge, package, script, service, linger, skill, github_release
-
-	// Shared fields
-	Path     string
-	State    string
-	Sudo     bool
-	Restarts []string
-
-	// File
-	Content *string
-	Mode    string
-
-	// Symlink
-	Target string
-
-	// Merge
-	Format string
-	Values pklObjectDTO
-
-	// Package
-	HasPkg         bool
-	PkgVal         any // string, packageRefDTO, or pklObjectDTO
-	Binary         *string
-	Install        *string
-	Update         *string
-	Uninstall      *string
-	VersionCommand *string
-
-	// Script
-	Name    string
-	Check   *string
-	Creates *string
-	Apply   string
-
-	// Service
-	Scope   string
-	Enabled bool
-	Running bool
-
-	// Linger
-	User *string
-
-	// AgentSkill
-	Source    string
-	SkillPath *string
-	Ref       *string
-	SkillName *string
-
-	// GitHubRelease
-	Repo   string
-	Assets map[string]tasks.ReleaseAsset
-	Tag    *string
-}
-
-type verifyDTO struct {
-	Name   *string
-	Event  string
-	Script string
-}
-
-type bundleUseDTO struct {
-	Name              string
-	Supported         bool
-	UnsupportedReason *string
-	Version           *string
-	Source            string
-	Manager           *string
-	Env               map[string]string
-	RequiredSecrets   []string
-	Path              []string
-	Tasks             []taskDTO
-	Verify            []verifyDTO
-	Uninstall         []taskDTO
-	State             string
-	Origin            string
-	Dir               string
-}
-
-type agentSpecDTO struct {
-	Name     string
-	Settings pklObjectDTO
-	Version  *string
-}
-
-type pklDurationDTO struct {
-	Value float64
-	Unit  int64
-}
-
-type pklDataSizeDTO struct {
-	Value float64
-	Unit  int64
-}
-
-type infisicalDTO struct {
-	SiteUrl        string
-	ProjectId      string
-	Environment    string
-	Path           string
-	Recursive      bool
-	IncludeImports bool
-	Credentials    *string
-	Cache          pklDurationDTO
-}
-
-type secretsDTO struct {
-	Delivery  string
-	File      *string
-	Infisical *infisicalDTO
-}
-
-type specDTO struct {
-	Machine Machine
-	Bundles []bundleUseDTO
-	Agents  []agentSpecDTO
-	Secrets *secretsDTO
-}
-
-func init() {
-	gob.Register(gobNil{})
-	gob.Register(pklObjectDTO{})
-	gob.Register(packageRefDTO{})
-	gob.Register(pklDurationDTO{})
-	gob.Register(pklDataSizeDTO{})
-	gob.Register(pkl.IntSeq{})
-	gob.Register(pkl.Regex{})
-	gob.Register(map[string]any{})
-	gob.Register([]any{})
-	gob.Register([]string{})
-	gob.Register([]int{})
-	gob.Register([]int64{})
-	gob.Register([]float64{})
-	gob.Register([]bool{})
-}
-
-func encodeSecrets(s *base.Secrets) *secretsDTO {
-	if s == nil {
-		return nil
-	}
-	d := &secretsDTO{Delivery: s.Delivery, File: s.File}
-	if s.Infisical != nil {
-		d.Infisical = &infisicalDTO{
-			SiteUrl:        s.Infisical.SiteUrl,
-			ProjectId:      s.Infisical.ProjectId,
-			Environment:    s.Infisical.Environment,
-			Path:           s.Infisical.Path,
-			Recursive:      s.Infisical.Recursive,
-			IncludeImports: s.Infisical.IncludeImports,
-			Credentials:    s.Infisical.Credentials,
-			Cache:          pklDurationDTO{Value: s.Infisical.Cache.Value, Unit: int64(s.Infisical.Cache.Unit)},
-		}
-	}
-	return d
-}
-
-func decodeSecrets(d *secretsDTO) *base.Secrets {
-	if d == nil {
-		return nil
-	}
-	s := &base.Secrets{Delivery: d.Delivery, File: d.File}
-	if d.Infisical != nil {
-		s.Infisical = &base.Infisical{
-			SiteUrl:        d.Infisical.SiteUrl,
-			ProjectId:      d.Infisical.ProjectId,
-			Environment:    d.Infisical.Environment,
-			Path:           d.Infisical.Path,
-			Recursive:      d.Infisical.Recursive,
-			IncludeImports: d.Infisical.IncludeImports,
-			Credentials:    d.Infisical.Credentials,
-			Cache:          pkl.Duration{Value: d.Infisical.Cache.Value, Unit: pkl.DurationUnit(d.Infisical.Cache.Unit)},
-		}
-	}
-	return s
-}
-
-func encodeDynamic(v any) any {
-	if v == nil {
-		return gobNil{}
-	}
-	switch x := v.(type) {
-	case pkl.Object:
-		return encodeObject(x)
-	case *pkl.Object:
-		if x == nil {
-			return gobNil{}
-		}
-		return encodeObject(*x)
-	case pkl.Duration:
-		return pklDurationDTO{Value: x.Value, Unit: int64(x.Unit)}
-	case *pkl.Duration:
-		if x == nil {
-			return gobNil{}
-		}
-		return pklDurationDTO{Value: x.Value, Unit: int64(x.Unit)}
-	case pkl.DataSize:
-		return pklDataSizeDTO{Value: x.Value, Unit: int64(x.Unit)}
-	case *pkl.DataSize:
-		if x == nil {
-			return gobNil{}
-		}
-		return pklDataSizeDTO{Value: x.Value, Unit: int64(x.Unit)}
-	case tasks.PackageRef:
-		return encodePkgRef(x)
-	case *tasks.PackageRef:
-		if x == nil {
-			return gobNil{}
-		}
-		return encodePkgRef(*x)
-	case []any:
-		out := make([]any, len(x))
-		for i, e := range x {
-			out[i] = encodeDynamic(e)
-		}
-		return out
-	case map[string]any:
-		out := make(map[string]any, len(x))
-		for k, e := range x {
-			out[k] = encodeDynamic(e)
-		}
-		return out
-	default:
-		return v
-	}
-}
-
-func decodeDynamic(v any) any {
-	switch x := v.(type) {
-	case gobNil:
-		return nil
-	case pklObjectDTO:
-		return decodeObject(x)
-	case pklDurationDTO:
-		return pkl.Duration{Value: x.Value, Unit: pkl.DurationUnit(x.Unit)}
-	case pklDataSizeDTO:
-		return pkl.DataSize{Value: x.Value, Unit: pkl.DataSizeUnit(x.Unit)}
-	case packageRefDTO:
-		return decodePkgRef(x)
-	case []any:
-		out := make([]any, len(x))
-		for i, e := range x {
-			out[i] = decodeDynamic(e)
-		}
-		return out
-	case map[string]any:
-		out := make(map[string]any, len(x))
-		for k, e := range x {
-			out[k] = decodeDynamic(e)
-		}
-		return out
-	default:
-		return v
-	}
-}
-
-func encodeObject(o pkl.Object) pklObjectDTO {
-	dto := pklObjectDTO{ModuleUri: o.ModuleUri, Name: o.Name}
-	if len(o.Properties) > 0 {
-		dto.Properties = make(map[string]any, len(o.Properties))
-		for k, v := range o.Properties {
-			dto.Properties[k] = encodeDynamic(v)
-		}
-	}
-	if len(o.Entries) > 0 {
-		dto.Entries = make([]pklEntryDTO, 0, len(o.Entries))
-		for k, v := range o.Entries {
-			dto.Entries = append(dto.Entries, pklEntryDTO{Key: encodeDynamic(k), Value: encodeDynamic(v)})
-		}
-	}
-	if len(o.Elements) > 0 {
-		dto.Elements = make([]any, len(o.Elements))
-		for i, e := range o.Elements {
-			dto.Elements[i] = encodeDynamic(e)
-		}
-	}
-	return dto
-}
-
-func decodeObject(d pklObjectDTO) pkl.Object {
-	o := pkl.Object{ModuleUri: d.ModuleUri, Name: d.Name}
-	if len(d.Properties) > 0 {
-		o.Properties = make(map[string]any, len(d.Properties))
-		for k, v := range d.Properties {
-			o.Properties[k] = decodeDynamic(v)
-		}
-	}
-	if len(d.Entries) > 0 {
-		o.Entries = make(map[any]any, len(d.Entries))
-		for _, e := range d.Entries {
-			o.Entries[decodeDynamic(e.Key)] = decodeDynamic(e.Value)
-		}
-	}
-	if len(d.Elements) > 0 {
-		o.Elements = make([]any, len(d.Elements))
-		for i, e := range d.Elements {
-			o.Elements[i] = decodeDynamic(e)
-		}
-	}
-	return o
-}
-
-func encodePkgRef(r tasks.PackageRef) packageRefDTO {
-	d := packageRefDTO{Package: r.Package, Manager: string(r.Manager)}
-	if len(r.Names) > 0 {
-		d.Names = make(map[string]string, len(r.Names))
-		for k, v := range r.Names {
-			d.Names[string(k)] = v
-		}
-	}
-	return d
-}
-
-func decodePkgRef(d packageRefDTO) tasks.PackageRef {
-	r := tasks.PackageRef{Package: d.Package, Manager: manager.Manager(d.Manager)}
-	if len(d.Names) > 0 {
-		r.Names = make(map[manager.Manager]string, len(d.Names))
-		for k, v := range d.Names {
-			r.Names[manager.Manager(k)] = v
-		}
-	}
-	return r
-}
-
-func encodeTasks(in []tasks.Task) ([]taskDTO, bool) {
-	if len(in) == 0 {
-		return nil, true
-	}
-	out := make([]taskDTO, len(in))
-	for i, t := range in {
-		switch x := t.(type) {
-		case tasks.FileImpl:
-			out[i] = taskDTO{Kind: "file", Path: x.Path, Content: x.Content, Mode: x.Mode, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case *tasks.FileImpl:
-			out[i] = taskDTO{Kind: "file", Path: x.Path, Content: x.Content, Mode: x.Mode, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case tasks.SymlinkImpl:
-			out[i] = taskDTO{Kind: "symlink", Path: x.Path, Target: x.Target, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case *tasks.SymlinkImpl:
-			out[i] = taskDTO{Kind: "symlink", Path: x.Path, Target: x.Target, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case tasks.MergeImpl:
-			out[i] = taskDTO{Kind: "merge", Path: x.Path, Format: x.Format, Values: encodeObject(x.Values), Mode: x.Mode, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case *tasks.MergeImpl:
-			out[i] = taskDTO{Kind: "merge", Path: x.Path, Format: x.Format, Values: encodeObject(x.Values), Mode: x.Mode, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case tasks.PackageImpl:
-			d := taskDTO{Kind: "package", Binary: x.Binary, Install: x.Install, Update: x.Update, Uninstall: x.Uninstall, VersionCommand: x.VersionCommand, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-			if x.Package != nil {
-				d.HasPkg = true
-				d.PkgVal = encodeDynamic(*x.Package)
-			}
-			out[i] = d
-		case *tasks.PackageImpl:
-			d := taskDTO{Kind: "package", Binary: x.Binary, Install: x.Install, Update: x.Update, Uninstall: x.Uninstall, VersionCommand: x.VersionCommand, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-			if x.Package != nil {
-				d.HasPkg = true
-				d.PkgVal = encodeDynamic(*x.Package)
-			}
-			out[i] = d
-		case tasks.ScriptImpl:
-			out[i] = taskDTO{Kind: "script", Name: x.Name, Check: x.Check, Creates: x.Creates, Apply: x.Apply, Sudo: x.Sudo, Restarts: x.Restarts}
-		case *tasks.ScriptImpl:
-			out[i] = taskDTO{Kind: "script", Name: x.Name, Check: x.Check, Creates: x.Creates, Apply: x.Apply, Sudo: x.Sudo, Restarts: x.Restarts}
-		case tasks.ServiceImpl:
-			out[i] = taskDTO{Kind: "service", Name: x.Name, Scope: x.Scope, Content: x.Content, Enabled: x.Enabled, Running: x.Running, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case *tasks.ServiceImpl:
-			out[i] = taskDTO{Kind: "service", Name: x.Name, Scope: x.Scope, Content: x.Content, Enabled: x.Enabled, Running: x.Running, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case tasks.LingerImpl:
-			out[i] = taskDTO{Kind: "linger", Sudo: x.Sudo, User: x.User, State: string(x.State), Restarts: x.Restarts}
-		case *tasks.LingerImpl:
-			out[i] = taskDTO{Kind: "linger", Sudo: x.Sudo, User: x.User, State: string(x.State), Restarts: x.Restarts}
-		case tasks.AgentSkillImpl:
-			out[i] = taskDTO{Kind: "skill", Source: x.Source, SkillPath: x.Path, Ref: x.Ref, SkillName: x.Name, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case *tasks.AgentSkillImpl:
-			out[i] = taskDTO{Kind: "skill", Source: x.Source, SkillPath: x.Path, Ref: x.Ref, SkillName: x.Name, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case tasks.GitHubReleaseImpl:
-			bin := x.Binary
-			out[i] = taskDTO{Kind: "github_release", Repo: x.Repo, Binary: &bin, VersionCommand: x.VersionCommand, Assets: x.Assets, Tag: x.Tag, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		case *tasks.GitHubReleaseImpl:
-			bin := x.Binary
-			out[i] = taskDTO{Kind: "github_release", Repo: x.Repo, Binary: &bin, VersionCommand: x.VersionCommand, Assets: x.Assets, Tag: x.Tag, State: string(x.State), Sudo: x.Sudo, Restarts: x.Restarts}
-		default:
-			return nil, false
-		}
-	}
-	return out, true
-}
-
-func decodeTasks(in []taskDTO) ([]tasks.Task, bool) {
-	if len(in) == 0 {
-		return nil, true
-	}
-	out := make([]tasks.Task, len(in))
-	for i, d := range in {
-		switch d.Kind {
-		case "file":
-			out[i] = tasks.FileImpl{Path: d.Path, Content: d.Content, Mode: d.Mode, State: state.State(d.State), Sudo: d.Sudo, Restarts: d.Restarts}
-		case "symlink":
-			out[i] = tasks.SymlinkImpl{Path: d.Path, Target: d.Target, State: state.State(d.State), Sudo: d.Sudo, Restarts: d.Restarts}
-		case "merge":
-			out[i] = tasks.MergeImpl{Path: d.Path, Format: d.Format, Values: decodeObject(d.Values), Mode: d.Mode, State: state.State(d.State), Sudo: d.Sudo, Restarts: d.Restarts}
-		case "package":
-			p := tasks.PackageImpl{Binary: d.Binary, Install: d.Install, Update: d.Update, Uninstall: d.Uninstall, VersionCommand: d.VersionCommand, State: state.State(d.State), Sudo: d.Sudo, Restarts: d.Restarts}
-			if d.HasPkg {
-				v := decodeDynamic(d.PkgVal)
-				p.Package = &v
-			}
-			out[i] = p
-		case "script":
-			out[i] = tasks.ScriptImpl{Name: d.Name, Check: d.Check, Creates: d.Creates, Apply: d.Apply, Sudo: d.Sudo, Restarts: d.Restarts}
-		case "service":
-			out[i] = tasks.ServiceImpl{Name: d.Name, Scope: d.Scope, Content: d.Content, Enabled: d.Enabled, Running: d.Running, State: state.State(d.State), Sudo: d.Sudo, Restarts: d.Restarts}
-		case "linger":
-			out[i] = tasks.LingerImpl{Sudo: d.Sudo, User: d.User, State: state.State(d.State), Restarts: d.Restarts}
-		case "skill":
-			out[i] = tasks.AgentSkillImpl{Source: d.Source, Path: d.SkillPath, Ref: d.Ref, Name: d.SkillName, State: state.State(d.State), Sudo: d.Sudo, Restarts: d.Restarts}
-		case "github_release":
-			bin := ""
-			if d.Binary != nil {
-				bin = *d.Binary
-			}
-			out[i] = tasks.GitHubReleaseImpl{Repo: d.Repo, Binary: bin, VersionCommand: d.VersionCommand, Assets: d.Assets, Tag: d.Tag, State: state.State(d.State), Sudo: d.Sudo, Restarts: d.Restarts}
-		default:
-			return nil, false
-		}
-	}
-	return out, true
-}
-
-func specToDTO(s *Spec) (specDTO, bool) {
-	dto := specDTO{
-		Machine: s.Machine,
-		Secrets: encodeSecrets(s.Secrets),
-		Bundles: make([]bundleUseDTO, len(s.Bundles)),
-		Agents:  make([]agentSpecDTO, len(s.Agents)),
-	}
-	for i, bu := range s.Bundles {
-		ts, ok := encodeTasks(bu.Bundle.Tasks)
-		if !ok {
-			return specDTO{}, false
-		}
-		us, ok := encodeTasks(bu.Bundle.Uninstall)
-		if !ok {
-			return specDTO{}, false
-		}
-		var mgr *string
-		if bu.Bundle.Manager != nil {
-			m := string(*bu.Bundle.Manager)
-			mgr = &m
-		}
-		vs := make([]verifyDTO, len(bu.Bundle.Verify))
-		for j, v := range bu.Bundle.Verify {
-			vs[j] = verifyDTO{Name: v.Name, Event: string(v.Event), Script: v.Script}
-		}
-		dto.Bundles[i] = bundleUseDTO{
-			Name:              bu.Bundle.Name,
-			Supported:         bu.Bundle.Supported,
-			UnsupportedReason: bu.Bundle.UnsupportedReason,
-			Version:           bu.Bundle.Version,
-			Source:            bu.Bundle.Source,
-			Manager:           mgr,
-			Env:               bu.Bundle.Env,
-			RequiredSecrets:   bu.Bundle.RequiredSecrets,
-			Path:              bu.Bundle.Path,
-			Tasks:             ts,
-			Verify:            vs,
-			Uninstall:         us,
-			State:             bu.State,
-			Origin:            bu.Origin,
-			Dir:               bu.Dir,
-		}
-	}
-	for i, a := range s.Agents {
-		dto.Agents[i] = agentSpecDTO{
-			Name:     a.Name,
-			Settings: encodeObject(a.Agent.Settings),
-			Version:  a.Agent.Version,
-		}
-	}
-	return dto, true
-}
-
-func dtoToSpec(dto specDTO) (*Spec, bool) {
-	s := &Spec{
-		Machine: dto.Machine,
-		Secrets: decodeSecrets(dto.Secrets),
-		Bundles: make([]BundleUse, len(dto.Bundles)),
-		Agents:  make([]AgentSpec, len(dto.Agents)),
-	}
-	for i, b := range dto.Bundles {
-		ts, ok := decodeTasks(b.Tasks)
-		if !ok {
-			return nil, false
-		}
-		us, ok := decodeTasks(b.Uninstall)
-		if !ok {
-			return nil, false
-		}
-		var mgr *manager.Manager
-		if b.Manager != nil {
-			m := manager.Manager(*b.Manager)
-			mgr = &m
-		}
-		vs := make([]bundle.Verify, len(b.Verify))
-		for j, v := range b.Verify {
-			vs[j] = bundle.Verify{Name: v.Name, Event: verifyevent.VerifyEvent(v.Event), Script: v.Script}
-		}
-		s.Bundles[i] = BundleUse{
-			Bundle: bundle.Bundle{
-				Name:              b.Name,
-				Supported:         b.Supported,
-				UnsupportedReason: b.UnsupportedReason,
-				Version:           b.Version,
-				Source:            b.Source,
-				Manager:           mgr,
-				Env:               b.Env,
-				RequiredSecrets:   b.RequiredSecrets,
-				Path:              b.Path,
-				Tasks:             ts,
-				Verify:            vs,
-				Uninstall:         us,
-			},
-			State:  b.State,
-			Origin: b.Origin,
-			Dir:    b.Dir,
-		}
-	}
-	for i, a := range dto.Agents {
-		s.Agents[i] = AgentSpec{
-			Name: a.Name,
-			Agent: base.Agent{
-				Settings: decodeObject(a.Settings),
-				Version:  a.Version,
-			},
-		}
-	}
-	return s, true
-}
-
-// PlanCache caches evaluated Pkl init (machines + secrets) and resolved machine Specs on disk
-// keyed by a full content hash of the project files, FAM version, schema checksum, and properties.
+// PlanCache caches raw Pkl binary evaluation results on disk keyed by a full SHA-256 fingerprint
+// of the project directory, schema checksum, binary build, and evaluation properties. Because it
+// stores Pkl's own binary encoding and re-runs pkl.Unmarshal + Resolve on every hit, every schema
+// field, nullable empty string, and Go resolver change stays 100% lossless and current.
 type PlanCache struct {
 	dir        string
 	projectKey string
-	readonly   bool
 	disabled   bool
-}
-
-type cachedInit struct {
-	Machines []Machine
-	Secrets  *secretsDTO
 }
 
 func planCacheDir() string {
@@ -619,16 +56,16 @@ func planCacheDir() string {
 	return ""
 }
 
-// NewPlanCache fingerprints base and configPath and returns a disk-backed PlanCache.
-// If any file references external URLs, parent/absolute paths outside base, or symlinks outside
-// base, caching is automatically disabled to guarantee zero stale hits.
-func NewPlanCache(baseDir, configPath, pkgChecksum string, readonly bool) *PlanCache {
-	c := &PlanCache{dir: planCacheDir(), readonly: readonly}
+// NewPlanCache fingerprints baseDir and configPath and returns a disk-backed PlanCache.
+// If any Pkl file references external URLs, paths outside baseDir, globs, dynamic imports/reads,
+// or symlinks escaping baseDir, caching is automatically disabled to guarantee zero stale hits.
+func NewPlanCache(baseDir, configPath, pkgChecksum string) *PlanCache {
+	c := &PlanCache{dir: planCacheDir()}
 	if c.dir == "" || os.Getenv("FAM_NO_PLAN_CACHE") == "1" {
 		c.disabled = true
 		return c
 	}
-	key, ok := fingerprintProject(baseDir, configPath, pkgChecksum, readonly)
+	key, ok := fingerprintProject(baseDir, configPath, pkgChecksum)
 	if !ok {
 		c.disabled = true
 		return c
@@ -637,11 +74,27 @@ func NewPlanCache(baseDir, configPath, pkgChecksum string, readonly bool) *PlanC
 	return c
 }
 
-func fingerprintProject(baseDir, configPath, pkgChecksum string, readonly bool) (string, bool) {
+func exeFingerprint() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if ei, err := os.Stat(exe); err == nil {
+		return fmt.Sprintf("%s:%d:%d", exe, ei.Size(), ei.ModTime().UnixNano())
+	}
+	return exe
+}
+
+func fingerprintProject(baseDir, configPath, pkgChecksum string) (string, bool) {
 	absBase, err := filepath.Abs(baseDir)
 	if err != nil {
 		return "", false
 	}
+	absConfig, err := filepath.Abs(configPath)
+	if err != nil {
+		return "", false
+	}
+	absConfig = filepath.Clean(absConfig)
 	realBase, err := filepath.EvalSymlinks(absBase)
 	if err != nil {
 		realBase = absBase
@@ -657,18 +110,14 @@ func fingerprintProject(baseDir, configPath, pkgChecksum string, readonly bool) 
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if p != absBase && (name == ".git" || name == ".cache" || name == "node_modules") {
+			if p != absBase && name == ".git" {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if d.Type()&fs.ModeSymlink != 0 {
 			target, err := filepath.EvalSymlinks(p)
-			if err != nil {
-				return fs.ErrInvalid
-			}
-			rel, err := filepath.Rel(realBase, target)
-			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			if err != nil || !pathWithin(realBase, target) {
 				return fs.ErrInvalid
 			}
 			info, err := os.Stat(target)
@@ -683,15 +132,25 @@ func fingerprintProject(baseDir, configPath, pkgChecksum string, readonly bool) 
 			return err
 		}
 		entries = append(entries, fileEntry{rel: filepath.ToSlash(rel), path: p})
+		if len(entries) > planCacheMaxProjectFiles {
+			return fs.ErrInvalid
+		}
 		return nil
 	})
 	if walkErr != nil {
 		return "", false
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].rel < entries[j].rel })
+	hashedFiles := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		hashedFiles[filepath.Clean(e.path)] = true
+	}
+	if !hashedFiles[absConfig] {
+		return "", false
+	}
 
 	h := sha256.New()
-	fmt.Fprintf(h, "v2\x00%s\x00%s\x00%s\x00%s\x00%t\x00", version.Version, pkgChecksum, absBase, configPath, readonly)
+	fmt.Fprintf(h, "v3\x00%s\x00%s\x00%s\x00%s\x00%s\x00", version.Version, exeFingerprint(), pkgChecksum, absBase, absConfig)
 	readsEnv := false
 	for _, e := range entries {
 		info, err := os.Stat(e.path)
@@ -702,12 +161,17 @@ func fingerprintProject(baseDir, configPath, pkgChecksum string, readonly bool) 
 		if err != nil {
 			return "", false
 		}
-		if strings.HasSuffix(e.rel, ".pkl") || e.rel == "PklProject" {
-			if hasExternalPklRef(b) {
+		if isScannedPklModule(e.rel) || filepath.Clean(e.path) == absConfig {
+			envUsed, ok := scanPklInputs(b, e.path, absBase, realBase, hashedFiles)
+			if !ok {
 				return "", false
 			}
-			if bytes.Contains(b, []byte("env:")) {
+			if envUsed {
 				readsEnv = true
+			}
+		} else if filepath.Base(e.rel) == "PklProject.deps.json" {
+			if !depsWithinProject(b) {
+				return "", false
 			}
 		}
 		fsum := sha256.Sum256(b)
@@ -728,30 +192,372 @@ func fingerprintProject(baseDir, configPath, pkgChecksum string, readonly bool) 
 	return hex.EncodeToString(h.Sum(nil)), true
 }
 
-func hasExternalPklRef(b []byte) bool {
-	for _, pat := range [][]byte{
-		[]byte(`read("http:`), []byte(`read("https:`),
-		[]byte(`import("http:`), []byte(`import("https:`),
-		[]byte(`read("/`), []byte(`import("/`), []byte(`amends "/`),
-		[]byte(`read("file:/`), []byte(`import("file:/`),
-		[]byte(`read("..`), []byte(`import("..`), []byte(`amends "..`),
-		[]byte(`read?("http:`), []byte(`read?("https:`), []byte(`read?("/`), []byte(`read?("..`),
-		[]byte(`read*(`), []byte(`import*(`),
-	} {
-		if bytes.Contains(b, pat) {
-			return true
+func isScannedPklModule(rel string) bool {
+	return strings.HasSuffix(rel, ".pkl") || filepath.Base(rel) == "PklProject"
+}
+
+func pathWithin(base, target string) bool {
+	rel, err := filepath.Rel(base, target)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func depsWithinProject(b []byte) bool {
+	var deps struct {
+		ResolvedDependencies map[string]struct {
+			Type string `json:"type"`
+			Path string `json:"path"`
+		} `json:"resolvedDependencies"`
+	}
+	if err := json.Unmarshal(b, &deps); err != nil {
+		return false
+	}
+	// Disable plan caching whenever the project depends on any local Pkl package, because
+	// `@local/...` imports can load arbitrary extensionless modules and external files inside
+	// that package that are not covered by the single-project module scan.
+	for _, dep := range deps.ResolvedDependencies {
+		if dep.Type != "remote" {
+			return false
 		}
+	}
+	return true
+}
+
+// scanPklInputs walks Pkl source tokens (skipping comments and plain string literals while still
+// scanning inside string interpolations) and verifies every amends/extends/import/read target is
+// strictly covered by the project fingerprint. Returns (readsEnv, cacheable).
+func scanPklInputs(src []byte, filePath, absBase, realBase string, hashedFiles map[string]bool) (bool, bool) {
+	s := pklScanner{src: src, dir: filepath.Dir(filePath), absBase: absBase, realBase: realBase, hashedFiles: hashedFiles}
+	if !s.scanCode(0) {
+		return false, false
+	}
+	return s.readsEnv, true
+}
+
+type pklScanner struct {
+	src         []byte
+	i           int
+	dir         string
+	absBase     string
+	realBase    string
+	hashedFiles map[string]bool
+	readsEnv    bool
+}
+
+func isIdentStart(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$'
+}
+
+func isIdentPart(c byte) bool {
+	return isIdentStart(c) || (c >= '0' && c <= '9')
+}
+
+func (s *pklScanner) skipSpaceAndComments() {
+	for s.i < len(s.src) {
+		c := s.src[s.i]
+		if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
+			s.i++
+			continue
+		}
+		if c == '/' && s.i+1 < len(s.src) {
+			if s.src[s.i+1] == '/' {
+				s.i += 2
+				for s.i < len(s.src) && s.src[s.i] != '\n' {
+					s.i++
+				}
+				continue
+			}
+			if s.src[s.i+1] == '*' {
+				s.i += 2
+				depth := 1
+				for s.i < len(s.src) && depth > 0 {
+					if s.src[s.i] == '/' && s.i+1 < len(s.src) && s.src[s.i+1] == '*' {
+						depth++
+						s.i += 2
+					} else if s.src[s.i] == '*' && s.i+1 < len(s.src) && s.src[s.i+1] == '/' {
+						depth--
+						s.i += 2
+					} else {
+						s.i++
+					}
+				}
+				continue
+			}
+		}
+		break
+	}
+}
+
+// scanCode scans Pkl code until EOF (stopParen == 0) or until the matching ')' closes an
+// interpolation block (stopParen > 0).
+func (s *pklScanner) scanCode(stopParen int) bool {
+	depth := stopParen
+	var prev byte
+	for s.i < len(s.src) {
+		s.skipSpaceAndComments()
+		if s.i >= len(s.src) {
+			break
+		}
+		c := s.src[s.i]
+		if stopParen > 0 {
+			if c == '(' {
+				depth++
+				s.i++
+				prev = c
+				continue
+			}
+			if c == ')' {
+				depth--
+				s.i++
+				if depth == 0 {
+					return true
+				}
+				prev = c
+				continue
+			}
+		}
+		if c == '"' || (c == '#' && s.isCustomString()) {
+			if !s.skipString() {
+				return false
+			}
+			prev = '"'
+			continue
+		}
+		if isIdentStart(c) {
+			start := s.i
+			s.i++
+			for s.i < len(s.src) && isIdentPart(s.src[s.i]) {
+				s.i++
+			}
+			word := string(s.src[start:s.i])
+			if prev != '.' && prev != '`' {
+				switch word {
+				case "amends", "extends":
+					if !s.checkModuleRef(false) {
+						return false
+					}
+					prev = ')'
+					continue
+				case "import":
+					if s.i < len(s.src) && s.src[s.i] == '*' {
+						return false
+					}
+					if !s.checkModuleRef(true) {
+						return false
+					}
+					prev = ')'
+					continue
+				case "read":
+					if s.i < len(s.src) && s.src[s.i] == '*' {
+						return false
+					}
+					save := s.i
+					if s.i < len(s.src) && s.src[s.i] == '?' {
+						s.i++
+					}
+					s.skipSpaceAndComments()
+					if s.i < len(s.src) && s.src[s.i] == '(' {
+						if !s.checkReadCall() {
+							return false
+						}
+						prev = ')'
+						continue
+					}
+					s.i = save
+				}
+			}
+			prev = 'a'
+			continue
+		}
+		prev = c
+		s.i++
+	}
+	return depth == 0
+}
+
+func (s *pklScanner) isCustomString() bool {
+	j := s.i
+	for j < len(s.src) && s.src[j] == '#' {
+		j++
+	}
+	return j > s.i && j < len(s.src) && s.src[j] == '"'
+}
+
+func (s *pklScanner) skipString() bool {
+	hashes := 0
+	for s.i < len(s.src) && s.src[s.i] == '#' {
+		hashes++
+		s.i++
+	}
+	multiline := s.i+2 < len(s.src) && s.src[s.i] == '"' && s.src[s.i+1] == '"' && s.src[s.i+2] == '"'
+	if multiline {
+		s.i += 3
+	} else {
+		s.i++
+	}
+	for s.i < len(s.src) {
+		if s.src[s.i] == '\\' {
+			// Escape sequence: `\` followed by `hashes` '#' chars.
+			if s.i+1+hashes < len(s.src) && allHashes(s.src[s.i+1:s.i+1+hashes]) {
+				next := s.src[s.i+1+hashes]
+				s.i += 2 + hashes
+				if next == '(' {
+					if !s.scanCode(1) {
+						return false
+					}
+				}
+				continue
+			}
+			s.i++
+			continue
+		}
+		if multiline {
+			if s.i+3+hashes <= len(s.src) && s.src[s.i] == '"' && s.src[s.i+1] == '"' && s.src[s.i+2] == '"' && allHashes(s.src[s.i+3:s.i+3+hashes]) {
+				s.i += 3 + hashes
+				return true
+			}
+		} else {
+			if s.i+1+hashes <= len(s.src) && s.src[s.i] == '"' && allHashes(s.src[s.i+1:s.i+1+hashes]) {
+				s.i += 1 + hashes
+				return true
+			}
+		}
+		s.i++
 	}
 	return false
 }
 
-func (c *PlanCache) entryPath(kind, extra string, props map[string]string) string {
+func allHashes(b []byte) bool {
+	for _, c := range b {
+		if c != '#' {
+			return false
+		}
+	}
+	return true
+}
+
+// readSimpleString parses a plain double-quoted Pkl string literal with no escapes or interpolation.
+func (s *pklScanner) readSimpleString() (string, bool) {
+	if s.i >= len(s.src) || s.src[s.i] != '"' {
+		return "", false
+	}
+	if s.i+2 < len(s.src) && s.src[s.i+1] == '"' && s.src[s.i+2] == '"' {
+		return "", false
+	}
+	s.i++
+	var out strings.Builder
+	for s.i < len(s.src) {
+		c := s.src[s.i]
+		if c == '"' {
+			s.i++
+			return out.String(), true
+		}
+		if c == '\\' || c == '\n' || c == '\r' {
+			// Reject all escape sequences (e.g. \u{2e}, \() so encoded paths cannot bypass checks.
+			return "", false
+		}
+		out.WriteByte(c)
+		s.i++
+	}
+	return "", false
+}
+
+func (s *pklScanner) checkModuleRef(allowParens bool) bool {
+	s.skipSpaceAndComments()
+	parens := false
+	if allowParens && s.i < len(s.src) && s.src[s.i] == '(' {
+		parens = true
+		s.i++
+		s.skipSpaceAndComments()
+	}
+	target, ok := s.readSimpleString()
+	if !ok {
+		return false
+	}
+	if parens {
+		s.skipSpaceAndComments()
+		if s.i >= len(s.src) || s.src[s.i] != ')' {
+			return false
+		}
+		s.i++
+	}
+	if strings.HasPrefix(target, "@") || strings.HasPrefix(target, "pkl:") {
+		return true
+	}
+	rel, ok := s.resolveSafeLocalRel(target)
+	if !ok {
+		return false
+	}
+	// Use the exact same module predicate as fingerprintProject so every imported local module
+	// is guaranteed to have been scanned for transitive imports and reads.
+	return isScannedPklModule(rel)
+}
+
+func (s *pklScanner) checkReadCall() bool {
+	// Caller positioned s.i at '('.
+	s.i++
+	s.skipSpaceAndComments()
+	target, ok := s.readSimpleString()
+	if !ok {
+		return false
+	}
+	s.skipSpaceAndComments()
+	if s.i >= len(s.src) || s.src[s.i] != ')' {
+		return false
+	}
+	s.i++
+	switch {
+	case strings.HasPrefix(target, "prop:"):
+		return true
+	case strings.HasPrefix(target, "env:"):
+		s.readsEnv = true
+		return true
+	default:
+		return s.isSafeLocalRel(target)
+	}
+}
+
+func (s *pklScanner) isSafeLocalRel(target string) bool {
+	_, ok := s.resolveSafeLocalRel(target)
+	return ok
+}
+
+func (s *pklScanner) resolveSafeLocalRel(target string) (string, bool) {
+	if target == "" || target == "..." || strings.HasPrefix(target, ".../") || strings.HasPrefix(target, "/") || strings.HasPrefix(target, "\\") || strings.Contains(target, ":") {
+		return "", false
+	}
+	resolved := filepath.Clean(filepath.Join(s.dir, filepath.FromSlash(target)))
+	if !pathWithin(s.absBase, resolved) {
+		return "", false
+	}
+	rel, err := filepath.Rel(s.absBase, resolved)
+	if err != nil {
+		return "", false
+	}
+	relSlash := filepath.ToSlash(rel)
+	for _, seg := range strings.Split(relSlash, "/") {
+		if seg == ".git" {
+			return "", false
+		}
+	}
+	if _, err := os.Lstat(resolved); err == nil {
+		if !s.hashedFiles[resolved] {
+			return "", false
+		}
+	}
+	if realTarget, err := filepath.EvalSymlinks(resolved); err == nil && !pathWithin(s.realBase, realTarget) {
+		return "", false
+	}
+	return relSlash, true
+}
+
+func (c *PlanCache) entryPath(kind string, props map[string]string, ext string) string {
 	h := sha256.New()
 	h.Write([]byte(c.projectKey))
 	h.Write([]byte{0})
 	h.Write([]byte(kind))
-	h.Write([]byte{0})
-	h.Write([]byte(extra))
 	h.Write([]byte{0})
 	keys := make([]string, 0, len(props))
 	for k := range props {
@@ -764,63 +570,59 @@ func (c *PlanCache) entryPath(kind, extra string, props map[string]string) strin
 		h.Write([]byte(props[k]))
 		h.Write([]byte{0})
 	}
-	return filepath.Join(c.dir, hex.EncodeToString(h.Sum(nil))+".gob")
+	return filepath.Join(c.dir, hex.EncodeToString(h.Sum(nil))+ext)
 }
 
 func (c *PlanCache) GetInit(props map[string]string) ([]Machine, *base.Secrets, bool) {
 	if c == nil || c.disabled {
 		return nil, nil, false
 	}
-	b, err := os.ReadFile(c.entryPath("init", "", props))
+	b, err := os.ReadFile(c.entryPath("init", props, ".json"))
 	if err != nil {
 		return nil, nil, false
 	}
-	var ci cachedInit
-	if err := gob.NewDecoder(bytes.NewReader(b)).Decode(&ci); err != nil {
+	var disk cachedInitDisk
+	if err := json.Unmarshal(b, &disk); err != nil || len(disk.SecretsRaw) == 0 {
 		return nil, nil, false
 	}
-	return ci.Machines, decodeSecrets(ci.Secrets), true
+	var sec *base.Secrets
+	if err := pkl.Unmarshal(disk.SecretsRaw, &sec); err != nil {
+		return nil, nil, false
+	}
+	return disk.Machines, sec, true
 }
 
-func (c *PlanCache) PutInit(props map[string]string, machines []Machine, sec *base.Secrets) {
-	if c == nil || c.disabled || c.readonly {
+func (c *PlanCache) PutInit(props map[string]string, machines []Machine, secretsRaw []byte) {
+	if c == nil || c.disabled || len(secretsRaw) == 0 {
 		return
 	}
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(cachedInit{Machines: machines, Secrets: encodeSecrets(sec)}); err != nil {
+	b, err := json.Marshal(cachedInitDisk{Machines: machines, SecretsRaw: secretsRaw})
+	if err != nil {
 		return
 	}
-	c.writeEntry(c.entryPath("init", "", props), buf.Bytes())
+	c.writeEntry(c.entryPath("init", props, ".json"), b)
 }
 
-func (c *PlanCache) GetSpec(machine string, props map[string]string) (*Spec, bool) {
+func (c *PlanCache) GetConfig(props map[string]string) (*pklconfig.Config, bool) {
 	if c == nil || c.disabled {
 		return nil, false
 	}
-	b, err := os.ReadFile(c.entryPath("spec", machine, props))
-	if err != nil {
+	raw, err := os.ReadFile(c.entryPath("cfg", props, ".pklbin"))
+	if err != nil || len(raw) == 0 {
 		return nil, false
 	}
-	var dto specDTO
-	if err := gob.NewDecoder(bytes.NewReader(b)).Decode(&dto); err != nil {
+	var cfg pklconfig.Config
+	if err := pkl.Unmarshal(raw, &cfg); err != nil {
 		return nil, false
 	}
-	return dtoToSpec(dto)
+	return &cfg, true
 }
 
-func (c *PlanCache) PutSpec(machine string, props map[string]string, spec *Spec) {
-	if c == nil || c.disabled || c.readonly || spec == nil {
+func (c *PlanCache) PutConfig(props map[string]string, raw []byte) {
+	if c == nil || c.disabled || len(raw) == 0 {
 		return
 	}
-	dto, ok := specToDTO(spec)
-	if !ok {
-		return
-	}
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(dto); err != nil {
-		return
-	}
-	c.writeEntry(c.entryPath("spec", machine, props), buf.Bytes())
+	c.writeEntry(c.entryPath("cfg", props, ".pklbin"), raw)
 }
 
 func (c *PlanCache) writeEntry(dst string, data []byte) {
@@ -860,7 +662,7 @@ func (c *PlanCache) prune() {
 	}
 	var items []item
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".gob") {
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".tmp-") {
 			continue
 		}
 		if info, err := e.Info(); err == nil {
@@ -901,7 +703,7 @@ func NewLazyEvaluator(baseDir, configPath, pkgChecksum string, progress io.Write
 		base:       baseDir,
 		configPath: configPath,
 		progress:   progress,
-		cache:      NewPlanCache(baseDir, configPath, pkgChecksum, false),
+		cache:      NewPlanCache(baseDir, configPath, pkgChecksum),
 	}
 }
 
@@ -928,24 +730,28 @@ func (l *LazyEvaluator) Init(ctx context.Context, props map[string]string) ([]Ma
 	if err != nil {
 		return nil, nil, err
 	}
-	ms, sec, err := ev.Init(ctx, props)
+	ms, sec, rawSec, err := ev.InitRaw(ctx, props)
 	if err != nil {
 		return nil, nil, err
 	}
-	l.cache.PutInit(props, ms, sec)
+	l.cache.PutInit(props, ms, rawSec)
 	return ms, sec, nil
 }
 
-// EvalSpec returns a cached validated+resolved Spec for machine, or evaluates with Pkl on miss.
+// EvalSpec returns a validated+resolved Spec for machine, reusing cached raw Pkl output on hit.
 func (l *LazyEvaluator) EvalSpec(ctx context.Context, machine string, props map[string]string) (*Spec, error) {
-	if spec, ok := l.cache.GetSpec(machine, props); ok {
+	if cfg, ok := l.cache.GetConfig(props); ok {
+		spec, err := Resolve(cfg, machine)
+		if err != nil {
+			return nil, &ConfigError{Err: err}
+		}
 		return spec, nil
 	}
 	ev, err := l.get(ctx)
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := ev.Eval(ctx, props)
+	cfg, raw, err := ev.EvalRaw(ctx, props)
 	if err != nil {
 		return nil, err
 	}
@@ -953,17 +759,8 @@ func (l *LazyEvaluator) EvalSpec(ctx context.Context, machine string, props map[
 	if err != nil {
 		return nil, &ConfigError{Err: err}
 	}
-	l.cache.PutSpec(machine, props, spec)
+	l.cache.PutConfig(props, raw)
 	return spec, nil
-}
-
-// Eval evaluates the raw Config via Pkl.
-func (l *LazyEvaluator) Eval(ctx context.Context, props map[string]string) (*pklconfig.Config, error) {
-	ev, err := l.get(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return ev.Eval(ctx, props)
 }
 
 // Close closes the underlying Pkl evaluator if it was started.

@@ -3,10 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gregor-tokarev/fam/internal/config"
@@ -194,134 +191,24 @@ func gateUpdates(ctx context.Context, mr *machineRun) (map[int][2]shellRun, erro
 	cached := map[int][2]shellRun{}
 	if len(items) > 0 {
 		mr.p.Count("verifying before updates", len(items))
-		batched := false
-		if len(items) >= 2 && isPOSIXShell(mr.env.Facts.Shell) {
-			specs := make([]VerifySpec, len(items))
-			for j, it := range items {
-				specs[j] = it.v
-			}
-			if nonInt, ok := runVerifyBatch(ctx, mr.env, specs, false); ok {
-				batched = true
-				var passIdx []int
-				var passSpecs []VerifySpec
-				for j, sr := range nonInt {
-					if !sr.ran {
-						continue
-					}
-					it := items[j]
-					if transport.IsConnError(sr.err) {
-						return nil, sr.err
-					}
-					pair := cached[it.idx]
-					pair[0] = sr
-					cached[it.idx] = pair
-					if sr.row.Status != "passed" {
-						failed[it.v.Group] = true
-						continue
-					}
-					passIdx = append(passIdx, j)
-					passSpecs = append(passSpecs, it.v)
-				}
-				if len(passSpecs) >= 2 {
-					if inter, ok := runVerifyBatch(ctx, mr.env, passSpecs, true); ok {
-						for k, sr := range inter {
-							if !sr.ran {
-								continue
-							}
-							it := items[passIdx[k]]
-							if transport.IsConnError(sr.err) {
-								return nil, sr.err
-							}
-							pair := cached[it.idx]
-							pair[1] = sr
-							cached[it.idx] = pair
-							if sr.row.Status != "passed" {
-								failed[it.v.Group] = true
-							}
-						}
-					} else {
-						for _, j := range passIdx {
-							it := items[j]
-							res, err := runVerify(ctx, mr.env, it.v, true)
-							if transport.IsConnError(err) {
-								return nil, err
-							}
-							pair := cached[it.idx]
-							pair[1] = shellRun{row: verifyRow(it.v, verifyShells[1], res, err), ran: true}
-							cached[it.idx] = pair
-							if err != nil || res.Code != 0 {
-								failed[it.v.Group] = true
-							}
-						}
-					}
-				} else if len(passSpecs) == 1 {
-					it := items[passIdx[0]]
-					res, err := runVerify(ctx, mr.env, it.v, true)
-					if transport.IsConnError(err) {
-						return nil, err
-					}
-					pair := cached[it.idx]
-					pair[1] = shellRun{row: verifyRow(it.v, verifyShells[1], res, err), ran: true}
-					cached[it.idx] = pair
-					if err != nil || res.Code != 0 {
-						failed[it.v.Group] = true
-					}
-				}
-			}
+		specs := make([]VerifySpec, len(items))
+		for j, it := range items {
+			specs[j] = it.v
 		}
-		if !batched {
-			var mu sync.Mutex
-			var connErr error
-			var wg sync.WaitGroup
-			// Keep SSH direct verify sessions below sshd MaxSessions (10).
-			limit := parallelCommands
-			if mr.env.T.Kind() != "ssh" {
-				limit = maxCheckConcurrency(mr.env.T)
+		pairs := runVerifyPairs(ctx, mr.env, mr.p, specs, func(sr shellRun) bool {
+			return sr.row.Status == "passed"
+		})
+		for j, pair := range pairs {
+			it := items[j]
+			if transport.IsConnError(pair[0].err) {
+				return nil, pair[0].err
 			}
-			sem := make(chan struct{}, limit)
-			rp := newRunning(mr.p)
-			for j, it := range items {
-				sem <- struct{}{}
-				mu.Lock()
-				stop := connErr != nil
-				mu.Unlock()
-				if stop {
-					<-sem
-					break
-				}
-				wg.Add(1)
-				rp.begin(j, "verify "+it.v.Name)
-				go func(j int, it item) {
-					defer wg.Done()
-					defer func() { <-sem }()
-					defer rp.end(j)
-					for k, interactive := range []bool{false, true} {
-						res, err := runVerify(ctx, mr.env, it.v, interactive)
-						conn := transport.IsConnError(err)
-						mu.Lock()
-						if conn && connErr == nil {
-							connErr = err
-						}
-						pair := cached[it.idx]
-						if conn {
-							pair[k] = shellRun{err: err, ran: true}
-						} else {
-							pair[k] = shellRun{row: verifyRow(it.v, verifyShells[k], res, err), ran: true}
-						}
-						cached[it.idx] = pair
-						if err != nil || res.Code != 0 {
-							failed[it.v.Group] = true
-						}
-						mu.Unlock()
-						if conn || err != nil || res.Code != 0 {
-							return
-						}
-					}
-				}(j, it)
+			if transport.IsConnError(pair[1].err) {
+				return nil, pair[1].err
 			}
-			wg.Wait()
-			if connErr != nil {
-				return nil, connErr
+			cached[it.idx] = pair
+			if !pair[0].ran || pair[0].row.Status != "passed" || !pair[1].ran || pair[1].row.Status != "passed" {
+				failed[it.v.Group] = true
 			}
 		}
 	}
@@ -397,110 +284,13 @@ func verifyMachineWithCache(ctx context.Context, mr *machineRun, cached map[int]
 	}
 
 	if len(toRun) > 0 {
-		batched := false
-		if len(toRun) >= 2 && isPOSIXShell(env.Facts.Shell) {
-			specs := make([]VerifySpec, len(toRun))
-			for j, idx := range toRun {
-				specs[j] = mr.verify[idx]
-			}
-			if nonInt, ok := runVerifyBatch(ctx, env, specs, false); ok {
-				batched = true
-				var interIndices []int
-				var interSpecs []VerifySpec
-				for j, sr := range nonInt {
-					if !sr.ran {
-						break
-					}
-					idx := toRun[j]
-					runs[idx][0] = sr
-					if transport.IsConnError(sr.err) {
-						// Stop at the first connection error (including script exit 255) without starting interactive.
-						break
-					}
-					interIndices = append(interIndices, idx)
-					interSpecs = append(interSpecs, mr.verify[idx])
-				}
-				if len(interSpecs) >= 2 {
-					if inter, ok := runVerifyBatch(ctx, env, interSpecs, true); ok {
-						for j, sr := range inter {
-							if !sr.ran {
-								break
-							}
-							runs[interIndices[j]][1] = sr
-							if transport.IsConnError(sr.err) {
-								break
-							}
-						}
-					} else {
-						for _, idx := range interIndices {
-							v := mr.verify[idx]
-							res, err := run(ctx, v, true)
-							if transport.IsConnError(err) {
-								runs[idx][1] = shellRun{err: err, ran: true}
-								break
-							}
-							runs[idx][1] = shellRun{row: verifyRow(v, verifyShells[1], res, err), ran: true}
-						}
-					}
-				} else if len(interSpecs) == 1 {
-					idx := interIndices[0]
-					v := mr.verify[idx]
-					res, err := run(ctx, v, true)
-					if transport.IsConnError(err) {
-						runs[idx][1] = shellRun{err: err, ran: true}
-					} else {
-						runs[idx][1] = shellRun{row: verifyRow(v, verifyShells[1], res, err), ran: true}
-					}
-				}
-			}
+		specs := make([]VerifySpec, len(toRun))
+		for j, idx := range toRun {
+			specs[j] = mr.verify[idx]
 		}
-		if !batched {
-			var mu sync.Mutex
-			var stopAt atomic.Int64
-			stopAt.Store(math.MaxInt64)
-			var wg sync.WaitGroup
-			limit := parallelCommands
-			if env.T.Kind() != "ssh" {
-				limit = maxCheckConcurrency(env.T)
-			}
-			sem := make(chan struct{}, limit)
-			rp := newRunning(mr.p)
-			for _, i := range toRun {
-				v := mr.verify[i]
-				sem <- struct{}{}
-				if int64(i) > stopAt.Load() {
-					<-sem
-					break
-				}
-				wg.Add(1)
-				rp.begin(i, "verify "+v.Name)
-				go func(i int, v VerifySpec) {
-					defer wg.Done()
-					defer func() { <-sem }()
-					defer rp.end(i)
-					for k, interactive := range []bool{false, true} {
-						if k > 0 && int64(i) > stopAt.Load() {
-							return
-						}
-						res, err := run(ctx, v, interactive)
-						mu.Lock()
-						conn := transport.IsConnError(err)
-						if conn {
-							runs[i][k] = shellRun{err: err, ran: true}
-						} else {
-							runs[i][k] = shellRun{row: verifyRow(v, verifyShells[k], res, err), ran: true}
-						}
-						if conn && int64(i) < stopAt.Load() {
-							stopAt.Store(int64(i))
-						}
-						mu.Unlock()
-						if conn {
-							return
-						}
-					}
-				}(i, v)
-			}
-			wg.Wait()
+		pairs := runVerifyPairs(ctx, env, mr.p, specs, func(shellRun) bool { return true })
+		for j, pair := range pairs {
+			runs[toRun[j]] = pair
 		}
 	}
 

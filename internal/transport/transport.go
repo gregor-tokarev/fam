@@ -81,8 +81,9 @@ type SkillState struct {
 	Digest  string
 }
 
-// SkillOps is implemented by transports that check and install skill folders natively.
+// SkillOps is implemented by transports that can check and install skill folders natively.
 type SkillOps interface {
+	HasNativeSkillOps() bool
 	SkillCheck(ctx context.Context, dir, marker string) (SkillState, error)
 	SkillWrite(ctx context.Context, dir, marker string, tarball []byte) error
 }
@@ -92,59 +93,55 @@ type ConcurrencyProvider interface {
 	MaxConcurrency() int
 }
 
-// VerifiedWriter writes a file atomically and returns its post-write FileInfo (mode + SHA-256)
-// in the same round trip so the caller can verify the write without a second Stat RPC.
-type VerifiedWriter interface {
-	WriteFileVerify(ctx context.Context, path string, data []byte, mode os.FileMode, sudo bool) (FileInfo, error)
+// PrimOp is one Go-planned dumb remote primitive executed sequentially in a batch.
+// All task semantics, content rendering, conflict checks, and error messages stay in Go;
+// the remote worker only validates the CAS precondition and applies the primitive.
+type PrimOp struct {
+	Index int    `json:"index"`
+	Op    string `json:"op"` // "write", "symlink", or "skill_write"
+
+	// Common observation metadata (not sent over wire).
+	Label  string `json:"-"`
+	Secret bool   `json:"-"`
+
+	// Target & payload fields depending on Op.
+	Path         string  `json:"path,omitempty"`
+	Target       string  `json:"target,omitempty"`
+	Dir          string  `json:"dir,omitempty"`
+	Marker       string  `json:"marker,omitempty"`
+	DataB64      string  `json:"data_b64,omitempty"`
+	TarB64       string  `json:"tar_b64,omitempty"`
+	Mode         *uint32 `json:"mode,omitempty"`
+	Sudo         bool    `json:"sudo,omitempty"`
+	Verify       bool    `json:"verify,omitempty"`
+	StopAfter    bool    `json:"stop_after,omitempty"`
+	IfMissing    bool    `json:"if_missing,omitempty"`
+	IfSHA256     string  `json:"if_sha256,omitempty"`
+	IfLinkTarget *string `json:"if_link_target,omitempty"`
+	IfDigest     string  `json:"if_digest,omitempty"`
 }
 
-// ApplyOp describes one check-apply-recheck operation in a sequential remote apply pipeline.
-type ApplyOp struct {
-	Index           int     `json:"index"`
-	Kind            string  `json:"kind"` // file, symlink, block, skill, managed_file, script, merge_fresh
-	Label           string  `json:"label,omitempty"`
-	Detail          string  `json:"detail,omitempty"`
-	Secret          bool    `json:"-"`
-	Path            string  `json:"path,omitempty"`
-	Target          string  `json:"target,omitempty"`
-	Dir             string  `json:"dir,omitempty"`
-	Marker          string  `json:"marker,omitempty"`
-	DataB64         string  `json:"data_b64,omitempty"`
-	TarB64          string  `json:"tar_b64,omitempty"`
-	SHA256          string  `json:"sha256,omitempty"`
-	ExpectedDigest  string  `json:"expected_digest,omitempty"`
-	Mode            *uint32 `json:"mode,omitempty"`
-	Sudo            bool    `json:"sudo,omitempty"`
-	Backup          bool    `json:"backup,omitempty"`
-	StrictConflict  bool    `json:"strict_conflict,omitempty"`
-	Block           string  `json:"block,omitempty"`
-	BlockBegin      string  `json:"block_begin,omitempty"`
-	BlockEnd        string  `json:"block_end,omitempty"`
-	Top             bool    `json:"top,omitempty"`
-	OnlyIfExists    bool    `json:"only_if_exists,omitempty"`
-	ManagedPrefix   string  `json:"managed_prefix,omitempty"`
-	Creates         string  `json:"creates,omitempty"`
-	CreatesDisplay  string  `json:"creates_display,omitempty"`
-	ApplyScript     string  `json:"apply_script,omitempty"`
-	Prelude         string  `json:"prelude,omitempty"`
-	StopAfterChange bool    `json:"stop_after_change,omitempty"`
-	TimeoutMS       int64   `json:"timeout_ms,omitempty"`
-}
-
-// ApplyOpResult is the outcome of one ApplyOp executed sequentially on the remote worker.
-type ApplyOpResult struct {
+// PrimResult is the remote outcome of one PrimOp in a sequential primitive batch.
+type PrimResult struct {
 	Index      int    `json:"index"`
-	Status     string `json:"status"` // unchanged, changed, failed, conflict
-	Detail     string `json:"detail,omitempty"`
+	Stale      bool   `json:"stale,omitempty"`
 	Err        string `json:"err,omitempty"`
 	DurationMS int64  `json:"duration_ms,omitempty"`
+	Exists     bool   `json:"exists,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Target     string `json:"target,omitempty"`
+	Mode       uint32 `json:"mode,omitempty"`
+	SHA256     string `json:"sha256,omitempty"`
+	IsDir      bool   `json:"is_dir,omitempty"`
+	Managed    bool   `json:"managed,omitempty"`
+	Digest     string `json:"digest,omitempty"`
 }
 
-// SeqApplier executes an ordered slice of ApplyOps sequentially on the remote host in one round
-// trip, stopping immediately at the first failure, conflict, or shell-environment mutation.
-type SeqApplier interface {
-	SupportsApplySeq() bool
-	ApplySeq(ctx context.Context, ops []ApplyOp, onResult func(ApplyOpResult)) error
+// PrimBatcher executes a sequence of Go-planned dumb primitives in one remote round trip,
+// stopping immediately on any CAS mismatch ("stale") or error so Go falls back cleanly.
+type PrimBatcher interface {
+	SupportsPrimBatch() bool
+	BatchPrims(ctx context.Context, ops []PrimOp, onResult func(PrimResult)) error
 }
 
 // SessionRefresher restarts a persistent remote session so later commands inherit updated
@@ -155,7 +152,7 @@ type SessionRefresher interface {
 	RefreshSessionIfNeeded(ctx context.Context) error
 }
 
-// SpecReq describes one speculative read-only remote check pipelined into Bootstrap stdin.
+// SpecReq describes one speculative read-only remote check pipelined into Bootstrap.
 type SpecReq struct {
 	Key       string `json:"key"`
 	Op        string `json:"op"` // stat, read, skill_check, exec
@@ -167,10 +164,35 @@ type SpecReq struct {
 	TimeoutMS int64  `json:"timeout_ms,omitempty"`
 }
 
+// Canonical speculative-check lookup keys shared by engine and transport.
+func SpecKeyStat(sudo bool, path string) string   { return fmt.Sprintf("stat:%t:%s", sudo, path) }
+func SpecKeyRead(sudo bool, path string) string   { return fmt.Sprintf("read:%t:%s", sudo, path) }
+func SpecKeySkill(dir, marker string) string      { return "skill:" + dir + "\x00" + marker }
+func SpecKeyExec(sudo bool, script string) string { return fmt.Sprintf("exec:%t:%s", sudo, script) }
+
+// BootstrapResult holds the initial facts, secrets, and speculative check status from BootstrapSpec.
+type BootstrapResult struct {
+	FactsRes      Result
+	SecretsData   []byte
+	SecretsExists bool
+	SpecHit       bool
+	SpecResults   map[string]WireResp
+	HasWire       bool
+	SessionKey    string
+	ControlSock   string
+}
+
+// IdentityError reports that SSH destination identity could not be verified or drifted.
+type IdentityError struct {
+	Msg string
+}
+
+func (e *IdentityError) Error() string { return e.Msg }
+
 // SpecBootstrapper establishes the persistent session, returns facts + secrets, and optionally
-// pipelines a speculative read-only check batch gated on the SHA-256 of the live facts output.
+// runs a speculative read-only check batch gated on the SHA-256 of the live facts output.
 type SpecBootstrapper interface {
-	BootstrapSpec(ctx context.Context, factsScript, secretsRelPath, expectedFactsSHA string, reqs []SpecReq) (factsRes Result, secretsData []byte, secretsExists bool, specHit bool, err error)
+	BootstrapSpec(ctx context.Context, factsScript, secretsRelPath, expectedFactsSHA string, reqs []SpecReq) (BootstrapResult, error)
 	ClearSpecCache()
 }
 
