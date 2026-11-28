@@ -73,12 +73,13 @@ func buildSections(ctx context.Context, env *Env, spec *config.Spec, staticOnly 
 	for _, sec := range out {
 		for _, t := range sec.Tasks {
 			if st, ok := t.(*SkillTask); ok {
-				if prev, ok := bundleSkills[st.Skill.Name]; ok {
-					return nil, nil, fmt.Errorf("two skills have the name %q: %s and %s", st.Skill.Name, prev, st.Skill.Dir)
+				name, dir := st.skillName(), st.skillDir()
+				if prev, ok := bundleSkills[name]; ok {
+					return nil, nil, fmt.Errorf("two skills have the name %q: %s and %s", name, prev, dir)
 				}
-				bundleSkills[st.Skill.Name] = st.Skill.Dir
-				keep[st.Skill.Name] = true
-				skillNames = append(skillNames, st.Skill.Name)
+				bundleSkills[name] = dir
+				keep[name] = true
+				skillNames = append(skillNames, name)
 			}
 		}
 	}
@@ -157,12 +158,11 @@ func runVerify(ctx context.Context, env *Env, v VerifySpec, interactive bool) (t
 }
 
 // gateUpdates runs, before the apply loop, the verify scripts of each bundle and agent with a
-// package update. When all these scripts pass in both shells, the tools of the group work, and
-// FAM skips the updates of its packages: an update can take minutes (for example a Cargo build).
-// A group without such scripts also skips its updates. A failed script lets the updates run.
-// Other tasks of the group still apply their changes. `fam apply --update` runs all updates.
-// It returns only a connection error.
-func gateUpdates(ctx context.Context, mr *machineRun) error {
+// package update. When all these scripts pass in both shells, the tools of the group work, and FAM
+// skips the updates of its packages: an update can take minutes (for example a Cargo build). It
+// returns any gating verify results whose both shells passed so verifyMachine can reuse them if
+// the apply loop changes nothing. It returns only a connection error.
+func gateUpdates(ctx context.Context, mr *machineRun) (map[int][2]shellRun, error) {
 	pkgs := map[string][]*PackageTask{}
 	for _, s := range mr.sects {
 		if s.SkipReason != "" {
@@ -175,25 +175,36 @@ func gateUpdates(ctx context.Context, mr *machineRun) error {
 		}
 	}
 	if len(pkgs) == 0 {
-		return nil
+		return nil, nil
 	}
-	var scripts []VerifySpec
+	type item struct {
+		idx int
+		v   VerifySpec
+	}
+	var items []item
 	verified := map[string]bool{}
-	for _, v := range mr.verify {
-		if v.Gate && v.Event == "fresh_shell" && len(pkgs[v.Group]) > 0 {
-			scripts = append(scripts, v)
-			verified[v.Group] = true
+	for i, v := range mr.verify {
+		if v.Event != "fresh_shell" || !v.Gate || len(pkgs[v.Group]) == 0 {
+			continue
 		}
+		verified[v.Group] = true
+		items = append(items, item{idx: i, v: v})
 	}
 	failed := map[string]bool{}
-	if len(scripts) > 0 {
-		mr.p.Count("verifying before updates", len(scripts))
+	cached := map[int][2]shellRun{}
+	if len(items) > 0 {
+		mr.p.Count("verifying before updates", len(items))
 		var mu sync.Mutex
 		var connErr error
 		var wg sync.WaitGroup
-		sem := make(chan struct{}, parallelCommands)
+		// Keep SSH direct verify sessions below sshd MaxSessions (10).
+		limit := parallelCommands
+		if mr.env.T.Kind() != "ssh" {
+			limit = maxCheckConcurrency(mr.env.T)
+		}
+		sem := make(chan struct{}, limit)
 		rp := newRunning(mr.p)
-		for i, v := range scripts {
+		for j, it := range items {
 			sem <- struct{}{}
 			mu.Lock()
 			stop := connErr != nil
@@ -203,29 +214,38 @@ func gateUpdates(ctx context.Context, mr *machineRun) error {
 				break
 			}
 			wg.Add(1)
-			rp.begin(i, "verify "+v.Name)
-			go func() {
+			rp.begin(j, "verify "+it.v.Name)
+			go func(j int, it item) {
 				defer wg.Done()
 				defer func() { <-sem }()
-				defer rp.end(i)
-				// The two shells run one after the other, as in verifyMachine.
-				for _, interactive := range []bool{false, true} {
-					res, err := runVerify(ctx, mr.env, v, interactive)
+				defer rp.end(j)
+				for k, interactive := range []bool{false, true} {
+					res, err := runVerify(ctx, mr.env, it.v, interactive)
+					conn := transport.IsConnError(err)
+					mu.Lock()
+					if conn && connErr == nil {
+						connErr = err
+					}
+					pair := cached[it.idx]
+					if conn {
+						pair[k] = shellRun{err: err, ran: true}
+					} else {
+						pair[k] = shellRun{row: verifyRow(it.v, verifyShells[k], res, err), ran: true}
+					}
+					cached[it.idx] = pair
 					if err != nil || res.Code != 0 {
-						mu.Lock()
-						failed[v.Group] = true
-						if transport.IsConnError(err) && connErr == nil {
-							connErr = err
-						}
-						mu.Unlock()
+						failed[it.v.Group] = true
+					}
+					mu.Unlock()
+					if conn || err != nil || res.Code != 0 {
 						return
 					}
 				}
-			}()
+			}(j, it)
 		}
 		wg.Wait()
 		if connErr != nil {
-			return connErr
+			return nil, connErr
 		}
 	}
 	for g, list := range pkgs {
@@ -240,19 +260,28 @@ func gateUpdates(ctx context.Context, mr *machineRun) error {
 			pt.SkipUpdate = detail
 		}
 	}
-	return nil
+	// Only return cached results for scripts whose both shells passed cleanly.
+	reusable := map[int][2]shellRun{}
+	for idx, pair := range cached {
+		if pair[0].ran && pair[1].ran && pair[0].err == nil && pair[1].err == nil &&
+			pair[0].row.Status == "passed" && pair[1].row.Status == "passed" {
+			reusable[idx] = pair
+		}
+	}
+	return reusable, nil
 }
 
 // verifyShells are the two shells of each fresh_shell script.
 var verifyShells = [2]string{"noninteractive", "interactive"}
 
 // verifyMachine runs the verify scripts in new shells.
-//   - fresh_shell: a noninteractive and an interactive login shell of the user. These scripts
-//     only prove that the tools work, so they run at the same time. FAM reports them in the
-//     order of the config.
-//   - reconnect: FAM closes the shared SSH connection first, then runs the script in a new one.
-//   - reboot: not in version 0.
 func verifyMachine(ctx context.Context, mr *machineRun) {
+	verifyMachineWithCache(ctx, mr, nil)
+}
+
+// verifyMachineWithCache runs the verify scripts in new shells, reusing cached fresh_shell results
+// from gateUpdates when no task mutated the machine.
+func verifyMachineWithCache(ctx context.Context, mr *machineRun, cached map[int][2]shellRun) {
 	r := mr.res
 	env := mr.env
 	addRow := func(vr output.VerifyResult) {
@@ -270,30 +299,39 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 		return runVerify(ctx, env, v, interactive)
 	}
 	runnable := 0
-	for _, v := range mr.verify {
-		if v.Event == "fresh_shell" || v.Event == "reconnect" {
+	var toRun []int
+	for i, v := range mr.verify {
+		if v.Event == "fresh_shell" {
+			runnable++
+			if _, ok := cached[i]; !ok {
+				toRun = append(toRun, i)
+			}
+		} else if v.Event == "reconnect" {
 			runnable++
 		}
 	}
-	mr.p.Count("verifying", runnable)
+	if len(toRun) > 0 || runnable > len(cached) {
+		mr.p.Count("verifying", runnable)
+	}
 
-	// The fresh_shell runs. Different scripts run at the same time. The two shells of one script
-	// run one after the other, so that a script that uses a fixed port or file does not meet a
-	// copy of itself. After a connection error of the script at position j, FAM starts no script
-	// after j, and no second shell of a script after j: the report ends at j, as when the scripts
-	// ran one after the other. Scripts before j run both shells.
 	runs := make([][2]shellRun, len(mr.verify))
-	{
+	for i, pair := range cached {
+		runs[i] = pair
+	}
+
+	if len(toRun) > 0 {
 		var mu sync.Mutex
 		var stopAt atomic.Int64
 		stopAt.Store(math.MaxInt64)
 		var wg sync.WaitGroup
-		sem := make(chan struct{}, parallelCommands)
+		limit := parallelCommands
+		if env.T.Kind() != "ssh" {
+			limit = maxCheckConcurrency(env.T)
+		}
+		sem := make(chan struct{}, limit)
 		rp := newRunning(mr.p)
-		for i, v := range mr.verify {
-			if v.Event != "fresh_shell" {
-				continue
-			}
+		for _, i := range toRun {
+			v := mr.verify[i]
 			sem <- struct{}{}
 			if int64(i) > stopAt.Load() {
 				<-sem
@@ -301,7 +339,7 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 			}
 			wg.Add(1)
 			rp.begin(i, "verify "+v.Name)
-			go func() {
+			go func(i int, v VerifySpec) {
 				defer wg.Done()
 				defer func() { <-sem }()
 				defer rp.end(i)
@@ -325,7 +363,7 @@ func verifyMachine(ctx context.Context, mr *machineRun) {
 						return
 					}
 				}
-			}()
+			}(i, v)
 		}
 		wg.Wait()
 	}

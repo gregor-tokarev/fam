@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -171,11 +172,56 @@ done' sh {} +`, transport.Quote(dir), managedMarker, env.T.SHA256Cmd())
 	return digestLines(lines), nil
 }
 
+// skillLoadError marks a failure while downloading or unpacking a remote skill source.
+// Plan and apply treat it identically to a config-stage build error.
+type skillLoadError struct{ err error }
+
+func (e *skillLoadError) Error() string { return e.err.Error() }
+func (e *skillLoadError) Unwrap() error { return e.err }
+
+// asyncSkill resolves a remote skill source in the background while remote checks run.
+type asyncSkill struct {
+	name   string
+	dir    string
+	origin string
+	done   chan struct{}
+	src    *SkillSource
+	err    error
+}
+
+var skillFetchSem = make(chan struct{}, 8)
+
+func startAsyncSkill(ctx context.Context, spec skillSpec, name, origin string) *asyncSkill {
+	a := &asyncSkill{name: name, dir: spec.String(), origin: origin, done: make(chan struct{})}
+	go func() {
+		defer close(a.done)
+		select {
+		case skillFetchSem <- struct{}{}:
+			defer func() { <-skillFetchSem }()
+		case <-ctx.Done():
+			a.err = ctx.Err()
+			return
+		}
+		a.src, a.err = spec.load(ctx, name, origin)
+	}()
+	return a
+}
+
+func (a *asyncSkill) wait(ctx context.Context) (*SkillSource, error) {
+	select {
+	case <-a.done:
+		return a.src, a.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
 // SkillTask copies one skill to ~/.agents/skills/<name>.
 type SkillTask struct {
 	base
-	Skill *SkillSource
-	units []Unit
+	Skill  *SkillSource
+	loader *asyncSkill
+	units  []Unit
 }
 
 // Restarts implements Restarter.
@@ -184,36 +230,124 @@ func (t *SkillTask) Restarts() []Unit { return t.units }
 // Kind implements Task.
 func (t *SkillTask) Kind() string { return "skill" }
 
-// Name implements Task.
-func (t *SkillTask) Name() string { return t.Skill.Name + " (" + t.Skill.Origin + ")" }
+func (t *SkillTask) skillName() string {
+	if t.Skill != nil {
+		return t.Skill.Name
+	}
+	return t.loader.name
+}
 
-func (t *SkillTask) dir(env *Env) string { return env.Home(agentsSkills + "/" + t.Skill.Name) }
+func (t *SkillTask) skillDir() string {
+	if t.Skill != nil {
+		return t.Skill.Dir
+	}
+	return t.loader.dir
+}
+
+func (t *SkillTask) skillOrigin() string {
+	if t.Skill != nil {
+		return t.Skill.Origin
+	}
+	return t.loader.origin
+}
+
+func (t *SkillTask) resolve(ctx context.Context) (*SkillSource, error) {
+	if t.Skill != nil {
+		return t.Skill, nil
+	}
+	src, err := t.loader.wait(ctx)
+	if err != nil {
+		return nil, &skillLoadError{err: err}
+	}
+	return src, nil
+}
+
+// resolveAllSkills waits for every async remote skill loader in sects and returns the first load
+// error (unwrapped) so plan, apply, and verify always report broken remote skill sources before
+// any target mutation or verification.
+func resolveAllSkills(ctx context.Context, sects []Section) error {
+	for _, s := range sects {
+		if s.SkipReason != "" {
+			continue
+		}
+		for _, t := range s.Tasks {
+			st, ok := t.(*SkillTask)
+			if !ok {
+				continue
+			}
+			if _, err := st.resolve(ctx); err != nil {
+				var sle *skillLoadError
+				if errors.As(err, &sle) {
+					return sle.err
+				}
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Name implements Task.
+func (t *SkillTask) Name() string { return t.skillName() + " (" + t.skillOrigin() + ")" }
+
+func (t *SkillTask) dir(env *Env) string { return env.Home(agentsSkills + "/" + t.skillName()) }
 
 // Check implements Task.
 func (t *SkillTask) Check(ctx context.Context, env *Env) (Check, error) {
 	d := t.dir(env)
-	fi, err := env.T.Stat(ctx, d, false)
+	var st transport.SkillState
+	if ops, ok := env.T.(transport.SkillOps); ok {
+		var err error
+		st, err = ops.SkillCheck(ctx, d, managedMarker)
+		if err != nil {
+			return Check{}, err
+		}
+		if st.Exists && st.IsDir && st.Managed && st.Digest == "" {
+			// Fallback transport without native digesting: compute digest over shell.
+			got, err := remoteDigest(ctx, env, d)
+			if err != nil {
+				return Check{}, err
+			}
+			st.Digest = got
+		}
+	} else {
+		fi, err := env.T.Stat(ctx, d, false)
+		if err != nil {
+			return Check{}, err
+		}
+		if fi.Exists {
+			st.Exists = true
+			st.IsDir = fi.Type == "dir"
+			if st.IsDir {
+				m, err := env.T.Stat(ctx, d+"/"+managedMarker, false)
+				if err != nil {
+					return Check{}, err
+				}
+				st.Managed = m.Exists
+				if st.Managed {
+					got, err := remoteDigest(ctx, env, d)
+					if err != nil {
+						return Check{}, err
+					}
+					st.Digest = got
+				}
+			}
+		}
+	}
+	src, err := t.resolve(ctx)
 	if err != nil {
 		return Check{}, err
 	}
-	if !fi.Exists {
+	if !st.Exists {
 		return Check{Status: Change, Detail: "copy"}, nil
 	}
-	if fi.Type != "dir" {
+	if !st.IsDir {
 		return Check{}, conflict(fmt.Sprintf("%s exists and FAM did not make it. Remove or rename it, or rename the skill", d))
 	}
-	m, err := env.T.Stat(ctx, d+"/"+managedMarker, false)
-	if err != nil {
-		return Check{}, err
-	}
-	if !m.Exists {
+	if !st.Managed {
 		return Check{}, conflict(fmt.Sprintf("the skill folder %s exists and FAM did not make it. Remove or rename it, or rename the skill", d))
 	}
-	got, err := remoteDigest(ctx, env, d)
-	if err != nil {
-		return Check{}, err
-	}
-	if got == t.Skill.digest() {
+	if st.Digest == src.digest() {
 		return Check{Status: Satisfied}, nil
 	}
 	return Check{Status: Change, Detail: "update"}, nil
@@ -221,11 +355,24 @@ func (t *SkillTask) Check(ctx context.Context, env *Env) (Check, error) {
 
 // Apply implements Task. FAM extracts the skill into a temporary folder, then swaps the folders.
 func (t *SkillTask) Apply(ctx context.Context, env *Env) (string, error) {
-	tb, err := t.Skill.tarball()
+	src, err := t.resolve(ctx)
+	if err != nil {
+		return "", err
+	}
+	tb, err := src.tarball()
 	if err != nil {
 		return "", err
 	}
 	d := t.dir(env)
+	if ops, ok := env.T.(transport.SkillOps); ok {
+		err := ops.SkillWrite(ctx, d, managedMarker, tb)
+		if err == nil {
+			return "copied", nil
+		}
+		if !transport.IsSkillFallback(err) {
+			return "", err
+		}
+	}
 	script := fmt.Sprintf(`set -e
 d=%[1]s
 mkdir -p -- "$(dirname -- "$d")"
@@ -238,8 +385,8 @@ if [ -d "$d" ]; then
   rm -rf -- "$d"
 fi
 mv -- "$t" "$d"
-trap - EXIT`, transport.Quote(d), t.Skill.Name, managedMarker)
-	r, err := env.T.Run(ctx, transport.Cmd{Script: script, Stdin: tb, Label: "copy skill " + t.Skill.Name})
+trap - EXIT`, transport.Quote(d), src.Name, managedMarker)
+	r, err := env.T.Run(ctx, transport.Cmd{Script: script, Stdin: tb, Label: "copy skill " + src.Name})
 	if err != nil {
 		return "", err
 	}

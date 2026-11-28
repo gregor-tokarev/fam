@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/apple/pkl-go/pkl"
+	"github.com/gregor-tokarev/fam/internal/transport"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -433,19 +434,14 @@ func (t *MergeTask) Restarts() []Unit { return t.units }
 
 func (t *MergeTask) compute(ctx context.Context, env *Env) (out []byte, keys []string, exists bool, mode os.FileMode, err error) {
 	p := env.Path(t.Path)
-	data, exists, err := env.T.ReadFile(ctx, p, t.sudo)
+	data, fi, err := env.T.ReadFileInfo(ctx, p, t.sudo)
 	if err != nil {
 		return nil, nil, false, 0, err
 	}
+	exists = fi.Exists
 	mode = t.Mode
-	if exists {
-		fi, err := env.T.Stat(ctx, p, t.sudo)
-		if err != nil {
-			return nil, nil, false, 0, err
-		}
-		if fi.Exists {
-			mode = fi.Mode.Perm()
-		}
+	if exists && fi.Type == "file" {
+		mode = fi.Mode.Perm()
 	}
 	var doc *omap
 	switch t.Format {
@@ -515,4 +511,71 @@ func (t *MergeTask) Apply(ctx context.Context, env *Env) (string, error) {
 		return "", sudoHint(err, t.sudo, "merge")
 	}
 	return "merged", nil
+}
+
+func (t *MergeTask) checkBytes(p string, data []byte) ([]string, error) {
+	var doc *omap
+	var err error
+	switch t.Format {
+	case "json":
+		doc, err = parseJSON(data)
+	case "toml":
+		doc, err = parseTOML(data)
+	default:
+		return nil, fmt.Errorf("unknown merge format %q", t.Format)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%s is not valid %s: %v. FAM does not change it", p, strings.ToUpper(t.Format), err)
+	}
+	var keys []string
+	if t.Absent {
+		removeFrom(doc, t.Values, "", &keys)
+	} else {
+		mergeInto(doc, t.Values, "", &keys)
+	}
+	return keys, nil
+}
+
+// ApplyChecked implements FastApplier: reads and merges once, writes and verifies the digest on
+// disk in a single round trip (2 round trips total instead of 4), and re-runs the semantic merge
+// check on the written content so format-specific omissions (e.g. null in TOML) are still caught.
+func (t *MergeTask) ApplyChecked(ctx context.Context, env *Env) (bool, Status, string, error, touch) {
+	vw, ok := env.T.(transport.VerifiedWriter)
+	if !ok {
+		return false, "", "", nil, touchNone
+	}
+	out, keys, exists, mode, err := t.compute(ctx, env)
+	if err != nil {
+		return true, Failed, "check failed", err, touchNone
+	}
+	if len(keys) == 0 {
+		return true, Unchanged, "", nil, touchNone
+	}
+	verb := "set "
+	if t.Absent {
+		verb = "remove "
+	} else if !exists {
+		verb = "create with "
+	}
+	checkDetail := verb + strings.Join(keys, ", ")
+	p := env.Path(t.Path)
+	fi, err := vw.WriteFileVerify(ctx, p, out, mode, t.sudo)
+	if err != nil {
+		return true, Failed, checkDetail, sudoHint(err, t.sudo, "merge"), touchApply
+	}
+	if !fi.Exists || fi.Type != "file" || fi.SHA256 != sha(out) {
+		return true, Failed, checkDetail, fmt.Errorf("the check still finds a difference after apply"), touchApply
+	}
+	remKeys, err := t.checkBytes(p, out)
+	if err != nil {
+		return true, Failed, "check after apply failed", err, touchApply
+	}
+	if len(remKeys) > 0 {
+		remVerb := "set "
+		if t.Absent {
+			remVerb = "remove "
+		}
+		return true, Failed, checkDetail, fmt.Errorf("the check still finds a difference after apply: %s%s", remVerb, strings.Join(remKeys, ", ")), touchApply
+	}
+	return true, Changed, checkDetail, nil, touchApply
 }

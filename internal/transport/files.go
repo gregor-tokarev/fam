@@ -69,6 +69,53 @@ exit 3`, q)
 	}
 }
 
+// ReadFileInfo reads a regular file and its permission bits in a single command.
+func (f *files) ReadFileInfo(ctx context.Context, path string, sudo bool) (data []byte, info FileInfo, err error) {
+	q := Quote(path)
+	script := fmt.Sprintf(`p=%[1]s
+if [ -f "$p" ]; then
+  if [ -L "$p" ]; then
+    echo "FAM_META:link:0"
+  else
+    m=$(%[2]s) || exit 5
+    echo "FAM_META:file:$m"
+  fi
+  exec cat -- "$p"
+elif [ -e "$p" ] || [ -L "$p" ]; then
+  exit 4
+fi
+d=$(dirname -- "$p")
+while [ ! -e "$d" ] && [ "$d" != / ]; do d=$(dirname -- "$d"); done
+if [ -d "$d" ] && [ ! -x "$d" ]; then echo "cannot look into $d: permission denied" >&2; exit 5; fi
+exit 3`, q, f.modeCmd(`"$p"`))
+	r, err := f.run(ctx, Cmd{Script: script, Sudo: sudo, Label: "read " + path, Secret: true})
+	if err != nil {
+		return nil, FileInfo{}, err
+	}
+	switch r.Code {
+	case 0:
+		head, body, ok := strings.Cut(string(r.Stdout), "\n")
+		if !ok || !strings.HasPrefix(head, "FAM_META:") {
+			return nil, FileInfo{}, fmt.Errorf("read %s: malformed metadata", path)
+		}
+		parts := strings.SplitN(strings.TrimPrefix(head, "FAM_META:"), ":", 2)
+		if len(parts) != 2 {
+			return nil, FileInfo{}, fmt.Errorf("read %s: malformed metadata", path)
+		}
+		fi := FileInfo{Exists: true, Type: parts[0]}
+		if n, err := strconv.ParseUint(strings.TrimSpace(parts[1]), 8, 32); err == nil {
+			fi.Mode = os.FileMode(n)
+		}
+		return []byte(body), fi, nil
+	case 3:
+		return nil, FileInfo{}, nil
+	case 4:
+		return nil, FileInfo{Exists: true}, fmt.Errorf("%s exists and is not a regular file", path)
+	default:
+		return nil, FileInfo{}, fmt.Errorf("read %s: exit code %d: %s", path, r.Code, r.Err())
+	}
+}
+
 // WriteFile writes data to path atomically: a temporary file in the same directory, then a rename.
 // It creates the parent directories.
 func (f *files) WriteFile(ctx context.Context, path string, data []byte, mode os.FileMode, sudo bool) error {

@@ -156,7 +156,7 @@ func (t *BlockTask) Check(ctx context.Context, env *Env) (Check, error) {
 // Apply implements Task.
 func (t *BlockTask) Apply(ctx context.Context, env *Env) (string, error) {
 	p := env.Path(t.Path)
-	cur, exists, err := env.T.ReadFile(ctx, p, false)
+	cur, fi, err := env.T.ReadFileInfo(ctx, p, false)
 	if err != nil {
 		return "", err
 	}
@@ -164,10 +164,8 @@ func (t *BlockTask) Apply(ctx context.Context, env *Env) (string, error) {
 	if t.Mode != 0 {
 		mode = t.Mode
 	}
-	if exists {
-		if fi, err := env.T.Stat(ctx, p, false); err == nil && fi.Exists {
-			mode = fi.Mode.Perm()
-		}
+	if fi.Exists && fi.Type == "file" {
+		mode = fi.Mode.Perm()
 	}
 	return "written", env.T.WriteFile(ctx, p, t.want(cur), mode, false)
 }

@@ -267,7 +267,7 @@ func releaseAssets(ctx context.Context, repo, tag string) (map[string]bool, erro
 	if err != nil {
 		return nil, err
 	}
-	resp, err := doRetry(ctx, &http.Client{Timeout: time.Minute}, req)
+	resp, err := doRetry(ctx, sharedAssetClient, req)
 	if err != nil {
 		return nil, err
 	}

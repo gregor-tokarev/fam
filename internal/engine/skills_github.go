@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,28 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+)
+
+// Shared HTTP clients reuse TLS sessions and HTTP/2 connections across parallel skill and release requests.
+var (
+	sharedHTTPTransport = func() *http.Transport {
+		tr := http.DefaultTransport.(*http.Transport).Clone()
+		tr.ResponseHeaderTimeout = archiveStall
+		// No Accept-Encoding: the ETag of the archive is the same in each run.
+		tr.DisableCompression = true
+		tr.MaxIdleConnsPerHost = 16
+		return tr
+	}()
+	sharedArchiveClient  = &http.Client{Transport: sharedHTTPTransport}
+	sharedRedirectClient = &http.Client{
+		Timeout:       30 * time.Second,
+		Transport:     sharedHTTPTransport,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	sharedAssetClient = &http.Client{
+		Timeout:   time.Minute,
+		Transport: sharedHTTPTransport,
+	}
 )
 
 // GitHubBase and CodeloadBase are the GitHub hosts for skill downloads.
@@ -131,11 +154,7 @@ func latestRelease(ctx context.Context, repo string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	c := &http.Client{
-		Timeout:       30 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
-	resp, err := doRetry(ctx, c, req)
+	resp, err := doRetry(ctx, sharedRedirectClient, req)
 	if err != nil {
 		return "", fmt.Errorf("find the latest release of %s: %w", repo, err)
 	}
@@ -169,15 +188,129 @@ func downloadSkill(ctx context.Context, repo, folder, ref string) ([]skillFile, 
 		segs[i] = url.PathEscape(sg)
 	}
 	u := CodeloadBase + "/" + repo + "/tar.gz/" + strings.Join(segs, "/")
-	return downloadCached(ctx, repo, ref, u, maxArchive, func(r io.Reader, _ *io.SectionReader) ([]skillFile, error) {
+	return downloadCached(ctx, repo, ref, u, maxArchive, "gh\x00"+folder, func(r io.Reader, _ *io.SectionReader) ([]skillFile, error) {
 		return readSkill(tarEntries(r, u), folder, u, true)
 	})
+}
+
+type extractedSkillCache struct {
+	ETag  string               `json:"etag"`
+	Files []extractedSkillFile `json:"files"`
+}
+
+type extractedSkillFile struct {
+	Rel  string `json:"rel"`
+	Data []byte `json:"data"`
+	Exec bool   `json:"exec,omitempty"`
+}
+
+func extractedCachePath(key, ref, hint string) (string, bool) {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return "", false
+	}
+	sum := sha256.Sum256([]byte(key + "\x00" + ref + "\x00" + hint))
+	return filepath.Join(dir, "fam", "github", "extracted", hex.EncodeToString(sum[:16])+".json"), true
+}
+
+const maxExtractedCacheBytes = maxSkillBytes*2 + (1 << 20)
+
+func readExtractedCache(cachePath, etag string) ([]skillFile, bool) {
+	if etag == "" || cachePath == "" {
+		return nil, false
+	}
+	f, err := os.Open(cachePath)
+	if err != nil {
+		return nil, false
+	}
+	defer f.Close()
+	if st, err := f.Stat(); err != nil || !st.Mode().IsRegular() || st.Size() > maxExtractedCacheBytes {
+		return nil, false
+	}
+	b, err := io.ReadAll(io.LimitReader(f, maxExtractedCacheBytes+1))
+	if err != nil || int64(len(b)) > maxExtractedCacheBytes {
+		return nil, false
+	}
+	var ec extractedSkillCache
+	if err := json.Unmarshal(b, &ec); err != nil || ec.ETag != etag || len(ec.Files) == 0 || len(ec.Files) > maxSkillFiles {
+		return nil, false
+	}
+	files := make([]skillFile, 0, len(ec.Files))
+	seen := make(map[string]bool, len(ec.Files))
+	var total int64
+	hasSkillMD := false
+	for _, f := range ec.Files {
+		rel := f.Rel
+		if rel == "" || strings.ContainsRune(rel, 0) || path.IsAbs(rel) || path.Clean(rel) != rel || rel == "." || rel == ".." || strings.HasPrefix(rel, "../") || rel == managedMarker || strings.HasPrefix(rel, managedMarker+"/") {
+			return nil, false
+		}
+		if seen[rel] {
+			return nil, false
+		}
+		seen[rel] = true
+		if int64(len(f.Data)) > maxSkillFile {
+			return nil, false
+		}
+		total += int64(len(f.Data))
+		if total > maxSkillBytes {
+			return nil, false
+		}
+		if rel == "SKILL.md" {
+			hasSkillMD = true
+		}
+		files = append(files, skillFile{rel: rel, data: f.Data, exec: f.Exec})
+	}
+	if !hasSkillMD {
+		return nil, false
+	}
+	now := time.Now()
+	_ = os.Chtimes(cachePath, now, now)
+	return files, true
+}
+
+func writeExtractedCache(cachePath, etag string, files []skillFile) {
+	if etag == "" || cachePath == "" || len(files) == 0 {
+		return
+	}
+	ec := extractedSkillCache{ETag: etag, Files: make([]extractedSkillFile, len(files))}
+	for i, f := range files {
+		ec.Files[i] = extractedSkillFile{Rel: f.rel, Data: f.data, Exec: f.exec}
+	}
+	b, err := json.Marshal(ec)
+	if err != nil {
+		return
+	}
+	dir := filepath.Dir(cachePath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	tmp, err := os.CreateTemp(dir, ".extract-*")
+	if err != nil {
+		return
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(b); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return
+	}
+	if err := os.Rename(tmpName, cachePath); err != nil {
+		os.Remove(tmpName)
+	}
 }
 
 // downloadCached downloads u through the archive cache (key and ref name the cache file) and
 // reads it with read. sec is the cached file; it is nil when the cache folder cannot keep the
 // download, and read then gets only the stream r. A damaged cache file is downloaded once more.
-func downloadCached(ctx context.Context, key, ref, u string, limit int64, read func(r io.Reader, sec *io.SectionReader) ([]skillFile, error)) ([]skillFile, error) {
+func downloadCached(ctx context.Context, key, ref, u string, limit int64, extractHint string, read func(r io.Reader, sec *io.SectionReader) ([]skillFile, error)) ([]skillFile, error) {
+	var extPath string
+	if extractHint != "" {
+		extPath, _ = extractedCachePath(key, ref, extractHint)
+	}
 	for attempt := 0; ; attempt++ {
 		a, direct, err := cachedDownloadFor(ctx, key, ref, u, attempt > 0, limit)
 		if errors.Is(err, errNoCache) {
@@ -193,12 +326,20 @@ func downloadCached(ctx context.Context, key, ref, u string, limit int64, read f
 		if err != nil {
 			return nil, err
 		}
+		if attempt == 0 && extPath != "" {
+			if cached, ok := readExtractedCache(extPath, a.etagValue()); ok {
+				return cached, nil
+			}
+		}
 		sec := a.section()
 		files, err := read(sec, sec)
 		var ae *archiveError
 		if err != nil && errors.As(err, &ae) && attempt == 0 {
 			// A damaged file in the cache: download it again, without the ETag.
 			continue
+		}
+		if err == nil && extPath != "" {
+			writeExtractedCache(extPath, a.etagValue(), files)
 		}
 		return files, err
 	}
@@ -240,11 +381,18 @@ type runArchive struct {
 	file    *os.File
 	data    int64 // offset of the downloaded bytes
 	size    int64
+	etag    string
 	bad     *os.File // the file that a reader found damaged
 	noCache bool     // the cache folder cannot keep this archive in this run
 }
 
 func (a *runArchive) reader() io.Reader { return a.section() }
+
+func (a *runArchive) etagValue() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.etag
+}
 
 func (a *runArchive) section() *io.SectionReader {
 	a.mu.Lock()
@@ -312,7 +460,8 @@ func cachedDownloadFor(ctx context.Context, repo, ref, u string, repair bool, li
 		f.Close()
 		return nil, nil, err
 	}
-	if _, err := readETag(f); err != nil {
+	confirmedETag, err := readETag(f)
+	if err != nil {
 		f.Close()
 		return nil, nil, badArchive(u, err)
 	}
@@ -324,7 +473,7 @@ func cachedDownloadFor(ctx context.Context, repo, ref, u string, repair bool, li
 	}
 	now := time.Now()
 	_ = os.Chtimes(path, now, now)
-	a.file, a.data, a.size = f, pos, st.Size()
+	a.file, a.data, a.size, a.etag = f, pos, st.Size(), confirmedETag
 	return a, nil, nil
 }
 
@@ -451,20 +600,24 @@ var pruneOnce sync.Once
 // pruneArchives removes old archives and temporary files that a stopped run left. A run that
 // still reads a removed file keeps its open file.
 func pruneArchives(dir string) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		info, err := e.Info()
-		if err != nil || !info.Mode().IsRegular() {
-			continue
+	pruneDir := func(d string) {
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			return
 		}
-		age := time.Since(info.ModTime())
-		if age > archiveMaxAge || (strings.HasPrefix(e.Name(), ".download-") && age > 24*time.Hour) {
-			_ = os.Remove(filepath.Join(dir, e.Name()))
+		for _, e := range entries {
+			info, err := e.Info()
+			if err != nil || !info.Mode().IsRegular() {
+				continue
+			}
+			age := time.Since(info.ModTime())
+			if age > archiveMaxAge || ((strings.HasPrefix(e.Name(), ".download-") || strings.HasPrefix(e.Name(), ".extract-")) && age > 24*time.Hour) {
+				_ = os.Remove(filepath.Join(d, e.Name()))
+			}
 		}
 	}
+	pruneDir(dir)
+	pruneDir(filepath.Join(dir, "extracted"))
 }
 
 // archiveStall: a download fails when no data arrives for this time. A large archive on a slow
@@ -485,11 +638,7 @@ func fetchArchive(ctx context.Context, u, etag string) (*stallReader, error) {
 	} else {
 		etag = ""
 	}
-	tr := http.DefaultTransport.(*http.Transport).Clone()
-	tr.ResponseHeaderTimeout = archiveStall
-	// No Accept-Encoding: the ETag of the archive is the same in each run.
-	tr.DisableCompression = true
-	resp, err := doRetry(ctx, &http.Client{Transport: tr}, req)
+	resp, err := doRetry(ctx, sharedArchiveClient, req)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("download %s: %w", u, err)

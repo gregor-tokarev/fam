@@ -115,6 +115,25 @@ func (e *Evaluator) Eval(ctx context.Context, props map[string]string) (*config.
 	return &cfg, nil
 }
 
+// Init evaluates both the machines mapping and the secrets property in a single Pkl evaluator
+// session so config.pkl is parsed and initialized only once.
+func (e *Evaluator) Init(ctx context.Context, props map[string]string) ([]Machine, *base.Secrets, error) {
+	ev, err := e.manager.NewEvaluator(ctx, e.options(props)...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("start the Pkl evaluator: %w", err)
+	}
+	defer ev.Close()
+	machines, err := evalMachineList(ctx, ev, e.path)
+	if err != nil {
+		return nil, nil, err
+	}
+	var sec *base.Secrets
+	if err := ev.EvaluateExpression(ctx, pkl.FileSource(e.path), "secrets", &sec); err != nil {
+		return nil, nil, &EvalError{Path: e.path, Err: err}
+	}
+	return machines, sec, nil
+}
+
 // MachineList evaluates only the machines mapping: name, cockpit, tags, address, and user of each machine.
 // Pkl is lazy, so this does not evaluate bundles that depend on the machine facts.
 func (e *Evaluator) MachineList(ctx context.Context, props map[string]string) ([]Machine, error) {
@@ -123,11 +142,15 @@ func (e *Evaluator) MachineList(ctx context.Context, props map[string]string) ([
 		return nil, fmt.Errorf("start the Pkl evaluator: %w", err)
 	}
 	defer ev.Close()
+	return evalMachineList(ctx, ev, e.path)
+}
+
+func evalMachineList(ctx context.Context, ev pkl.Evaluator, path string) ([]Machine, error) {
 	var raw map[string]map[string]string
 	// Tag names cannot contain a comma, so one string keeps the map simple.
 	expr := `machines.toMap().mapValues((_, m) -> Map("cockpit", m.cockpit.toString(), "tags", m.tags.toList().join(","), "address", m.address ?? "", "user", m.user ?? ""))`
-	if err := ev.EvaluateExpression(ctx, pkl.FileSource(e.path), expr, &raw); err != nil {
-		return nil, &EvalError{Path: e.path, Err: err}
+	if err := ev.EvaluateExpression(ctx, pkl.FileSource(path), expr, &raw); err != nil {
+		return nil, &EvalError{Path: path, Err: err}
 	}
 	out := make([]Machine, 0, len(raw))
 	for name, m := range raw {

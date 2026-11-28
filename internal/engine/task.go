@@ -69,6 +69,12 @@ type Update struct {
 	Detail  string
 }
 
+// FastApplier is an optional interface for tasks that can execute check -> apply -> post-check
+// in fewer round trips while preserving the exact semantics of applyTask.
+type FastApplier interface {
+	ApplyChecked(ctx context.Context, env *Env) (handled bool, st Status, detail string, err error, tc touch)
+}
+
 // Restarter is a task that restarts units at the end of its bundle when it changed.
 type Restarter interface {
 	Restarts() []Unit
